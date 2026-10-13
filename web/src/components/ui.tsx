@@ -89,10 +89,10 @@ export function Choice<K extends string>(props: {
 export function Toggle(props: { label: string; isSelected: boolean; onChange: (on: boolean) => void }) {
   return (
     <Switch isSelected={props.isSelected} onChange={props.onChange}>
-      <Switch.Control>
-        <Switch.Thumb />
-      </Switch.Control>
       <Switch.Content>
+        <Switch.Control>
+          <Switch.Thumb />
+        </Switch.Control>
         <Label>{props.label}</Label>
       </Switch.Content>
     </Switch>
