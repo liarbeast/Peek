@@ -8,6 +8,6 @@
   }
 {% endblock %}
 {% block body %}
-  <img class="photo" src="{{ image }}" alt="">
+  {% if image %}<img class="photo" src="{{ image }}" alt="">{% endif %}
   {% if title %}<div class="caption">{{ title }}</div>{% endif %}
 {% endblock %}

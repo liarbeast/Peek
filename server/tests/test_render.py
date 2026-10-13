@@ -5,15 +5,13 @@ import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 
-from peek import app as app_module
 from peek import layouts, renderer, samples
+from peek.app import create_app
 
 
 @pytest.fixture(scope="module")
 def client(tmp_path_factory):
-    app_module.DATA = tmp_path_factory.mktemp("data")
-    app_module.CURRENT = app_module.DATA / "current.png"
-    return TestClient(app_module.app)
+    return TestClient(create_app(tmp_path_factory.mktemp("data")))
 
 
 def panel_colours(png: bytes) -> set:
