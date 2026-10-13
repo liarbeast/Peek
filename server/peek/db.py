@@ -42,7 +42,18 @@ MIGRATIONS = [
     );
     CREATE INDEX item_category ON item(category_id, position);
     """,
+    """
+    CREATE TABLE setting (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+    );
+    """,
 ]
+
+# Frame-wide settings and their values until someone changes them.
+SETTING_DEFAULTS = {
+    "orientation": "landscape",
+}
 
 
 class Store:
@@ -70,6 +81,22 @@ class Store:
             for i, script in enumerate(MIGRATIONS[version:], start=version + 1):
                 conn.executescript(script)
                 conn.execute(f"PRAGMA user_version = {i}")
+
+    # Settings
+
+    def settings(self) -> dict:
+        with self.connect() as conn:
+            rows = conn.execute("SELECT key, value FROM setting").fetchall()
+        return {**SETTING_DEFAULTS, **{k: v for k, v in rows if k in SETTING_DEFAULTS}}
+
+    def update_settings(self, fields: dict) -> dict:
+        with self.connect() as conn:
+            conn.executemany(
+                "INSERT INTO setting (key, value) VALUES (?, ?) "
+                "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                [(k, str(v)) for k, v in fields.items() if k in SETTING_DEFAULTS],
+            )
+        return self.settings()
 
     # Categories
 

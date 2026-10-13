@@ -52,6 +52,10 @@ class Reorder(BaseModel):
     item_ids: list[int]
 
 
+class SettingsPatch(BaseModel):
+    orientation: str | None = None
+
+
 def _store(request: Request) -> db.Store:
     return request.app.state.store
 
@@ -109,17 +113,42 @@ def item_fields(store: db.Store, item: dict) -> dict:
     }
 
 
+def render_page(store: db.Store, template: str, fields: dict, custom_css: str = "") -> renderer.Render:
+    """Render a layout the way the frame hangs (landscape or portrait)."""
+    orientation = store.settings()["orientation"]
+    size = renderer.canvas_size(orientation)
+    return renderer.render(layouts.build(template, fields, custom_css, size), orientation)
+
+
 def render_item(store: db.Store, category: dict, item: dict | None, template: str | None = None,
                 custom_css: str | None = None) -> renderer.Render:
     template = template or category["template"]
     css = category["custom_css"] if custom_css is None else custom_css
     fields = item_fields(store, item) if item else samples.placeholder(template)
-    return renderer.render(layouts.build(template, fields, css))
+    return render_page(store, template, fields, css)
 
 
 def _png(render: renderer.Render, view: View) -> Response:
     data = {"panel": render.panel_png, "raw": render.raw_png}.get(view, render.preview_png)()
     return Response(content=data, media_type="image/png", headers={"Cache-Control": "no-store"})
+
+
+@router.get("/api/settings")
+def get_settings(request: Request) -> dict:
+    return _store(request).settings()
+
+
+@router.patch("/api/settings")
+def update_settings(request: Request, body: SettingsPatch) -> dict:
+    fields = body.model_dump(exclude_none=True)
+    if fields.get("orientation") not in (None, *renderer.ORIENTATIONS):
+        raise HTTPException(422, f"unknown orientation: {fields['orientation']}")
+    before = _store(request).settings()
+    settings = _store(request).update_settings(fields)
+    if settings["orientation"] != before["orientation"]:
+        # Turn what the frame shows now, so it doesn't wait for the next change.
+        request.app.state.refresh_current()
+    return settings
 
 
 @router.get("/api/templates")
@@ -267,7 +296,7 @@ def show_item(request: Request, item_id: int) -> Response:
     store = _store(request)
     item = _item_or_404(store, item_id)
     render = render_item(store, store.category(item["category_id"]), item)
-    request.app.state.set_current(render)
+    request.app.state.set_current(render, {"item_id": item_id})
     return _png(render, "preview")
 
 

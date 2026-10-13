@@ -2,6 +2,14 @@
 
 export type ItemOrder = "in_order" | "random" | "shuffle";
 
+export type Orientation = "landscape" | "portrait" | "landscape_flipped" | "portrait_flipped";
+
+export interface Settings {
+  orientation: Orientation;
+}
+
+export const isPortrait = (o: Orientation) => o === "portrait" || o === "portrait_flipped";
+
 export interface Template {
   name: string;
   label: string;
@@ -62,6 +70,8 @@ export const imageUrl = (name: string) => `/images/${name}`;
 
 export const api = {
   templates: () => request<Template[]>("/api/templates"),
+  settings: () => request<Settings>("/api/settings"),
+  updateSettings: (body: Partial<Settings>) => request<Settings>("/api/settings", json("PATCH", body)),
 
   categories: () => request<Category[]>("/api/categories"),
   category: (id: number) => request<Category>(`/api/categories/${id}`),

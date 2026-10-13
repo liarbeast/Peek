@@ -37,7 +37,7 @@ To move Peek to another machine, copy the whole folder and run the same command 
 
 ## Layouts and custom CSS
 
-Layouts are Jinja templates in `server/peek/templates` (photo, quote, sprite), rendered at 800x480 in headless Chromium.
+Layouts are Jinja templates in `server/peek/templates` (photo, quote, sprite), rendered in headless Chromium at 800x480, or at 480x800 when Settings says the frame hangs in portrait. The panel always gets 800x480, turned to match. Custom CSS can target portrait with `@media (orientation: portrait)`.
 Custom CSS is added after the template's own styles, and can use the panel colours as
 `var(--black)`, `var(--white)`, `var(--yellow)`, `var(--red)`, `var(--blue)` and `var(--green)`.
 
