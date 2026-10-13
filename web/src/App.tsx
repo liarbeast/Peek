@@ -49,7 +49,7 @@ export function App() {
               <Button variant="ghost" size="sm" onPress={() => go("#/settings")}>
                 Settings
               </Button>
-              <Button variant="secondary" size="sm" onPress={() => setShowFrame(true)}>
+              <Button variant="tertiary" size="sm" onPress={() => setShowFrame(true)}>
                 On the frame now
               </Button>
             </nav>
