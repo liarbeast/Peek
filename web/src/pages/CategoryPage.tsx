@@ -1,6 +1,7 @@
 import { css } from "@codemirror/lang-css";
 import { Button, Chip, Spinner, Tabs, toast } from "@heroui/react";
 import CodeMirror from "@uiw/react-codemirror";
+import { Reorder, useDragControls } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, imageUrl, type Category, type Item, type ItemOrder, type Template } from "../api";
 import { PanelImage } from "../components/PanelImage";
@@ -110,12 +111,28 @@ function ContentTab(props: { category: Category; template: Template; items: Item
     }
   };
 
-  const move = async (index: number, delta: number) => {
-    const ids = items.map((i) => i.id);
-    const [moved] = ids.splice(index, 1);
-    ids.splice(index + delta, 0, moved);
-    await api.reorderItems(category.id, ids);
+  // The list as shown, which runs ahead of the server while dragging.
+  const [order, setOrder] = useState(items);
+  const orderRef = useRef(order);
+  orderRef.current = order;
+  useEffect(() => setOrder(items), [items]);
+
+  const saveOrder = async (next: Item[]) => {
+    if (next.every((item, i) => item.id === items[i]?.id)) return;
+    try {
+      await api.reorderItems(category.id, next.map((i) => i.id));
+    } catch (e) {
+      toast.danger((e as Error).message);
+    }
     onChange();
+  };
+
+  const move = (index: number, delta: number) => {
+    const next = [...order];
+    const [moved] = next.splice(index, 1);
+    next.splice(index + delta, 0, moved);
+    setOrder(next);
+    saveOrder(next);
   };
 
   const toggle = async (item: Item, enabled: boolean) => {
@@ -158,56 +175,31 @@ function ContentTab(props: { category: Category; template: Template; items: Item
         </p>
       )}
 
-      {items.length > 0 && (
-      <ul className="flex flex-col divide-y divide-separator rounded-xl border border-border bg-surface">
-        {items.map((item, index) => (
-          <li key={item.id} className={`flex flex-wrap items-center gap-3 p-3 ${item.enabled ? "" : "opacity-50"}`}>
-            {item.image ? (
-              <img
-                src={imageUrl(item.image)}
-                alt=""
-                className="h-14 w-24 flex-none rounded-md bg-surface-secondary object-contain"
-                style={{ imageRendering: template.name === "sprite" ? "pixelated" : "auto" }}
-              />
-            ) : (
-              <div className="flex h-14 w-24 flex-none items-center justify-center rounded-md bg-surface-secondary text-2xl text-muted">
-                “
-              </div>
-            )}
-            <div className="min-w-0 flex-1">
-              <p className="truncate font-medium">{item.title || item.text || "Untitled"}</p>
-              <p className="truncate text-sm text-muted">
-                {[item.subtitle, item.title ? item.text : ""].filter(Boolean).join(" · ") || " "}
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-1">
-              <Toggle label="Show" isSelected={item.enabled} onChange={(on) => toggle(item, on)} />
-              <Button size="sm" variant="ghost" isIconOnly aria-label="Move up" isDisabled={index === 0} onPress={() => move(index, -1)}>
-                ↑
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                isIconOnly
-                aria-label="Move down"
-                isDisabled={index === items.length - 1}
-                onPress={() => move(index, 1)}
-              >
-                ↓
-              </Button>
-              <Button size="sm" variant="secondary" onPress={() => setPreviewing(item)}>
-                Preview
-              </Button>
-              <Button size="sm" variant="secondary" onPress={() => setEditing(item)}>
-                Edit
-              </Button>
-              <Button size="sm" variant="danger-soft" onPress={() => remove(item)}>
-                Delete
-              </Button>
-            </div>
-          </li>
-        ))}
-      </ul>
+      {order.length > 0 && (
+        <Reorder.Group
+          as="ul"
+          axis="y"
+          values={order}
+          onReorder={setOrder}
+          className="flex flex-col overflow-hidden rounded-xl border border-border bg-surface"
+        >
+          {order.map((item, index) => (
+            <ItemRow
+              key={item.id}
+              item={item}
+              number={index + 1}
+              pixelated={template.name === "sprite"}
+              isFirst={index === 0}
+              isLast={index === order.length - 1}
+              onDragEnd={() => saveOrder(orderRef.current)}
+              onMove={(delta) => move(index, delta)}
+              onToggle={(on) => toggle(item, on)}
+              onPreview={() => setPreviewing(item)}
+              onEdit={() => setEditing(item)}
+              onDelete={() => remove(item)}
+            />
+          ))}
+        </Reorder.Group>
       )}
 
       <ItemDialog
@@ -345,6 +337,88 @@ function ItemPreviewDialog({ item, onClose }: { item: Item | null; onClose: () =
     >
       {item && <PanelImage alt="Preview" load={() => api.previewItem(item.id)} deps={[item.id]} />}
     </Dialog>
+  );
+}
+
+function ItemRow(props: {
+  item: Item;
+  number: number;
+  pixelated: boolean;
+  isFirst: boolean;
+  isLast: boolean;
+  onDragEnd: () => void;
+  onMove: (delta: number) => void;
+  onToggle: (on: boolean) => void;
+  onPreview: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const { item } = props;
+  const drag = useDragControls();
+
+  return (
+    <Reorder.Item
+      as="li"
+      value={item}
+      dragListener={false}
+      dragControls={drag}
+      onDragEnd={props.onDragEnd}
+      whileDrag={{ scale: 1.01, boxShadow: "0 8px 24px rgba(0,0,0,0.15)", zIndex: 1 }}
+      className="relative flex flex-wrap items-center gap-3 border-b border-separator bg-surface p-3 last:border-b-0"
+    >
+      <div className="flex flex-none items-center gap-1">
+        <button
+          type="button"
+          aria-label="Drag to reorder"
+          className="cursor-grab touch-none rounded p-1 text-muted hover:bg-surface-secondary active:cursor-grabbing"
+          onPointerDown={(e) => drag.start(e)}
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+            {[3, 8, 13].flatMap((y) => [5, 11].map((x) => <circle key={`${x}-${y}`} cx={x} cy={y} r="1.5" />))}
+          </svg>
+        </button>
+        <span className="w-7 text-right font-mono text-sm tabular-nums text-muted">{props.number}</span>
+      </div>
+      <div className={`flex min-w-0 flex-1 items-center gap-3 ${item.enabled ? "" : "opacity-50"}`}>
+        {item.image ? (
+          <img
+            src={imageUrl(item.image)}
+            alt=""
+            draggable={false}
+            className="h-14 w-24 flex-none rounded-md bg-surface-secondary object-contain"
+            style={{ imageRendering: props.pixelated ? "pixelated" : "auto" }}
+          />
+        ) : (
+          <div className="flex h-14 w-24 flex-none items-center justify-center rounded-md bg-surface-secondary text-2xl text-muted">
+            “
+          </div>
+        )}
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-medium">{item.title || item.text || "Untitled"}</p>
+          <p className="truncate text-sm text-muted">
+            {[item.subtitle, item.title ? item.text : ""].filter(Boolean).join(" · ") || " "}
+          </p>
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-1">
+        <Toggle label="Show" isSelected={item.enabled} onChange={props.onToggle} />
+        <Button size="sm" variant="ghost" isIconOnly aria-label="Move up" isDisabled={props.isFirst} onPress={() => props.onMove(-1)}>
+          ↑
+        </Button>
+        <Button size="sm" variant="ghost" isIconOnly aria-label="Move down" isDisabled={props.isLast} onPress={() => props.onMove(1)}>
+          ↓
+        </Button>
+        <Button size="sm" variant="secondary" onPress={props.onPreview}>
+          Preview
+        </Button>
+        <Button size="sm" variant="secondary" onPress={props.onEdit}>
+          Edit
+        </Button>
+        <Button size="sm" variant="danger-soft" onPress={props.onDelete}>
+          Delete
+        </Button>
+      </div>
+    </Reorder.Item>
   );
 }
 
