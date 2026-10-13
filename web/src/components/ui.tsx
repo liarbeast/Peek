@@ -1,0 +1,100 @@
+// Small wrappers around HeroUI's compound components, so pages stay short.
+import { Description, Input, Label, ListBox, Modal, Select, Switch, TextArea, TextField } from "@heroui/react";
+import type { ReactNode } from "react";
+
+export function Dialog(props: {
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: ReactNode;
+  children: ReactNode;
+  footer?: ReactNode;
+  size?: "sm" | "md" | "lg";
+}) {
+  return (
+    <Modal isOpen={props.isOpen} onOpenChange={props.onOpenChange}>
+      <Modal.Backdrop>
+        <Modal.Container size={props.size ?? "md"}>
+          <Modal.Dialog>
+            <Modal.CloseTrigger />
+            <Modal.Header>
+              <Modal.Heading>{props.title}</Modal.Heading>
+            </Modal.Header>
+            <Modal.Body className="flex flex-col gap-4">{props.children}</Modal.Body>
+            {props.footer && <Modal.Footer>{props.footer}</Modal.Footer>}
+          </Modal.Dialog>
+        </Modal.Container>
+      </Modal.Backdrop>
+    </Modal>
+  );
+}
+
+export function TextInput(props: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  description?: string;
+  placeholder?: string;
+  multiline?: boolean;
+  autoFocus?: boolean;
+}) {
+  return (
+    <TextField value={props.value} onChange={props.onChange} autoFocus={props.autoFocus} fullWidth>
+      <Label>{props.label}</Label>
+      {props.multiline ? (
+        <TextArea placeholder={props.placeholder} rows={3} />
+      ) : (
+        <Input placeholder={props.placeholder} />
+      )}
+      {props.description && <Description>{props.description}</Description>}
+    </TextField>
+  );
+}
+
+export function Choice<K extends string>(props: {
+  label: string;
+  value: K;
+  onChange: (value: K) => void;
+  options: Array<{ id: K; label: string; description?: string }>;
+  description?: string;
+}) {
+  return (
+    <Select
+      selectedKey={props.value}
+      onSelectionChange={(key) => key != null && props.onChange(String(key) as K)}
+      fullWidth
+    >
+      <Label>{props.label}</Label>
+      <Select.Trigger>
+        <Select.Value />
+        <Select.Indicator />
+      </Select.Trigger>
+      {props.description && <Description>{props.description}</Description>}
+      <Select.Popover>
+        <ListBox>
+          {props.options.map((o) => (
+            <ListBox.Item key={o.id} id={o.id} textValue={o.label}>
+              <div className="flex flex-col">
+                <span>{o.label}</span>
+                {o.description && <span className="text-xs text-muted">{o.description}</span>}
+              </div>
+              <ListBox.ItemIndicator />
+            </ListBox.Item>
+          ))}
+        </ListBox>
+      </Select.Popover>
+    </Select>
+  );
+}
+
+export function Toggle(props: { label: string; isSelected: boolean; onChange: (on: boolean) => void }) {
+  return (
+    <Switch isSelected={props.isSelected} onChange={props.onChange}>
+      <Switch.Content>
+        <Switch.Control>
+          <Switch.Thumb />
+        </Switch.Control>
+        <Label>{props.label}</Label>
+      </Switch.Content>
+    </Switch>
+  );
+}

@@ -1,6 +1,8 @@
 """Turns an HTML layout into a 6-colour image for the panel.
 
-The page is screenshotted in headless Chromium at 800x480. Photos are then
+The page is screenshotted in headless Chromium at 800x480, or 480x800 when
+the frame hangs in portrait; the result is then turned to the panel's own
+800x480 for the frame. Photos are then
 dithered while text, shapes and pixel art are mapped to the nearest panel
 colour, so letters stay crisp and sprites stay blocky.
 
@@ -31,18 +33,34 @@ _MASK_STYLE = "%s { filter: brightness(0) %s !important; }"
 # it by more than this much (0-255, summed over RGB / 3).
 _MASK_THRESHOLD = 96
 
+# How the frame hangs, and how many quarter turns anticlockwise take the
+# upright picture to the panel's own landscape orientation.
+ORIENTATIONS = {
+    "landscape": 0,
+    "portrait": 1,
+}
+
+
+def canvas_size(orientation: str) -> tuple[int, int]:
+    """The (width, height) a layout is drawn at for this orientation."""
+    if ORIENTATIONS[orientation] % 2:
+        return palette.HEIGHT, palette.WIDTH
+    return palette.WIDTH, palette.HEIGHT
+
 
 @dataclass
 class Render:
-    raw: Image.Image  # what Chromium drew, full colour
-    indices: np.ndarray  # palette index (0-5) per pixel
+    raw: Image.Image  # what Chromium drew, full colour, upright
+    indices: np.ndarray  # palette index (0-5) per pixel, upright
+    orientation: str = "landscape"
 
     def panel_png(self) -> bytes:
-        """The PNG the frame downloads: a paletted image in PANEL colours."""
-        return png(palette.indices_to_image(self.indices))
+        """The PNG the frame downloads: 800x480, paletted, in PANEL colours."""
+        turned = np.rot90(self.indices, ORIENTATIONS[self.orientation])
+        return png(palette.indices_to_image(np.ascontiguousarray(turned)))
 
     def preview_png(self) -> bytes:
-        """The same image in MEASURED colours, to show how the panel looks."""
+        """The image upright in MEASURED colours, to show how the panel looks."""
         return png(palette.indices_to_image(self.indices, realistic=True))
 
     def raw_png(self) -> bytes:
@@ -59,8 +77,9 @@ def _shot(page) -> Image.Image:
     return Image.open(io.BytesIO(page.screenshot(type="png"))).convert("RGB")
 
 
-def screenshot(html: str) -> tuple[Image.Image, np.ndarray]:
+def screenshot(html: str, size: tuple[int, int] = (palette.WIDTH, palette.HEIGHT)) -> tuple[Image.Image, np.ndarray]:
     """Return the page as drawn plus a boolean mask of visible photo pixels."""
+    width, height = size
     launch = {"args": ["--disable-dev-shm-usage"]}
     if path := os.environ.get("PEEK_CHROMIUM_PATH"):
         launch["executable_path"] = path
@@ -68,7 +87,7 @@ def screenshot(html: str) -> tuple[Image.Image, np.ndarray]:
         browser = p.chromium.launch(**launch)
         try:
             page = browser.new_page(
-                viewport={"width": palette.WIDTH, "height": palette.HEIGHT},
+                viewport={"width": width, "height": height},
                 device_scale_factor=1,
             )
             page.set_content(html, wait_until="load")
@@ -79,7 +98,7 @@ def screenshot(html: str) -> tuple[Image.Image, np.ndarray]:
                 f"document.querySelectorAll({PHOTO_SELECTOR!r}).length > 0"
             )
             if not has_photos:
-                return raw, np.zeros((palette.HEIGHT, palette.WIDTH), dtype=bool)
+                return raw, np.zeros((height, width), dtype=bool)
 
             style = page.add_style_tag(content=_MASK_STYLE % (PHOTO_SELECTOR, "invert(1)"))
             white = np.asarray(_shot(page), dtype=np.int16)
@@ -102,6 +121,6 @@ def reduce(raw: Image.Image, photo_mask: np.ndarray) -> np.ndarray:
     return idx
 
 
-def render(html: str) -> Render:
-    raw, mask = screenshot(html)
-    return Render(raw=raw, indices=reduce(raw, mask))
+def render(html: str, orientation: str = "landscape") -> Render:
+    raw, mask = screenshot(html, canvas_size(orientation))
+    return Render(raw=raw, indices=reduce(raw, mask), orientation=orientation)
