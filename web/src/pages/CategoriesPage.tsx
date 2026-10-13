@@ -80,6 +80,7 @@ export function CategoriesPage({ templates }: { templates: Template[] }) {
         isOpen={creating}
         onOpenChange={setCreating}
         templates={templates}
+        categories={categories ?? []}
         onCreated={(c) => go(`#/categories/${c.id}`)}
       />
     </div>
@@ -90,17 +91,21 @@ function NewCategoryDialog(props: {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   templates: Template[];
+  categories: Category[];
   onCreated: (c: Category) => void;
 }) {
   const [name, setName] = useState("");
   const [template, setTemplate] = useState("photo");
+  // "layout", or the id of a category to copy fields and style from.
+  const [start, setStart] = useState("layout");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const create = async () => {
     setBusy(true);
     try {
-      props.onCreated(await api.createCategory({ name: name.trim(), template }));
+      const body = start === "layout" ? { template } : { copy_from: Number(start) };
+      props.onCreated(await api.createCategory({ name: name.trim(), ...body }));
       props.onOpenChange(false);
       setName("");
     } catch (e) {
@@ -127,13 +132,30 @@ function NewCategoryDialog(props: {
       }
     >
       <TextInput label="Name" value={name} onChange={setName} placeholder="Bird of the day" autoFocus />
-      <Choice
-        label="Layout"
-        value={template}
-        onChange={setTemplate}
-        options={props.templates.map((t) => ({ id: t.name, label: t.label, description: t.description }))}
-        description="You can change the layout and add custom CSS later."
-      />
+      {props.categories.length > 0 && (
+        <Choice
+          label="Start from"
+          value={start}
+          onChange={setStart}
+          options={[
+            { id: "layout", label: "A layout", description: "With that layout's usual fields" },
+            ...props.categories.map((c) => ({
+              id: String(c.id),
+              label: `A copy of ${c.name}`,
+              description: "Its fields and style, without its items",
+            })),
+          ]}
+        />
+      )}
+      {start === "layout" && (
+        <Choice
+          label="Layout"
+          value={template}
+          onChange={setTemplate}
+          options={props.templates.map((t) => ({ id: t.name, label: t.label, description: t.description }))}
+          description="You can change the layout, fields and CSS later."
+        />
+      )}
       {error && <p className="text-sm text-danger">{error}</p>}
     </Dialog>
   );

@@ -36,10 +36,13 @@ export function TextInput(props: {
   placeholder?: string;
   multiline?: boolean;
   autoFocus?: boolean;
+  type?: "text" | "number" | "date" | "url";
+  // Keep the label for screen readers only, e.g. inside a table row.
+  hideLabel?: boolean;
 }) {
   return (
-    <TextField value={props.value} onChange={props.onChange} autoFocus={props.autoFocus} fullWidth>
-      <Label>{props.label}</Label>
+    <TextField value={props.value} onChange={props.onChange} autoFocus={props.autoFocus} type={props.type} fullWidth>
+      <Label className={props.hideLabel ? "sr-only" : undefined}>{props.label}</Label>
       {props.multiline ? (
         <TextArea placeholder={props.placeholder} rows={3} />
       ) : (
@@ -56,6 +59,7 @@ export function Choice<K extends string>(props: {
   onChange: (value: K) => void;
   options: Array<{ id: K; label: string; description?: string }>;
   description?: string;
+  hideLabel?: boolean;
 }) {
   return (
     <Select
@@ -63,7 +67,7 @@ export function Choice<K extends string>(props: {
       onSelectionChange={(key) => key != null && props.onChange(String(key) as K)}
       fullWidth
     >
-      <Label>{props.label}</Label>
+      <Label className={props.hideLabel ? "sr-only" : undefined}>{props.label}</Label>
       <Select.Trigger>
         <Select.Value />
         <Select.Indicator />
