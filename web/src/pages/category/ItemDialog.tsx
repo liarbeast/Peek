@@ -1,4 +1,4 @@
-import { Button } from "@heroui/react";
+import { Button, Label } from "@heroui/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, imageUrl, type Category, type Field, type Item } from "../../api";
 import { Dialog, TextInput } from "../../components/ui";
@@ -99,7 +99,7 @@ function ImageInput(props: {
 
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-sm font-medium">{props.field.label}</span>
+      <Label>{props.field.label}</Label>
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex h-20 w-32 items-center justify-center overflow-hidden rounded-md bg-surface-secondary">
           {shown ? (
