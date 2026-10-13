@@ -2,13 +2,13 @@
 
 export type ItemOrder = "in_order" | "random" | "shuffle";
 
-export type Orientation = "landscape" | "portrait" | "landscape_flipped" | "portrait_flipped";
+export type Orientation = "landscape" | "portrait";
 
 export interface Settings {
   orientation: Orientation;
 }
 
-export const isPortrait = (o: Orientation) => o === "portrait" || o === "portrait_flipped";
+export const isPortrait = (o: Orientation) => o === "portrait";
 
 export interface Template {
   name: string;
