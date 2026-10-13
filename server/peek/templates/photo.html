@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block style %}
-  .photo { position: absolute; inset: 0; width: 800px; height: 480px; object-fit: cover; }
+  .photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
   .caption {
     position: absolute; left: 0; right: 0; bottom: 0;
     padding: 14px 24px; background: var(--black); color: var(--white);
@@ -8,6 +8,6 @@
   }
 {% endblock %}
 {% block body %}
-  <img class="photo" src="{{ image }}" alt="">
+  {% if image %}<img class="photo" src="{{ image }}" alt="">{% endif %}
   {% if title %}<div class="caption">{{ title }}</div>{% endif %}
 {% endblock %}
