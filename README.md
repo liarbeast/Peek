@@ -35,9 +35,21 @@ To move Peek to another machine, copy the whole folder and run the same command 
 | `GET /api/sleep` | Seconds to sleep before the next wake, as plain text |
 | `GET /frame.png` | The current 800x480 image, a paletted PNG in the six pure panel colours |
 
+## Fields, CSV import and layouts
+
+Each category has its own fields (short text, long text, image, number, date or link), edited on its Fields tab.
+Items store one value per field. A CSV file can fill a category: each row becomes an item, columns are matched to
+fields by name or added as new fields, and image columns hold URLs that Peek downloads. Comma, semicolon and tab
+separated files all work.
+
+Layouts have places such as a main image or a title; the Style tab picks which field goes where. Fields without a
+place are listed after the rest. Every field's element has the classes `field field-<key> type-<type>`, so custom CSS
+can style, move or hide any field. The Stack layout simply draws every field in order. A category can also be drawn
+in black and white only.
+
 ## Layouts and custom CSS
 
-Layouts are Jinja templates in `server/peek/templates` (photo, quote, sprite), rendered in headless Chromium at 800x480, or at 480x800 when Settings says the frame hangs in portrait. The panel always gets 800x480, turned to match. Custom CSS can target portrait with `@media (orientation: portrait)`.
+Layouts are Jinja templates in `server/peek/templates` (photo, quote, sprite, stack), rendered in headless Chromium at 800x480, or at 480x800 when Settings says the frame hangs in portrait. The panel always gets 800x480, turned to match. Custom CSS can target portrait with `@media (orientation: portrait)`.
 Custom CSS is added after the template's own styles, and can use the panel colours as
 `var(--black)`, `var(--white)`, `var(--yellow)`, `var(--red)`, `var(--blue)` and `var(--green)`.
 
