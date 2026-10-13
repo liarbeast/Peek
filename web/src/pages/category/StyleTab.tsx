@@ -13,7 +13,6 @@ const PLACEHOLDER_CSS = `.field-title {
 }
 .field-image {
   width: 384px;
-  image-rendering: pixelated;
 }`;
 
 function useDebounced<T>(value: T, ms: number): T {
@@ -34,16 +33,17 @@ export function StyleTab(props: {
   const { category, templates, items } = props;
   const [customCss, setCustomCss] = useState(category.custom_css);
   const [mono, setMono] = useState(category.mono);
+  const [pixelate, setPixelate] = useState(category.pixelate);
   const [previewItem, setPreviewItem] = useState<string>(items[0] ? String(items[0].id) : "");
   const [busy, setBusy] = useState(false);
   const info = templates.find((t) => t.name === category.template) ?? templates[0];
-  const dirty = customCss !== category.custom_css || mono !== category.mono;
+  const dirty = customCss !== category.custom_css || mono !== category.mono || pixelate !== category.pixelate;
   const debouncedCss = useDebounced(customCss, 700);
 
   const save = async () => {
     setBusy(true);
     try {
-      props.onSaved(await api.updateCategory(category.id, { custom_css: customCss, mono }));
+      props.onSaved(await api.updateCategory(category.id, { custom_css: customCss, mono, pixelate }));
       toast.success("Style saved");
     } catch (e) {
       toast.danger((e as Error).message);
@@ -55,12 +55,27 @@ export function StyleTab(props: {
   const undo = () => {
     setCustomCss(category.custom_css);
     setMono(category.mono);
+    setPixelate(category.pixelate);
   };
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
       <div className="flex flex-col gap-4">
-        <Toggle label="Black and white only" isSelected={mono} onChange={setMono} />
+        <div className="flex flex-col gap-3">
+          <span className="text-sm font-medium">Filters</span>
+          <Filter
+            label="Black and white"
+            description="Draws everything in black and white only."
+            isSelected={mono}
+            onChange={setMono}
+          />
+          <Filter
+            label="Pixelate"
+            description="For pixel art: images are enlarged with hard edges and keep their exact colours."
+            isSelected={pixelate}
+            onChange={setPixelate}
+          />
+        </div>
 
         <div className="flex flex-col gap-2">
           <span className="text-sm font-medium">Custom CSS</span>
@@ -78,9 +93,6 @@ export function StyleTab(props: {
             Fields are drawn in order inside <code>.stack</code>. Each has its own class:
           </p>
           <ChipList items={["body", ...info.classes, ...category.fields.map((f) => `.field-${f.key}`)]} />
-          <p className="text-sm text-muted">
-            For pixel art, add <code>image-rendering: pixelated</code> to an image field: it stays sharp and isn't dithered.
-          </p>
           <p className="text-sm text-muted">Panel colours:</p>
           <ChipList items={COLOURS.map((c) => `var(--${c})`)} />
         </div>
@@ -109,16 +121,26 @@ export function StyleTab(props: {
             api.previewCategory(category.id, {
               custom_css: debouncedCss,
               mono,
+              pixelate,
               item_id: previewItem ? Number(previewItem) : undefined,
             })
           }
-          deps={[debouncedCss, mono, previewItem]}
+          deps={[debouncedCss, mono, pixelate, previewItem]}
         />
         <p className="text-sm text-muted">
           {items.length ? "" : "Showing placeholder content until you add items. "}
           This is how the panel shows it, in its own {mono ? "black and white" : "six colours"}.
         </p>
       </div>
+    </div>
+  );
+}
+
+function Filter(props: { label: string; description: string; isSelected: boolean; onChange: (on: boolean) => void }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <Toggle label={props.label} isSelected={props.isSelected} onChange={props.onChange} />
+      <p className="pl-12 text-sm text-muted">{props.description}</p>
     </div>
   );
 }

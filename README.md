@@ -45,14 +45,15 @@ separated files all work.
 
 Every item is drawn by one layout, Stack (`server/peek/templates/stack.html`): each field in order, centred, inside
 `.stack`. Every field's element has the classes `field field-<key> type-<type>`, so a category's custom CSS can style,
-move or hide any field; the layout's own rules never outweigh it. A category can also be drawn in black and white only.
+move or hide any field; the layout's own rules never outweigh it.
 
 Pages are rendered in headless Chromium at 800x480, or at 480x800 when Settings says the frame hangs in portrait; the
 panel always gets 800x480, turned to match. CSS can target portrait with `@media (orientation: portrait)` and use the
 panel colours as `var(--black)`, `var(--white)`, `var(--yellow)`, `var(--red)`, `var(--blue)` and `var(--green)`.
 
-Images are treated as photos and dithered. An image drawn with `image-rendering: pixelated` counts as pixel art: it is
-mapped to the nearest colours without dithering, so it stays sharp.
+The Style tab also has two filters. Black and white draws the category in black and white only. Pixelate is for pixel
+art: images are enlarged with hard edges and mapped to the nearest panel colours instead of being dithered like photos.
+(Under the hood, any image drawn with `image-rendering: pixelated` is treated this way.)
 
 ## Development
 

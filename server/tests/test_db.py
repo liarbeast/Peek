@@ -10,6 +10,7 @@ def test_items_move_to_fields(tmp_path):
         conn.executescript(script)
     conn.execute("PRAGMA user_version = 2")
     conn.execute("INSERT INTO category (id, name, template) VALUES (1, 'Quotes', 'quote'), (2, 'Mons', 'sprite')")
+    conn.execute("UPDATE category SET custom_css = 'img { image-rendering: pixelated; }' WHERE id = 2")
     conn.execute(
         "INSERT INTO item (category_id, position, title, subtitle, text, image) VALUES "
         "(1, 1, 'Casablanca', '', 'Here''s looking at you, kid.', NULL), "
@@ -29,3 +30,5 @@ def test_items_move_to_fields(tmp_path):
     assert store.items(1)[0]["data"] == {"title": "Casablanca", "text": "Here's looking at you, kid."}
     assert store.items(2)[0]["data"] == {"image": "abc.png", "title": "pikachu", "subtitle": "#025"}
     assert mons["cover"] == "abc.png"
+    # CSS that drew images pixelated becomes the Pixelate filter.
+    assert mons["pixelate"] and not quotes["pixelate"]

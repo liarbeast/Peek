@@ -209,7 +209,7 @@ function ItemRow(props: {
             alt=""
             draggable={false}
             className="h-14 w-24 flex-none rounded-md bg-surface-secondary object-contain"
-            style={{ imageRendering: category.custom_css.includes("pixelated") ? "pixelated" : "auto" }}
+            style={{ imageRendering: category.pixelate ? "pixelated" : "auto" }}
           />
         ) : (
           <div className="flex h-14 w-24 flex-none items-center justify-center rounded-md bg-surface-secondary text-2xl text-muted">
