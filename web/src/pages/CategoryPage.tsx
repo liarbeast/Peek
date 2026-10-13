@@ -5,8 +5,9 @@ import { ItemsTab } from "./category/ItemsTab";
 import { FieldsTab } from "./category/FieldsTab";
 import { SettingsTab } from "./category/SettingsTab";
 import { StyleTab } from "./category/StyleTab";
+import { go, type CategoryTab } from "../router";
 
-export function CategoryPage({ id, templates }: { id: number; templates: Template[] }) {
+export function CategoryPage({ id, tab, templates }: { id: number; tab: CategoryTab; templates: Template[] }) {
   const [category, setCategory] = useState<Category | null>(null);
   const [items, setItems] = useState<Item[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -41,7 +42,7 @@ export function CategoryPage({ id, templates }: { id: number; templates: Templat
         </div>
       </div>
 
-      <Tabs>
+      <Tabs selectedKey={tab} onSelectionChange={(key) => go(`#/categories/${id}/${key}`)}>
         <Tabs.ListContainer>
           <Tabs.List aria-label="Category sections">
             <Tabs.Tab id="items">

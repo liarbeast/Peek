@@ -62,7 +62,7 @@ export function App() {
           ) : route.page === "settings" ? (
             <SettingsPage settings={settings} onChange={setSettings} />
           ) : route.page === "category" ? (
-            <CategoryPage key={route.id} id={route.id} templates={templates} />
+            <CategoryPage key={route.id} id={route.id} tab={route.tab} templates={templates} />
           ) : (
             <CategoriesPage />
           )}
