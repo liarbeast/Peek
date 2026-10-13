@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 from functools import lru_cache
 from pathlib import Path
@@ -34,13 +35,15 @@ def _view(render: renderer.Render, view: View) -> bytes:
     return render.preview_png()
 
 
-@lru_cache(maxsize=len(samples.SAMPLES))
-def _sample_render(name: str) -> renderer.Render:
+@lru_cache(maxsize=len(samples.SAMPLES) * len(renderer.ORIENTATIONS))
+def _sample_render(name: str, orientation: str) -> renderer.Render:
     template, fields = samples.sample(name)
-    return renderer.render(layouts.build(template, fields))
+    size = renderer.canvas_size(orientation)
+    return renderer.render(layouts.build(template, fields, size=size), orientation)
 
 
-def _upload_render(template: str, title: str, text: str, custom_css: str, image: UploadFile | None) -> renderer.Render:
+def _upload_render(store: db.Store, template: str, title: str, text: str, custom_css: str,
+                   image: UploadFile | None) -> renderer.Render:
     if template not in layouts.TEMPLATES:
         raise HTTPException(400, f"unknown template: {template}")
     fields = {"title": title, "text": text}
@@ -48,20 +51,42 @@ def _upload_render(template: str, title: str, text: str, custom_css: str, image:
         fields["image"] = layouts.data_uri(image.file.read(), image.content_type or "image/png")
     elif template != "quote":
         raise HTTPException(400, "this template needs an image")
-    return renderer.render(layouts.build(template, fields, custom_css))
+    return content.render_page(store, template, fields, custom_css)
 
 
 def create_app(data_dir: Path) -> FastAPI:
     app = FastAPI(title="Peek")
     store = db.Store(data_dir)
     store.migrate()
+    # What the frame shows: the panel image, the same upright in real colours,
+    # and where it came from so it can be redrawn when the orientation changes.
     current = data_dir / "current.png"
+    current_preview = data_dir / "current-preview.png"
+    current_source = data_dir / "current.json"
 
-    def set_current(render: renderer.Render) -> None:
+    def sample_render(name: str) -> renderer.Render:
+        return _sample_render(name, store.settings()["orientation"])
+
+    def set_current(render: renderer.Render, source: dict | None = None) -> None:
         current.write_bytes(render.panel_png())
+        current_preview.write_bytes(render.preview_png())
+        current_source.write_text(json.dumps(source or {}))
+
+    def refresh_current() -> None:
+        """Redraw what the frame shows, e.g. in a new orientation."""
+        try:
+            source = json.loads(current_source.read_text())
+        except (OSError, ValueError):
+            source = {}
+        if "item_id" in source and (item := store.item(source["item_id"])):
+            category = store.category(item["category_id"])
+            set_current(content.render_item(store, category, item), source)
+        elif source.get("sample") in samples.SAMPLES:
+            set_current(sample_render(source["sample"]), source)
 
     app.state.store = store
     app.state.set_current = set_current
+    app.state.refresh_current = refresh_current
     app.include_router(content.router)
 
     # The frame's endpoints
@@ -70,13 +95,15 @@ def create_app(data_dir: Path) -> FastAPI:
     def frame_png() -> Response:
         """The image the frame downloads on each wake."""
         if not current.exists():
-            set_current(_sample_render("photo"))
+            set_current(sample_render("photo"), {"sample": "photo"})
         return _image_response(current.read_bytes())
 
     @app.get("/frame/preview.png")
     def frame_preview() -> Response:
-        """The current frame image in the panel's real colours."""
+        """The current frame image, upright, in the panel's real colours."""
         frame_png()  # make sure there is one
+        if current_preview.exists():
+            return _image_response(current_preview.read_bytes())
         idx = np.asarray(Image.open(current), dtype=np.uint8)
         return _image_response(renderer.png(palette.indices_to_image(idx, realistic=True)))
 
@@ -102,7 +129,7 @@ def create_app(data_dir: Path) -> FastAPI:
     def render_sample(name: str, view: View = "preview") -> Response:
         if name not in samples.SAMPLES:
             raise HTTPException(404, "no such sample")
-        return _image_response(_view(_sample_render(name), view))
+        return _image_response(_view(sample_render(name), view))
 
     @app.post("/render")
     def render_upload(
@@ -113,7 +140,7 @@ def create_app(data_dir: Path) -> FastAPI:
         image: UploadFile | None = File(None),
         view: View = "preview",
     ) -> Response:
-        return _image_response(_view(_upload_render(template, title, text, custom_css, image), view))
+        return _image_response(_view(_upload_render(store, template, title, text, custom_css, image), view))
 
     @app.post("/frame")
     def set_frame(
@@ -124,7 +151,7 @@ def create_app(data_dir: Path) -> FastAPI:
         image: UploadFile | None = File(None),
     ) -> Response:
         """Render and make it the image the frame shows on its next wake."""
-        render = _upload_render(template, title, text, custom_css, image)
+        render = _upload_render(store, template, title, text, custom_css, image)
         set_current(render)
         return _image_response(render.preview_png())
 
@@ -132,8 +159,8 @@ def create_app(data_dir: Path) -> FastAPI:
     def set_frame_sample(name: str) -> Response:
         if name not in samples.SAMPLES:
             raise HTTPException(404, "no such sample")
-        render = _sample_render(name)
-        set_current(render)
+        render = sample_render(name)
+        set_current(render, {"sample": name})
         return _image_response(render.preview_png())
 
     # The web app: static files, with index.html for every other page.

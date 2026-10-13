@@ -138,3 +138,32 @@ def test_preview_without_items_uses_placeholder(client):
     res = client.post(f"/api/categories/{cat['id']}/preview.png", json={})
     assert res.status_code == 200
     assert Image.open(io.BytesIO(res.content)).size == (800, 480)
+
+
+def test_orientation_setting(client):
+    assert client.get("/api/settings").json()["orientation"] == "landscape"
+    assert client.patch("/api/settings", json={"orientation": "sideways"}).status_code == 422
+    res = client.patch("/api/settings", json={"orientation": "portrait"})
+    assert res.json()["orientation"] == "portrait"
+    assert client.get("/api/settings").json()["orientation"] == "portrait"
+
+
+def test_portrait_previews_upright_and_frame_gets_turned(client):
+    # A quote with a red band across the top of the upright picture.
+    css = "body { border-top: 40px solid var(--red); }"
+    cat = make_category(client, template="quote", custom_css=css)
+    item = client.post(f"/api/categories/{cat['id']}/items", data={"text": "Hi"}).json()[0]
+    client.post(f"/api/items/{item['id']}/show")
+    assert frame_pixel(client, x=400, y=5) == (255, 0, 0)
+
+    client.patch("/api/settings", json={"orientation": "portrait"})
+
+    preview = Image.open(io.BytesIO(client.get(f"/api/items/{item['id']}/preview.png").content))
+    assert preview.size == (480, 800)
+    # Changing the orientation redraws what the frame shows: still 800x480,
+    # with the picture's top edge turned to the panel's left edge.
+    frame = Image.open(io.BytesIO(client.get("/frame.png").content))
+    assert frame.size == (800, 480)
+    assert frame_pixel(client, x=5, y=240) == (255, 0, 0)
+    assert frame_pixel(client, x=400, y=5) != (255, 0, 0)
+    assert Image.open(io.BytesIO(client.get("/frame/preview.png").content)).size == (480, 800)
