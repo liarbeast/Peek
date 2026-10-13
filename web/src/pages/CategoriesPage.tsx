@@ -50,7 +50,7 @@ export function CategoriesPage() {
                   src={imageUrl(c.cover)}
                   alt=""
                   className="h-full w-full object-contain"
-                  style={{ imageRendering: c.custom_css.includes("pixelated") ? "pixelated" : "auto" }}
+                  style={{ imageRendering: c.pixelate ? "pixelated" : "auto" }}
                 />
               ) : (
                 <div className="flex h-full items-center justify-center text-muted">No image yet</div>

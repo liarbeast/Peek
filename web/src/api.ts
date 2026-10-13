@@ -38,6 +38,7 @@ export interface Category {
   weight: number;
   enabled: boolean;
   mono: boolean;
+  pixelate: boolean;
   fields: Field[];
   item_count: number;
   cover: string | null;
@@ -66,6 +67,7 @@ export interface StyleChanges {
   template?: string;
   custom_css?: string;
   mono?: boolean;
+  pixelate?: boolean;
   item_id?: number;
 }
 

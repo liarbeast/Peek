@@ -51,6 +51,14 @@ def test_pixelated_images_are_pixel_art():
     assert not mask.any()
 
 
+def test_pixelate_filter_makes_pixel_art():
+    values = {"image": layouts.data_uri(samples.sunset_photo()), "title": "Evening"}
+    _, mask = renderer.screenshot(layouts.build("stack", FIELDS, values, pixelate=True))
+    assert not mask.any()
+    _, mask = renderer.screenshot(layouts.build("stack", FIELDS, values))
+    assert mask.any()
+
+
 def test_frame_png_and_sleep(client):
     res = client.get("/frame.png")
     assert res.status_code == 200

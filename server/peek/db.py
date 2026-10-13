@@ -81,6 +81,12 @@ MIGRATIONS = [
         FROM json_each(category.fields) AS f
     );
     """,
+    # A Pixelate filter for pixel art, switched on where custom CSS already
+    # drew images pixelated.
+    """
+    ALTER TABLE category ADD COLUMN pixelate INTEGER NOT NULL DEFAULT 0;
+    UPDATE category SET pixelate = 1 WHERE custom_css LIKE '%pixelated%';
+    """,
 ]
 
 # Frame-wide settings and their values until someone changes them.
@@ -174,8 +180,8 @@ class Store:
     def create_category(self, fields: dict) -> dict:
         with self.connect() as conn:
             cur = conn.execute(
-                """INSERT INTO category (name, template, custom_css, item_order, weight, enabled, fields, mono)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                """INSERT INTO category (name, template, custom_css, item_order, weight, enabled, fields, mono, pixelate)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     fields["name"],
                     fields["template"],
@@ -185,13 +191,14 @@ class Store:
                     int(fields.get("enabled", True)),
                     json.dumps(fields.get("fields", [])),
                     int(fields.get("mono", False)),
+                    int(fields.get("pixelate", False)),
                 ),
             )
             new_id = cur.lastrowid
         return self.category(new_id)
 
     def update_category(self, category_id: int, fields: dict) -> dict | None:
-        allowed = ("name", "template", "custom_css", "item_order", "weight", "enabled", "fields", "mono")
+        allowed = ("name", "template", "custom_css", "item_order", "weight", "enabled", "fields", "mono", "pixelate")
         changes = {k: _column(k, v) for k, v in fields.items() if k in allowed}
         if changes:
             sets = ", ".join(f"{k} = ?" for k in changes)
@@ -262,7 +269,7 @@ def _column(key: str, value):
     """A value as SQLite stores it: JSON for structures, 0/1 for flags."""
     if key in ("fields", "data"):
         return json.dumps(value)
-    if key in ("enabled", "mono"):
+    if key in ("enabled", "mono", "pixelate"):
         return int(value)
     return value
 
@@ -271,6 +278,7 @@ def _category(row: sqlite3.Row) -> dict:
     d = dict(row)
     d["enabled"] = bool(d["enabled"])
     d["mono"] = bool(d["mono"])
+    d["pixelate"] = bool(d["pixelate"])
     d["fields"] = json.loads(d["fields"])
     return d
 
