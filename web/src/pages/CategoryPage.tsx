@@ -154,7 +154,7 @@ function ContentTab(props: { category: Category; template: Template; items: Item
         <Button onPress={() => setEditing("new")}>Add item</Button>
         {usesImage && (
           <>
-            <Button variant="secondary" isDisabled={uploading} onPress={() => fileInput.current?.click()}>
+            <Button variant="tertiary" isDisabled={uploading} onPress={() => fileInput.current?.click()}>
               {uploading ? "Uploading…" : "Upload several images"}
             </Button>
             <input
@@ -281,7 +281,7 @@ function ItemDialog(props: {
               <span className="text-sm text-muted">No image</span>
             )}
           </div>
-          <Button variant="secondary" onPress={() => fileInput.current?.click()}>
+          <Button variant="tertiary" onPress={() => fileInput.current?.click()}>
             {filePreview ? "Change image" : "Choose image"}
           </Button>
           <input
@@ -408,10 +408,10 @@ function ItemRow(props: {
         <Button size="sm" variant="ghost" isIconOnly aria-label="Move down" isDisabled={props.isLast} onPress={() => props.onMove(1)}>
           ↓
         </Button>
-        <Button size="sm" variant="secondary" onPress={props.onPreview}>
+        <Button size="sm" variant="tertiary" onPress={props.onPreview}>
           Preview
         </Button>
-        <Button size="sm" variant="secondary" onPress={props.onEdit}>
+        <Button size="sm" variant="tertiary" onPress={props.onEdit}>
           Edit
         </Button>
         <Button size="sm" variant="danger-soft" onPress={props.onDelete}>
