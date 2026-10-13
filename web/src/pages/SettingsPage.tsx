@@ -7,8 +7,6 @@ import { Choice } from "../components/ui";
 const ORIENTATIONS: { id: Orientation; label: string; description: string }[] = [
   { id: "landscape", label: "Landscape", description: "Wide, 800 × 480" },
   { id: "portrait", label: "Portrait", description: "Tall, 480 × 800" },
-  { id: "landscape_flipped", label: "Landscape, upside down", description: "Wide, with the board's edge on top" },
-  { id: "portrait_flipped", label: "Portrait, other way round", description: "Tall, turned the other way" },
 ];
 
 export function SettingsPage({ settings, onChange }: { settings: Settings; onChange: (s: Settings) => void }) {
@@ -40,7 +38,7 @@ export function SettingsPage({ settings, onChange }: { settings: Settings; onCha
             value={settings.orientation}
             onChange={(o) => !busy && update({ orientation: o as Orientation })}
             options={ORIENTATIONS}
-            description="Layouts are drawn upright for this, and the image is turned for the panel. If the picture shows upside down, pick the other version of the same orientation."
+            description="Layouts are drawn upright for this, and the image is turned for the panel."
           />
         </div>
         <div className="flex flex-col gap-2">

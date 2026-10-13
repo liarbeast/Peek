@@ -65,7 +65,7 @@ def create_app(data_dir: Path) -> FastAPI:
     current_source = data_dir / "current.json"
 
     def sample_render(name: str) -> renderer.Render:
-        return _sample_render(name, store.settings()["orientation"])
+        return _sample_render(name, content.orientation(store))
 
     def set_current(render: renderer.Render, source: dict | None = None) -> None:
         current.write_bytes(render.panel_png())

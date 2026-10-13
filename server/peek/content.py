@@ -113,11 +113,17 @@ def item_fields(store: db.Store, item: dict) -> dict:
     }
 
 
+def orientation(store: db.Store) -> str:
+    """How the frame hangs; anything unknown counts as landscape."""
+    value = store.settings()["orientation"]
+    return value if value in renderer.ORIENTATIONS else "landscape"
+
+
 def render_page(store: db.Store, template: str, fields: dict, custom_css: str = "") -> renderer.Render:
     """Render a layout the way the frame hangs (landscape or portrait)."""
-    orientation = store.settings()["orientation"]
-    size = renderer.canvas_size(orientation)
-    return renderer.render(layouts.build(template, fields, custom_css, size), orientation)
+    orientation_ = orientation(store)
+    size = renderer.canvas_size(orientation_)
+    return renderer.render(layouts.build(template, fields, custom_css, size), orientation_)
 
 
 def render_item(store: db.Store, category: dict, item: dict | None, template: str | None = None,

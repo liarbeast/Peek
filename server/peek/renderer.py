@@ -38,8 +38,6 @@ _MASK_THRESHOLD = 96
 ORIENTATIONS = {
     "landscape": 0,
     "portrait": 1,
-    "landscape_flipped": 2,
-    "portrait_flipped": 3,
 }
 
 
