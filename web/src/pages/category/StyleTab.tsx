@@ -70,8 +70,8 @@ export function StyleTab(props: {
             onChange={setMono}
           />
           <Filter
-            label="Pixelate"
-            description="For pixel art: images keep hard edges when you enlarge them, and aren't dithered like photos."
+            label="Crisp images"
+            description="Images are resized without smoothing and drawn in solid panel colours instead of photo dithering. For pixel art, icons, logos and QR codes."
             isSelected={pixelate}
             onChange={setPixelate}
           />
