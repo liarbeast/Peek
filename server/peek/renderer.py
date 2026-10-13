@@ -112,15 +112,16 @@ def screenshot(html: str, size: tuple[int, int] = (palette.WIDTH, palette.HEIGHT
     return raw, mask
 
 
-def reduce(raw: Image.Image, photo_mask: np.ndarray) -> np.ndarray:
+def reduce(raw: Image.Image, photo_mask: np.ndarray, mono: bool = False) -> np.ndarray:
     """Map a full-colour image to palette indices: dither photos only."""
-    idx = palette.to_indices(raw, dither=False)
+    idx = palette.to_indices(raw, dither=False, mono=mono)
     if photo_mask.any():
-        dithered = palette.to_indices(raw, dither=True)
+        dithered = palette.to_indices(raw, dither=True, mono=mono)
         idx = np.where(photo_mask, dithered, idx)
     return idx
 
 
-def render(html: str, orientation: str = "landscape") -> Render:
+def render(html: str, orientation: str = "landscape", mono: bool = False) -> Render:
+    """Render a page; ``mono`` draws it in black and white only."""
     raw, mask = screenshot(html, canvas_size(orientation))
-    return Render(raw=raw, indices=reduce(raw, mask), orientation=orientation)
+    return Render(raw=raw, indices=reduce(raw, mask, mono), orientation=orientation)

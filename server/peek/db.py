@@ -1,4 +1,4 @@
-"""SQLite storage for categories and their items.
+"""SQLite storage for categories, their items and the frame's settings.
 
 The database is one file in the data folder; uploaded images sit next to it
 in ``images/``. Every call opens its own short-lived connection, which keeps
@@ -7,6 +7,7 @@ things simple and safe across FastAPI's worker threads.
 
 from __future__ import annotations
 
+import json
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
@@ -47,6 +48,26 @@ MIGRATIONS = [
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL
     );
+    """,
+    # Per-category fields: items keep their values as JSON in item.data, and
+    # each category lists its fields and which field fills each layout place.
+    """
+    ALTER TABLE category ADD COLUMN fields TEXT NOT NULL DEFAULT '[]';
+    ALTER TABLE category ADD COLUMN slots TEXT NOT NULL DEFAULT '{}';
+    ALTER TABLE category ADD COLUMN mono INTEGER NOT NULL DEFAULT 0;
+    UPDATE category SET fields = CASE template
+        WHEN 'photo' THEN '[{"key":"image","label":"Image","type":"image"},{"key":"title","label":"Title","type":"text"}]'
+        WHEN 'quote' THEN '[{"key":"text","label":"Text","type":"long_text"},{"key":"title","label":"Title","type":"text"}]'
+        ELSE '[{"key":"image","label":"Image","type":"image"},{"key":"title","label":"Title","type":"text"},{"key":"subtitle","label":"Subtitle","type":"text"},{"key":"text","label":"Text","type":"long_text"}]'
+    END;
+    ALTER TABLE item ADD COLUMN data TEXT NOT NULL DEFAULT '{}';
+    UPDATE item SET data = json_patch('{}', json_object(
+        'image', image, 'title', NULLIF(title, ''), 'subtitle', NULLIF(subtitle, ''), 'text', NULLIF(text, '')
+    ));
+    ALTER TABLE item DROP COLUMN title;
+    ALTER TABLE item DROP COLUMN subtitle;
+    ALTER TABLE item DROP COLUMN text;
+    ALTER TABLE item DROP COLUMN image;
     """,
 ]
 
@@ -103,28 +124,46 @@ class Store:
     def categories(self) -> list[dict]:
         with self.connect() as conn:
             rows = conn.execute(
-                """SELECT c.*, COUNT(i.id) AS item_count,
-                          (SELECT image FROM item WHERE category_id = c.id AND image IS NOT NULL
-                           ORDER BY position LIMIT 1) AS cover
+                """SELECT c.*, COUNT(i.id) AS item_count
                    FROM category c LEFT JOIN item i ON i.category_id = c.id
                    GROUP BY c.id ORDER BY c.name COLLATE NOCASE"""
             ).fetchall()
-        return [_category(r) for r in rows]
+            categories = [_category(r) for r in rows]
+            for c in categories:
+                c["cover"] = self._cover(conn, c)
+        return categories
+
+    def _cover(self, conn: sqlite3.Connection, category: dict) -> str | None:
+        """The first image of the category's first image field, if any."""
+        key = next((f["key"] for f in category["fields"] if f["type"] == "image"), None)
+        if key is None:
+            return None
+        row = conn.execute(
+            """SELECT json_extract(data, ?) FROM item
+               WHERE category_id = ? AND json_extract(data, ?) IS NOT NULL
+               ORDER BY position LIMIT 1""",
+            (f'$."{key}"', category["id"], f'$."{key}"'),
+        ).fetchone()
+        return row[0] if row else None
 
     def category(self, category_id: int) -> dict | None:
         with self.connect() as conn:
             row = conn.execute(
-                """SELECT c.*, (SELECT COUNT(*) FROM item WHERE category_id = c.id) AS item_count,
-                          NULL AS cover
+                """SELECT c.*, (SELECT COUNT(*) FROM item WHERE category_id = c.id) AS item_count
                    FROM category c WHERE c.id = ?""",
                 (category_id,),
             ).fetchone()
-        return _category(row) if row else None
+        if not row:
+            return None
+        category = _category(row)
+        category["cover"] = None
+        return category
 
     def create_category(self, fields: dict) -> dict:
         with self.connect() as conn:
             cur = conn.execute(
-                "INSERT INTO category (name, template, custom_css, item_order, weight, enabled) VALUES (?, ?, ?, ?, ?, ?)",
+                """INSERT INTO category (name, template, custom_css, item_order, weight, enabled, fields, slots, mono)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     fields["name"],
                     fields["template"],
@@ -132,28 +171,26 @@ class Store:
                     fields.get("item_order", "in_order"),
                     fields.get("weight", 1),
                     int(fields.get("enabled", True)),
+                    json.dumps(fields.get("fields", [])),
+                    json.dumps(fields.get("slots", {})),
+                    int(fields.get("mono", False)),
                 ),
             )
             new_id = cur.lastrowid
         return self.category(new_id)
 
     def update_category(self, category_id: int, fields: dict) -> dict | None:
-        allowed = ("name", "template", "custom_css", "item_order", "weight", "enabled")
-        changes = {k: (int(v) if k == "enabled" else v) for k, v in fields.items() if k in allowed}
+        allowed = ("name", "template", "custom_css", "item_order", "weight", "enabled", "fields", "slots", "mono")
+        changes = {k: _column(k, v) for k, v in fields.items() if k in allowed}
         if changes:
             sets = ", ".join(f"{k} = ?" for k in changes)
             with self.connect() as conn:
                 conn.execute(f"UPDATE category SET {sets} WHERE id = ?", (*changes.values(), category_id))
         return self.category(category_id)
 
-    def delete_category(self, category_id: int) -> list[str]:
-        """Delete a category and its items; returns image files to remove."""
+    def delete_category(self, category_id: int) -> None:
         with self.connect() as conn:
-            images = [r[0] for r in conn.execute(
-                "SELECT image FROM item WHERE category_id = ? AND image IS NOT NULL", (category_id,)
-            )]
             conn.execute("DELETE FROM category WHERE id = ?", (category_id,))
-        return images
 
     # Items
 
@@ -169,40 +206,37 @@ class Store:
             row = conn.execute("SELECT * FROM item WHERE id = ?", (item_id,)).fetchone()
         return _item(row) if row else None
 
-    def create_item(self, category_id: int, fields: dict) -> dict:
+    def create_items(self, category_id: int, datas: list[dict]) -> list[dict]:
+        """Add items at the end of the category, in one transaction."""
+        ids = []
         with self.connect() as conn:
             position = conn.execute(
-                "SELECT COALESCE(MAX(position), 0) + 1 FROM item WHERE category_id = ?", (category_id,)
+                "SELECT COALESCE(MAX(position), 0) FROM item WHERE category_id = ?", (category_id,)
             ).fetchone()[0]
-            cur = conn.execute(
-                "INSERT INTO item (category_id, position, title, subtitle, text, image) VALUES (?, ?, ?, ?, ?, ?)",
-                (
-                    category_id,
-                    position,
-                    fields.get("title", ""),
-                    fields.get("subtitle", ""),
-                    fields.get("text", ""),
-                    fields.get("image"),
-                ),
-            )
-            new_id = cur.lastrowid
-        return self.item(new_id)
+            for data in datas:
+                position += 1
+                cur = conn.execute(
+                    "INSERT INTO item (category_id, position, data) VALUES (?, ?, ?)",
+                    (category_id, position, json.dumps(data)),
+                )
+                ids.append(cur.lastrowid)
+        return [self.item(i) for i in ids]
+
+    def create_item(self, category_id: int, data: dict) -> dict:
+        return self.create_items(category_id, [data])[0]
 
     def update_item(self, item_id: int, fields: dict) -> dict | None:
-        allowed = ("title", "subtitle", "text", "image", "enabled", "position")
-        changes = {k: (int(v) if k == "enabled" else v) for k, v in fields.items() if k in allowed}
+        allowed = ("data", "enabled", "position")
+        changes = {k: _column(k, v) for k, v in fields.items() if k in allowed}
         if changes:
             sets = ", ".join(f"{k} = ?" for k in changes)
             with self.connect() as conn:
                 conn.execute(f"UPDATE item SET {sets} WHERE id = ?", (*changes.values(), item_id))
         return self.item(item_id)
 
-    def delete_item(self, item_id: int) -> str | None:
-        """Delete an item; returns its image file to remove, if any."""
+    def delete_item(self, item_id: int) -> None:
         with self.connect() as conn:
-            row = conn.execute("SELECT image FROM item WHERE id = ?", (item_id,)).fetchone()
             conn.execute("DELETE FROM item WHERE id = ?", (item_id,))
-        return row[0] if row else None
 
     def reorder_items(self, category_id: int, item_ids: list[int]) -> None:
         with self.connect() as conn:
@@ -213,13 +247,26 @@ class Store:
                 )
 
 
+def _column(key: str, value):
+    """A value as SQLite stores it: JSON for structures, 0/1 for flags."""
+    if key in ("fields", "slots", "data"):
+        return json.dumps(value)
+    if key in ("enabled", "mono"):
+        return int(value)
+    return value
+
+
 def _category(row: sqlite3.Row) -> dict:
     d = dict(row)
     d["enabled"] = bool(d["enabled"])
+    d["mono"] = bool(d["mono"])
+    d["fields"] = json.loads(d["fields"])
+    d["slots"] = json.loads(d["slots"])
     return d
 
 
 def _item(row: sqlite3.Row) -> dict:
     d = dict(row)
     d["enabled"] = bool(d["enabled"])
+    d["data"] = json.loads(d["data"])
     return d

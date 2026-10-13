@@ -1,0 +1,26 @@
+{# Draws one field's value with its classes: field field-<key> type-<type>. #}
+{% macro field(e, cls="", pixel=false) -%}
+  {%- if e and e.value -%}
+    {%- set classes = (cls ~ " field field-" ~ e.key ~ " type-" ~ e.type) | trim -%}
+    {%- if e.type == "image" -%}
+      <img class="{{ classes }}"{% if pixel %} data-peek="pixel"{% endif %} src="{{ e.value }}" alt="">
+    {%- else -%}
+      <div class="{{ classes }}">{{ e.value }}</div>
+    {%- endif -%}
+  {%- endif -%}
+{%- endmacro %}
+
+{# Fields the layout has no place for, each with its label. #}
+{% macro extras(extra) -%}
+  {%- if extra -%}
+  <div class="extra">
+    {%- for e in extra -%}
+      {%- if e.type == "image" -%}
+        {{ field(e) }}
+      {%- else -%}
+        <div class="field field-{{ e.key }} type-{{ e.type }}"><span class="label">{{ e.label }}</span> <span class="value">{{ e.value }}</span></div>
+      {%- endif -%}
+    {%- endfor -%}
+  </div>
+  {%- endif -%}
+{%- endmacro %}

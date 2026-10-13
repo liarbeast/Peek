@@ -21,22 +21,22 @@ def panel_colours(png: bytes) -> set:
 
 
 def test_photo_is_dithered_but_caption_is_solid():
-    template, fields = samples.sample("photo")
-    raw, mask = renderer.screenshot(layouts.build(template, fields))
+    template, fields, values = samples.sample("photo")
+    raw, mask = renderer.screenshot(layouts.build(template, fields, values))
     # The caption bar along the bottom covers the photo, so it isn't photo.
     assert mask[200].all()
     assert not mask[470].any()
 
 
 def test_quote_has_no_photo_pixels():
-    template, fields = samples.sample("quote")
-    _, mask = renderer.screenshot(layouts.build(template, fields))
+    template, fields, values = samples.sample("quote")
+    _, mask = renderer.screenshot(layouts.build(template, fields, values))
     assert not mask.any()
 
 
 def test_pixel_art_is_not_dithered():
-    template, fields = samples.sample("sprite")
-    _, mask = renderer.screenshot(layouts.build(template, fields))
+    template, fields, values = samples.sample("sprite")
+    _, mask = renderer.screenshot(layouts.build(template, fields, values))
     assert not mask.any()
 
 
@@ -64,3 +64,12 @@ def test_custom_css_and_set_frame(client):
 
 def test_photo_template_needs_an_image(client):
     assert client.post("/render", data={"template": "photo"}).status_code == 400
+
+
+def test_mono_uses_only_black_and_white():
+    template, fields, values = samples.sample("photo")
+    raw, mask = renderer.screenshot(layouts.build(template, fields, values))
+    idx = renderer.reduce(raw, mask, mono=True)
+    assert set(np.unique(idx)) <= {0, 1}
+    # Photos still dither, so greys come out as a mix of both.
+    assert len(set(np.unique(idx[:200]))) == 2

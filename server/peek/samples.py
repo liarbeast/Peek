@@ -71,14 +71,15 @@ def pokemon_sprite(number: int = 25) -> bytes:
         return fallback_sprite()
 
 
-def sample(name: str) -> tuple[str, dict]:
-    """Return (template, fields) for a named sample."""
+def sample(name: str) -> tuple[str, list[dict], dict]:
+    """Return (template, fields, values) for a named sample."""
+    fields = layouts.TEMPLATE_INFO[name]["fields"] if name in SAMPLES else None
     if name == "photo":
-        return "photo", {"image": layouts.data_uri(sunset_photo()), "title": "Evening over the hills"}
+        return "photo", fields, {"image": layouts.data_uri(sunset_photo()), "title": "Evening over the hills"}
     if name == "quote":
-        return "quote", {"text": "Here's looking at you, kid.", "title": "Casablanca (1942)"}
+        return "quote", fields, {"text": "Here's looking at you, kid.", "title": "Casablanca (1942)"}
     if name == "sprite":
-        return "sprite", {
+        return "sprite", fields, {
             "image": layouts.data_uri(pokemon_sprite(25)),
             "subtitle": "#025",
             "title": "pikachu",
@@ -89,11 +90,22 @@ def sample(name: str) -> tuple[str, dict]:
 
 SAMPLES = ("photo", "quote", "sprite")
 
+_PLACEHOLDER_TEXT = {
+    "text": "{label}",
+    "long_text": "Some longer text for {label}.",
+    "number": "42",
+    "date": "2026-10-13",
+    "link": "example.com",
+}
 
-def placeholder(template: str) -> dict:
-    """Fields to preview a template with before a category has any items."""
-    if template == "photo":
-        return {"image": layouts.data_uri(sunset_photo()), "title": "Your caption here"}
-    if template == "quote":
-        return {"text": "Your quote here.", "title": "Its source"}
-    return {"image": layouts.data_uri(fallback_sprite()), "subtitle": "#001", "title": "Your sprite", "text": "A line of text."}
+
+def placeholder(template: str, fields: list[dict]) -> dict:
+    """Values to preview a layout with before a category has any items."""
+    values = {}
+    for f in fields:
+        if f["type"] == "image":
+            art = fallback_sprite() if template == "sprite" else sunset_photo()
+            values[f["key"]] = layouts.data_uri(art)
+        else:
+            values[f["key"]] = _PLACEHOLDER_TEXT[f["type"]].format(label=f["label"])
+    return values
