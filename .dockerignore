@@ -3,3 +3,5 @@ data
 **/__pycache__
 **/.pytest_cache
 server/tests
+web/node_modules
+server/peek/static/app

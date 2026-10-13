@@ -80,7 +80,7 @@ def sample(name: str) -> tuple[str, dict]:
     if name == "sprite":
         return "sprite", {
             "image": layouts.data_uri(pokemon_sprite(25)),
-            "number": "025",
+            "subtitle": "#025",
             "title": "pikachu",
             "text": "Electric type. Stores electricity in its cheeks.",
         }
@@ -88,3 +88,12 @@ def sample(name: str) -> tuple[str, dict]:
 
 
 SAMPLES = ("photo", "quote", "sprite")
+
+
+def placeholder(template: str) -> dict:
+    """Fields to preview a template with before a category has any items."""
+    if template == "photo":
+        return {"image": layouts.data_uri(sunset_photo()), "title": "Your caption here"}
+    if template == "quote":
+        return {"text": "Your quote here.", "title": "Its source"}
+    return {"image": layouts.data_uri(fallback_sprite()), "subtitle": "#001", "title": "Your sprite", "text": "A line of text."}

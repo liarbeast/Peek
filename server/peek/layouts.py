@@ -9,6 +9,30 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 TEMPLATES = ("photo", "quote", "sprite")
 
+# What each template shows, for the GUI. "classes" are the elements custom
+# CSS can target; every template also sets the six panel colours as
+# --black, --white, --yellow, --red, --blue and --green.
+TEMPLATE_INFO = {
+    "photo": {
+        "label": "Photo",
+        "description": "A full-screen photo with the title as a caption bar.",
+        "fields": ["image", "title"],
+        "classes": [".photo", ".caption"],
+    },
+    "quote": {
+        "label": "Quote",
+        "description": "Large text with the title as its source.",
+        "fields": ["text", "title"],
+        "classes": [".mark", ".text", ".source"],
+    },
+    "sprite": {
+        "label": "Sprite",
+        "description": "Pixel art scaled up sharply, with a name, a subtitle and text.",
+        "fields": ["image", "title", "subtitle", "text"],
+        "classes": [".sprite", ".subtitle", ".name", ".text"],
+    },
+}
+
 _env = Environment(
     loader=FileSystemLoader(Path(__file__).parent / "templates"),
     autoescape=select_autoescape(["html"]),
