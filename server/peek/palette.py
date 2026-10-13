@@ -49,14 +49,24 @@ def _palette_image(colors: tuple[tuple[int, int, int], ...]) -> Image.Image:
 
 
 _MEASURED_PAL = _palette_image(MEASURED)
+# Black and white only (indices 0 and 1), for categories drawn in greyscale.
+_MONO_PAL = _palette_image(MEASURED[:2])
 
 
-def to_indices(img: Image.Image, dither: bool) -> np.ndarray:
-    """Map an RGB image to palette indices (0-5), matched against MEASURED."""
+def to_indices(img: Image.Image, dither: bool, mono: bool = False) -> np.ndarray:
+    """Map an RGB image to palette indices (0-5), matched against MEASURED.
+
+    With ``mono`` only black and white are used: the image is turned to grey
+    first, so colours map by brightness and photos dither to shades of grey.
+    """
     mode = Image.Dither.FLOYDSTEINBERG if dither else Image.Dither.NONE
-    q = img.convert("RGB").quantize(palette=_MEASURED_PAL, dither=mode)
+    if mono:
+        q = img.convert("L").convert("RGB").quantize(palette=_MONO_PAL, dither=mode)
+    else:
+        q = img.convert("RGB").quantize(palette=_MEASURED_PAL, dither=mode)
     idx = np.asarray(q, dtype=np.uint8)
-    return np.where(idx >= len(MEASURED), 0, idx).astype(np.uint8)
+    used = 2 if mono else len(MEASURED)
+    return np.where(idx >= used, 0, idx).astype(np.uint8)
 
 
 def indices_to_image(idx: np.ndarray, realistic: bool = False) -> Image.Image:

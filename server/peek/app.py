@@ -37,21 +37,22 @@ def _view(render: renderer.Render, view: View) -> bytes:
 
 @lru_cache(maxsize=len(samples.SAMPLES) * len(renderer.ORIENTATIONS))
 def _sample_render(name: str, orientation: str) -> renderer.Render:
-    template, fields = samples.sample(name)
+    template, fields, values = samples.sample(name)
     size = renderer.canvas_size(orientation)
-    return renderer.render(layouts.build(template, fields, size=size), orientation)
+    return renderer.render(layouts.build(template, fields, values, size=size), orientation)
 
 
 def _upload_render(store: db.Store, template: str, title: str, text: str, custom_css: str,
                    image: UploadFile | None) -> renderer.Render:
     if template not in layouts.TEMPLATES:
         raise HTTPException(400, f"unknown template: {template}")
-    fields = {"title": title, "text": text}
+    fields = layouts.TEMPLATE_INFO[template]["fields"]
+    values = {"title": title, "text": text}
     if image is not None and image.filename:
-        fields["image"] = layouts.data_uri(image.file.read(), image.content_type or "image/png")
-    elif template != "quote":
+        values["image"] = layouts.data_uri(image.file.read(), image.content_type or "image/png")
+    elif any(f["type"] == "image" for f in fields):
         raise HTTPException(400, "this template needs an image")
-    return content.render_page(store, template, fields, custom_css)
+    return content.render_page(store, template, fields, values, custom_css=custom_css)
 
 
 def create_app(data_dir: Path) -> FastAPI:
