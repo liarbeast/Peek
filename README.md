@@ -52,8 +52,8 @@ panel always gets 800x480, turned to match. CSS can target portrait with `@media
 panel colours as `var(--black)`, `var(--white)`, `var(--yellow)`, `var(--red)`, `var(--blue)` and `var(--green)`.
 
 The Style tab also has two filters. Black and white draws the category in black and white only, turning shades into
-dither patterns (an even, regular one for pixel art). Pixelate is for pixel art: images keep hard edges when CSS enlarges
-them, and are mapped to the nearest panel colours instead of being dithered like photos.
+dither patterns (an even, regular one for crisp images). Crisp images resizes images without smoothing and maps each pixel
+to the nearest panel colour instead of dithering it like a photo: for pixel art, icons, logos and QR codes.
 (Under the hood, any image drawn with `image-rendering: pixelated` is treated this way.)
 
 ## Development
