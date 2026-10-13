@@ -1,10 +1,10 @@
 import { Button, Card, Chip, Spinner } from "@heroui/react";
 import { useEffect, useState } from "react";
-import { api, imageUrl, type Category, type Template } from "../api";
+import { api, imageUrl, type Category } from "../api";
 import { Choice, Dialog, TextInput } from "../components/ui";
 import { go } from "../router";
 
-export function CategoriesPage({ templates }: { templates: Template[] }) {
+export function CategoriesPage() {
   const [categories, setCategories] = useState<Category[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -12,8 +12,6 @@ export function CategoriesPage({ templates }: { templates: Template[] }) {
   useEffect(() => {
     api.categories().then(setCategories, (e: Error) => setError(e.message));
   }, []);
-
-  const label = (name: string) => templates.find((t) => t.name === name)?.label ?? name;
 
   return (
     <div className="flex flex-col gap-6">
@@ -51,18 +49,17 @@ export function CategoriesPage({ templates }: { templates: Template[] }) {
                 <img
                   src={imageUrl(c.cover)}
                   alt=""
-                  className={`h-full w-full ${c.template === "sprite" ? "object-contain" : "object-cover"}`}
-                  style={{ imageRendering: c.template === "sprite" ? "pixelated" : "auto" }}
+                  className="h-full w-full object-contain"
+                  style={{ imageRendering: c.custom_css.includes("pixelated") ? "pixelated" : "auto" }}
                 />
               ) : (
-                <div className="flex h-full items-center justify-center text-muted">{label(c.template)}</div>
+                <div className="flex h-full items-center justify-center text-muted">No image yet</div>
               )}
             </div>
             <Card.Header>
               <Card.Title>{c.name}</Card.Title>
             </Card.Header>
             <Card.Footer className="flex flex-wrap gap-2">
-              <Chip size="sm">{label(c.template)}</Chip>
               <Chip size="sm">
                 {c.item_count} {c.item_count === 1 ? "item" : "items"}
               </Chip>
@@ -79,7 +76,6 @@ export function CategoriesPage({ templates }: { templates: Template[] }) {
       <NewCategoryDialog
         isOpen={creating}
         onOpenChange={setCreating}
-        templates={templates}
         categories={categories ?? []}
         onCreated={(c) => go(`#/categories/${c.id}`)}
       />
@@ -90,21 +86,19 @@ export function CategoriesPage({ templates }: { templates: Template[] }) {
 function NewCategoryDialog(props: {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  templates: Template[];
   categories: Category[];
   onCreated: (c: Category) => void;
 }) {
   const [name, setName] = useState("");
-  const [template, setTemplate] = useState("photo");
-  // "layout", or the id of a category to copy fields and style from.
-  const [start, setStart] = useState("layout");
+  // "new", or the id of a category to copy fields and style from.
+  const [start, setStart] = useState("new");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const create = async () => {
     setBusy(true);
     try {
-      const body = start === "layout" ? { template } : { copy_from: Number(start) };
+      const body = start === "new" ? {} : { copy_from: Number(start) };
       props.onCreated(await api.createCategory({ name: name.trim(), ...body }));
       props.onOpenChange(false);
       setName("");
@@ -138,22 +132,13 @@ function NewCategoryDialog(props: {
           value={start}
           onChange={setStart}
           options={[
-            { id: "layout", label: "A layout", description: "With that layout's usual fields" },
+            { id: "new", label: "Image, title and subtext", description: "The usual fields; change them any time" },
             ...props.categories.map((c) => ({
               id: String(c.id),
               label: `A copy of ${c.name}`,
               description: "Its fields and style, without its items",
             })),
           ]}
-        />
-      )}
-      {start === "layout" && (
-        <Choice
-          label="Layout"
-          value={template}
-          onChange={setTemplate}
-          options={props.templates.map((t) => ({ id: t.name, label: t.label, description: t.description }))}
-          description="You can change the layout, fields and CSS later."
         />
       )}
       {error && <p className="text-sm text-danger">{error}</p>}

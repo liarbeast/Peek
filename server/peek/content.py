@@ -35,8 +35,8 @@ class FieldIn(BaseModel):
 
 class CategoryIn(BaseModel):
     name: str = Field(min_length=1, max_length=80)
-    template: str | None = None
-    # Start from another category's fields and style instead of the layout's.
+    template: str = "stack"
+    # Start from another category's fields and style instead of the defaults.
     copy_from: int | None = None
     custom_css: str = ""
     item_order: str = "in_order"
@@ -53,7 +53,6 @@ class CategoryPatch(BaseModel):
     enabled: bool | None = None
     mono: bool | None = None
     fields: list[FieldIn] | None = None
-    slots: dict[str, str | None] | None = None
 
 
 class PreviewIn(BaseModel):
@@ -62,7 +61,6 @@ class PreviewIn(BaseModel):
     template: str | None = None
     custom_css: str | None = None
     mono: bool | None = None
-    slots: dict[str, str | None] | None = None
     item_id: int | None = None
 
 
@@ -147,12 +145,12 @@ def orientation(store: db.Store) -> str:
     return value if value in renderer.ORIENTATIONS else "landscape"
 
 
-def render_page(store: db.Store, template: str, fields: list[dict], values: dict, slots: dict | None = None,
+def render_page(store: db.Store, template: str, fields: list[dict], values: dict,
                 custom_css: str = "", mono: bool = False) -> renderer.Render:
     """Render a layout the way the frame hangs (landscape or portrait)."""
     orientation_ = orientation(store)
     size = renderer.canvas_size(orientation_)
-    html = layouts.build(template, fields, values, slots, custom_css, size)
+    html = layouts.build(template, fields, values, custom_css, size)
     return renderer.render(html, orientation_, mono)
 
 
@@ -162,9 +160,9 @@ def render_item(store: db.Store, category: dict, item: dict | None, changes: dic
     `changes` overrides saved style settings, to preview unsaved edits.
     """
     style = {**category, **{k: v for k, v in (changes or {}).items() if v is not None}}
-    template = style["template"]
-    values = item_values(store, category, item) if item else samples.placeholder(template, category["fields"])
-    return render_page(store, template, category["fields"], values, style["slots"], style["custom_css"], style["mono"])
+    template = style["template"] if style["template"] in layouts.TEMPLATES else layouts.TEMPLATES[0]
+    values = item_values(store, category, item) if item else samples.placeholder(category["fields"])
+    return render_page(store, template, category["fields"], values, style["custom_css"], style["mono"])
 
 
 def _png(render: renderer.Render, view: View) -> Response:
@@ -217,12 +215,10 @@ def create_category(request: Request, body: CategoryIn) -> dict:
     new = body.model_dump(exclude={"copy_from"})
     if body.copy_from is not None:
         source = _category_or_404(store, body.copy_from)
-        for key in ("template", "fields", "slots", "mono", "item_order"):
+        for key in ("template", "fields", "mono", "item_order"):
             new[key] = source[key]
         new["custom_css"] = body.custom_css or source["custom_css"]
     else:
-        if body.template is None:
-            raise HTTPException(422, "pick a layout or a category to copy")
         _check(new)
         new["fields"] = layouts.TEMPLATE_INFO[body.template]["fields"]
     _check(new)

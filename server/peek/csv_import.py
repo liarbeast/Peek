@@ -14,8 +14,6 @@ from . import fields as fieldlib
 MAX_ROWS = 5000
 MAX_IMAGE_BYTES = 15 * 1024 * 1024
 
-_NUMBER = re.compile(r"^-?\d+([.,]\d+)?$")
-_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$|^\d{1,2}[-/.]\d{1,2}[-/.]\d{4}$")
 _URL = re.compile(r"^https?://\S+$", re.IGNORECASE)
 _IMAGE_URL = re.compile(r"\.(png|jpe?g|gif|webp)(\?.*)?$", re.IGNORECASE)
 _IMAGE_WORDS = ("image", "img", "photo", "picture", "sprite", "foto", "afbeelding", "plaatje", "thumbnail")
@@ -58,20 +56,11 @@ def parse(data: bytes) -> tuple[list[str], list[list[str]]]:
 
 
 def guess_type(name: str, values: list[str]) -> str:
-    """Guess a field type from a column's name and values."""
+    """Guess whether a column holds image URLs ("image") or anything else ("text")."""
     values = [v.strip() for v in values if v.strip()]
-    if not values:
-        return "text"
-    if all(_URL.match(v) for v in values):
+    if values and all(_URL.match(v) for v in values):
         if any(word in name.lower() for word in _IMAGE_WORDS) or all(_IMAGE_URL.search(v) for v in values):
             return "image"
-        return "link"
-    if all(_NUMBER.match(v) for v in values):
-        return "number"
-    if all(_DATE.match(v) for v in values):
-        return "date"
-    if max(len(v) for v in values) > 80 or any("\n" in v for v in values):
-        return "long_text"
     return "text"
 
 

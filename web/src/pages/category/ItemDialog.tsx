@@ -76,8 +76,7 @@ export function ItemDialog(props: {
             label={field.label}
             value={values[field.key] ?? ""}
             onChange={(v) => setValues((old) => ({ ...old, [field.key]: v }))}
-            multiline={field.type === "long_text"}
-            type={field.type === "number" ? "number" : field.type === "date" ? "date" : field.type === "link" ? "url" : "text"}
+            multiline
           />
         ),
       )}

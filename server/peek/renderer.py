@@ -23,11 +23,18 @@ from playwright.sync_api import sync_playwright
 
 from . import palette
 
-# <img> elements are photos unless marked otherwise; anything else (a CSS
-# background, say) can opt in with data-peek="photo".
+# <img> elements are photos unless marked otherwise or drawn with
+# `image-rendering: pixelated`; anything else (a CSS background, say) can opt
+# in with data-peek="photo".
 PHOTO_SELECTOR = 'img:not([data-peek]), [data-peek="photo"]'
 
 _MASK_STYLE = "%s { filter: brightness(0) %s !important; }"
+
+_MARK_PIXEL_ART = """
+for (const img of document.querySelectorAll("img:not([data-peek])")) {
+  if (getComputedStyle(img).imageRendering === "pixelated") img.dataset.peek = "pixel";
+}
+"""
 
 # A pixel counts as photo when painting the photos white versus black moves
 # it by more than this much (0-255, summed over RGB / 3).
@@ -94,6 +101,8 @@ def screenshot(html: str, size: tuple[int, int] = (palette.WIDTH, palette.HEIGHT
             page.evaluate("document.fonts.ready")
             raw = _shot(page)
 
+            # Images that CSS draws pixelated are pixel art, not photos.
+            page.evaluate(_MARK_PIXEL_ART)
             has_photos = page.evaluate(
                 f"document.querySelectorAll({PHOTO_SELECTOR!r}).length > 0"
             )

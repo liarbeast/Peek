@@ -50,7 +50,7 @@ MIGRATIONS = [
     );
     """,
     # Per-category fields: items keep their values as JSON in item.data, and
-    # each category lists its fields and which field fills each layout place.
+    # each category lists its fields (and, until migration 4, layout places).
     """
     ALTER TABLE category ADD COLUMN fields TEXT NOT NULL DEFAULT '[]';
     ALTER TABLE category ADD COLUMN slots TEXT NOT NULL DEFAULT '{}';
@@ -68,6 +68,18 @@ MIGRATIONS = [
     ALTER TABLE item DROP COLUMN subtitle;
     ALTER TABLE item DROP COLUMN text;
     ALTER TABLE item DROP COLUMN image;
+    """,
+    # One layout (Stack) instead of several, so no more layout places; and
+    # fields are only text or image, so long text, numbers, dates and links
+    # all become text.
+    """
+    UPDATE category SET template = 'stack';
+    ALTER TABLE category DROP COLUMN slots;
+    UPDATE category SET fields = (
+        SELECT json_group_array(json_set(f.value, '$.type',
+            CASE json_extract(f.value, '$.type') WHEN 'image' THEN 'image' ELSE 'text' END))
+        FROM json_each(category.fields) AS f
+    );
     """,
 ]
 
@@ -162,8 +174,8 @@ class Store:
     def create_category(self, fields: dict) -> dict:
         with self.connect() as conn:
             cur = conn.execute(
-                """INSERT INTO category (name, template, custom_css, item_order, weight, enabled, fields, slots, mono)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                """INSERT INTO category (name, template, custom_css, item_order, weight, enabled, fields, mono)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     fields["name"],
                     fields["template"],
@@ -172,7 +184,6 @@ class Store:
                     fields.get("weight", 1),
                     int(fields.get("enabled", True)),
                     json.dumps(fields.get("fields", [])),
-                    json.dumps(fields.get("slots", {})),
                     int(fields.get("mono", False)),
                 ),
             )
@@ -180,7 +191,7 @@ class Store:
         return self.category(new_id)
 
     def update_category(self, category_id: int, fields: dict) -> dict | None:
-        allowed = ("name", "template", "custom_css", "item_order", "weight", "enabled", "fields", "slots", "mono")
+        allowed = ("name", "template", "custom_css", "item_order", "weight", "enabled", "fields", "mono")
         changes = {k: _column(k, v) for k, v in fields.items() if k in allowed}
         if changes:
             sets = ", ".join(f"{k} = ?" for k in changes)
@@ -249,7 +260,7 @@ class Store:
 
 def _column(key: str, value):
     """A value as SQLite stores it: JSON for structures, 0/1 for flags."""
-    if key in ("fields", "slots", "data"):
+    if key in ("fields", "data"):
         return json.dumps(value)
     if key in ("enabled", "mono"):
         return int(value)
@@ -261,7 +272,6 @@ def _category(row: sqlite3.Row) -> dict:
     d["enabled"] = bool(d["enabled"])
     d["mono"] = bool(d["mono"])
     d["fields"] = json.loads(d["fields"])
-    d["slots"] = json.loads(d["slots"])
     return d
 
 

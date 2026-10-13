@@ -15,10 +15,7 @@
     font-family: "DejaVu Sans", "Liberation Sans", Arial, sans-serif;
     -webkit-font-smoothing: none;
   }
-  .type-long_text, .type-long_text .value { white-space: pre-line; }
-  .extra { font-size: 20px; line-height: 1.35; }
-  .extra .label { font-weight: bold; }
-  .extra img { max-height: 120px; max-width: 100%; }
+  .type-text { white-space: pre-line; }
   {% block style %}{% endblock %}
 </style>
 {% if custom_css %}<style>{{ custom_css | safe }}</style>{% endif %}
