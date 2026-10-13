@@ -49,14 +49,42 @@ def _palette_image(colors: tuple[tuple[int, int, int], ...]) -> Image.Image:
 
 
 _MEASURED_PAL = _palette_image(MEASURED)
+# Black and white only (indices 0 and 1), for categories drawn in greyscale.
+_MONO_PAL = _palette_image(MEASURED[:2])
 
 
-def to_indices(img: Image.Image, dither: bool) -> np.ndarray:
-    """Map an RGB image to palette indices (0-5), matched against MEASURED."""
+def to_indices(img: Image.Image, dither: bool, mono: bool = False) -> np.ndarray:
+    """Map an RGB image to palette indices (0-5), matched against MEASURED.
+
+    With ``mono`` only black and white are used: the image is turned to grey
+    first, so colours map by brightness and photos dither to shades of grey.
+    """
     mode = Image.Dither.FLOYDSTEINBERG if dither else Image.Dither.NONE
-    q = img.convert("RGB").quantize(palette=_MEASURED_PAL, dither=mode)
+    if mono:
+        q = img.convert("L").convert("RGB").quantize(palette=_MONO_PAL, dither=mode)
+    else:
+        q = img.convert("RGB").quantize(palette=_MEASURED_PAL, dither=mode)
     idx = np.asarray(q, dtype=np.uint8)
-    return np.where(idx >= len(MEASURED), 0, idx).astype(np.uint8)
+    used = 2 if mono else len(MEASURED)
+    return np.where(idx >= used, 0, idx).astype(np.uint8)
+
+
+# 4x4 ordered-dither thresholds, from 1/32 to 31/32.
+_BAYER = (np.array([[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]]) + 0.5) / 16
+
+
+def ordered_mono(img: Image.Image) -> np.ndarray:
+    """Black and white indices (0 or 1) with a regular dither pattern.
+
+    Used for pixel art in black and white: each shade becomes an even
+    pattern, the way old handhelds drew grey, rather than photo-style noise.
+    """
+    grey = np.asarray(img.convert("L"), dtype=np.float32)
+    lo, hi = (sum(MEASURED[i]) / 3 for i in (0, 1))
+    level = np.clip((grey - lo) / (hi - lo), 0, 1)
+    h, w = level.shape
+    threshold = np.tile(_BAYER, (h // 4 + 1, w // 4 + 1))[:h, :w]
+    return (level > threshold).astype(np.uint8)
 
 
 def indices_to_image(idx: np.ndarray, realistic: bool = False) -> Image.Image:

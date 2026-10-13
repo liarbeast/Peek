@@ -6,11 +6,11 @@ Peek decides what to show and renders it for the panel.
 
 So far Peek has:
 
-- **A renderer** that turns an HTML layout into a six-colour image, dithering photos while
+- **A renderer** that turns a page of fields into a six-colour image, dithering photos while
   keeping text crisp and pixel art blocky.
 - **A web app** to create categories (for example "Pokémon of the day" or "Movie quotes"),
-  fill them with images and text, give each its own layout and custom CSS with a live preview,
-  and pick what the frame shows.
+  give each its own fields, fill them by hand or from a CSV, style them with custom CSS and a live
+  preview, and pick what the frame shows.
 
 ## Run it
 
@@ -23,7 +23,6 @@ docker compose up -d --build    # or: podman compose up -d --build
 ```
 
 Open http://localhost:8080. The first build downloads Chromium and takes a few minutes.
-The renderer's test page with built-in samples is at http://localhost:8080/samples.
 
 Categories, uploaded images and the current frame image live in the `data` folder next to `compose.yaml`.
 To move Peek to another machine, copy the whole folder and run the same command there.
@@ -35,14 +34,27 @@ To move Peek to another machine, copy the whole folder and run the same command 
 | `GET /api/sleep` | Seconds to sleep before the next wake, as plain text |
 | `GET /frame.png` | The current 800x480 image, a paletted PNG in the six pure panel colours |
 
-## Layouts and custom CSS
+## Fields and CSV import
 
-Layouts are Jinja templates in `server/peek/templates` (photo, quote, sprite), rendered in headless Chromium at 800x480, or at 480x800 when Settings says the frame hangs in portrait. The panel always gets 800x480, turned to match. Custom CSS can target portrait with `@media (orientation: portrait)`.
-Custom CSS is added after the template's own styles, and can use the panel colours as
-`var(--black)`, `var(--white)`, `var(--yellow)`, `var(--red)`, `var(--blue)` and `var(--green)`.
+Each category has its own fields, each holding text or an image, edited on its Fields tab.
+Items store one value per field. A CSV file can fill a category: each row becomes an item, columns are matched to
+fields by name or added as new fields, and image columns hold URLs that Peek downloads. Comma, semicolon and tab
+separated files all work.
 
-Images are treated as photos and dithered. Mark pixel art with `data-peek="pixel"` (and `image-rendering: pixelated`)
-to map it to the nearest colours without dithering. Anything else can opt in to dithering with `data-peek="photo"`.
+## Styling with CSS
+
+Every item is drawn by one layout, Stack (`server/peek/templates/stack.html`): each field in order, centred, inside
+`.stack`. Every field's element has the classes `field field-<key> type-<type>`, so a category's custom CSS can style,
+move or hide any field; the layout's own rules never outweigh it.
+
+Pages are rendered in headless Chromium at 800x480, or at 480x800 when Settings says the frame hangs in portrait; the
+panel always gets 800x480, turned to match. CSS can target portrait with `@media (orientation: portrait)` and use the
+panel colours as `var(--black)`, `var(--white)`, `var(--yellow)`, `var(--red)`, `var(--blue)` and `var(--green)`.
+
+The Style tab also has two filters. Black and white draws the category in black and white only, turning shades into
+dither patterns (an even, regular one for crisp images). Crisp images resizes images without smoothing and maps each pixel
+to the nearest panel colour instead of dithering it like a photo: for pixel art, icons, logos and QR codes.
+(Under the hood, any image drawn with `image-rendering: pixelated` is treated this way.)
 
 ## Development
 
