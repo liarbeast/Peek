@@ -7,7 +7,7 @@ import { Dialog, Toggle } from "../../components/ui";
 import { ImportDialog } from "./ImportDialog";
 import { ItemDialog } from "./ItemDialog";
 
-export function ContentTab(props: {
+export function ItemsTab(props: {
   category: Category;
   items: Item[];
   onChange: () => void;

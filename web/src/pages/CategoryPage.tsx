@@ -1,7 +1,7 @@
 import { Chip, Spinner, Tabs } from "@heroui/react";
 import { useCallback, useEffect, useState } from "react";
 import { api, type Category, type Item, type Template } from "../api";
-import { ContentTab } from "./category/ContentTab";
+import { ItemsTab } from "./category/ItemsTab";
 import { FieldsTab } from "./category/FieldsTab";
 import { SettingsTab } from "./category/SettingsTab";
 import { StyleTab } from "./category/StyleTab";
@@ -44,8 +44,8 @@ export function CategoryPage({ id, templates }: { id: number; templates: Templat
       <Tabs>
         <Tabs.ListContainer>
           <Tabs.List aria-label="Category sections">
-            <Tabs.Tab id="content">
-              Content
+            <Tabs.Tab id="items">
+              Items
               <Tabs.Indicator />
             </Tabs.Tab>
             <Tabs.Tab id="fields">
@@ -62,8 +62,8 @@ export function CategoryPage({ id, templates }: { id: number; templates: Templat
             </Tabs.Tab>
           </Tabs.List>
         </Tabs.ListContainer>
-        <Tabs.Panel id="content" className="pt-4">
-          <ContentTab category={category} items={items} onChange={reload} onCategoryChange={setCategory} />
+        <Tabs.Panel id="items" className="pt-4">
+          <ItemsTab category={category} items={items} onChange={reload} onCategoryChange={setCategory} />
         </Tabs.Panel>
         <Tabs.Panel id="fields" className="pt-4">
           <FieldsTab key={JSON.stringify(category.fields)} category={category} onSaved={setCategory} />

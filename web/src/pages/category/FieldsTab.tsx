@@ -3,7 +3,7 @@ import { Reorder, useDragControls } from "motion/react";
 import { useState } from "react";
 import { api, FIELD_TYPES, type Category, type FieldDraft, type FieldType } from "../../api";
 import { Choice, Dialog, TextInput } from "../../components/ui";
-import { DragHandle } from "./ContentTab";
+import { DragHandle } from "./ItemsTab";
 
 // A field in the editor, with a local id so rows keep their identity while
 // they are dragged or renamed.
