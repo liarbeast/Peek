@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 import unicodedata
 
-FIELD_TYPES = ("text", "long_text", "image", "number", "date", "link")
+FIELD_TYPES = ("text", "image")
 
 _KEY = re.compile(r"^[a-z][a-z0-9-]{0,39}$")
 

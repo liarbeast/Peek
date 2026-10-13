@@ -1,14 +1,20 @@
 {% extends "base.html" %}
 {% import "_fields.html" as f %}
 {% block style %}
-  body { padding: 40px 48px; }
-  .stack { display: flex; flex-direction: column; gap: 16px; height: 100%; justify-content: center; }
-  .stack > .field { font-size: 28px; line-height: 1.3; }
-  .stack > .field:first-child:not(img) { font-size: 44px; font-weight: bold; }
-  .stack > img.field { max-width: 100%; max-height: 50%; object-fit: contain; align-self: flex-start; }
+  /* Every field in order, centred. The first text field reads as a title.
+     :where() keeps these rules weaker than any custom CSS, so a plain
+     .field-title { ... } always wins. */
+  :where(body) { padding: 40px 48px; }
+  :where(.stack) {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 16px; height: 100%; text-align: center;
+  }
+  :where(.stack > .field) { font-size: 28px; line-height: 1.3; }
+  :where(.stack > div.field:first-of-type) { font-size: 44px; font-weight: bold; }
+  :where(.stack > img.field) { max-width: 100%; max-height: 55%; min-height: 0; object-fit: contain; }
 {% endblock %}
 {% block body %}
   <div class="stack">
-    {% for e in all_fields %}{{ f.field(e) }}{% endfor %}
+    {% for e in fields %}{{ f.field(e) }}{% endfor %}
   </div>
 {% endblock %}

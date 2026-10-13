@@ -36,15 +36,14 @@ export function TextInput(props: {
   placeholder?: string;
   multiline?: boolean;
   autoFocus?: boolean;
-  type?: "text" | "number" | "date" | "url";
   // Keep the label for screen readers only, e.g. inside a table row.
   hideLabel?: boolean;
 }) {
   return (
-    <TextField value={props.value} onChange={props.onChange} autoFocus={props.autoFocus} type={props.type} fullWidth>
+    <TextField value={props.value} onChange={props.onChange} autoFocus={props.autoFocus} fullWidth>
       <Label className={props.hideLabel ? "sr-only" : undefined}>{props.label}</Label>
       {props.multiline ? (
-        <TextArea placeholder={props.placeholder} rows={3} />
+        <TextArea placeholder={props.placeholder} rows={2} />
       ) : (
         <Input placeholder={props.placeholder} />
       )}

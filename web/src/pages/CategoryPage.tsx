@@ -24,7 +24,6 @@ export function CategoryPage({ id, templates }: { id: number; templates: Templat
 
   if (error) return <p className="text-danger">{error}</p>;
   if (!category) return <Spinner />;
-  const template = templates.find((t) => t.name === category.template) ?? templates[0];
 
   return (
     <div className="flex flex-col gap-6">
@@ -34,7 +33,6 @@ export function CategoryPage({ id, templates }: { id: number; templates: Templat
         </a>
         <div className="mt-1 flex flex-wrap items-center gap-3">
           <h1 className="text-2xl font-semibold">{category.name}</h1>
-          <Chip size="sm">{template.label}</Chip>
           {!category.enabled && (
             <Chip size="sm" color="warning">
               Off

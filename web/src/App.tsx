@@ -64,7 +64,7 @@ export function App() {
           ) : route.page === "category" ? (
             <CategoryPage key={route.id} id={route.id} templates={templates} />
           ) : (
-            <CategoriesPage templates={templates} />
+            <CategoriesPage />
           )}
         </main>
 

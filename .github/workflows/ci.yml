@@ -47,4 +47,4 @@ jobs:
           file frame.png | grep "800 x 480"
           curl -sf localhost:8080/ | grep -q '<div id="root">'
           curl -sf -X POST -H 'Content-Type: application/json' \
-            -d '{"name":"CI","template":"quote"}' localhost:8080/api/categories
+            -d '{"name":"CI"}' localhost:8080/api/categories

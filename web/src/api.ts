@@ -10,7 +10,7 @@ export interface Settings {
 
 export const isPortrait = (o: Orientation) => o === "portrait";
 
-export type FieldType = "text" | "long_text" | "image" | "number" | "date" | "link";
+export type FieldType = "text" | "image";
 
 export interface Field {
   key: string;
@@ -21,17 +21,10 @@ export interface Field {
 // A field being edited: new fields get their key from the server.
 export type FieldDraft = Omit<Field, "key"> & { key?: string };
 
-export interface Slot {
-  name: string;
-  label: string;
-  kind: "image" | "text";
-}
-
 export interface Template {
   name: string;
   label: string;
   description: string;
-  slots: Slot[];
   fields: Field[];
   classes: string[];
 }
@@ -46,7 +39,6 @@ export interface Category {
   enabled: boolean;
   mono: boolean;
   fields: Field[];
-  slots: Record<string, string | null>;
   item_count: number;
   cover: string | null;
 }
@@ -74,7 +66,6 @@ export interface StyleChanges {
   template?: string;
   custom_css?: string;
   mono?: boolean;
-  slots?: Record<string, string | null>;
   item_id?: number;
 }
 
@@ -105,12 +96,8 @@ const json = (method: string, body: unknown): RequestInit => ({
 export const imageUrl = (name: string) => `/images/${name}`;
 
 export const FIELD_TYPES: Array<{ id: FieldType; label: string }> = [
-  { id: "text", label: "Short text" },
-  { id: "long_text", label: "Long text" },
+  { id: "text", label: "Text" },
   { id: "image", label: "Image" },
-  { id: "number", label: "Number" },
-  { id: "date", label: "Date" },
-  { id: "link", label: "Link" },
 ];
 
 // A one-line name and summary of an item, from its first fields.
