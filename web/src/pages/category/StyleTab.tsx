@@ -65,13 +65,13 @@ export function StyleTab(props: {
           <span className="text-sm font-medium">Filters</span>
           <Filter
             label="Black and white"
-            description="Draws everything in black and white only."
+            description="Draws everything in black and white; shades become dither patterns."
             isSelected={mono}
             onChange={setMono}
           />
           <Filter
             label="Pixelate"
-            description="For pixel art: images are enlarged with hard edges and keep their exact colours."
+            description="For pixel art: images keep hard edges when you enlarge them, and aren't dithered like photos."
             isSelected={pixelate}
             onChange={setPixelate}
           />

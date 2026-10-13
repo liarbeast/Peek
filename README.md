@@ -51,8 +51,9 @@ Pages are rendered in headless Chromium at 800x480, or at 480x800 when Settings 
 panel always gets 800x480, turned to match. CSS can target portrait with `@media (orientation: portrait)` and use the
 panel colours as `var(--black)`, `var(--white)`, `var(--yellow)`, `var(--red)`, `var(--blue)` and `var(--green)`.
 
-The Style tab also has two filters. Black and white draws the category in black and white only. Pixelate is for pixel
-art: images are enlarged with hard edges and mapped to the nearest panel colours instead of being dithered like photos.
+The Style tab also has two filters. Black and white draws the category in black and white only, turning shades into
+dither patterns (an even, regular one for pixel art). Pixelate is for pixel art: images keep hard edges when CSS enlarges
+them, and are mapped to the nearest panel colours instead of being dithered like photos.
 (Under the hood, any image drawn with `image-rendering: pixelated` is treated this way.)
 
 ## Development
