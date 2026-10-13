@@ -13,8 +13,7 @@
   :where(.stack > div.field:first-of-type) { font-size: 44px; font-weight: bold; }
   :where(.stack > img.field) { max-width: 100%; max-height: 55%; min-height: 0; object-fit: contain; }
   {% if pixelate %}
-  /* Pixel art: small sprites grow to fill the space, with hard edges. */
-  :where(.stack > img.field) { height: 55%; width: auto; }
+  /* Pixel art: hard edges whenever an image is drawn larger than it is. */
   img.field { image-rendering: pixelated; }
   {% endif %}
 {% endblock %}

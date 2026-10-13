@@ -69,6 +69,24 @@ def to_indices(img: Image.Image, dither: bool, mono: bool = False) -> np.ndarray
     return np.where(idx >= used, 0, idx).astype(np.uint8)
 
 
+# 4x4 ordered-dither thresholds, from 1/32 to 31/32.
+_BAYER = (np.array([[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]]) + 0.5) / 16
+
+
+def ordered_mono(img: Image.Image) -> np.ndarray:
+    """Black and white indices (0 or 1) with a regular dither pattern.
+
+    Used for pixel art in black and white: each shade becomes an even
+    pattern, the way old handhelds drew grey, rather than photo-style noise.
+    """
+    grey = np.asarray(img.convert("L"), dtype=np.float32)
+    lo, hi = (sum(MEASURED[i]) / 3 for i in (0, 1))
+    level = np.clip((grey - lo) / (hi - lo), 0, 1)
+    h, w = level.shape
+    threshold = np.tile(_BAYER, (h // 4 + 1, w // 4 + 1))[:h, :w]
+    return (level > threshold).astype(np.uint8)
+
+
 def indices_to_image(idx: np.ndarray, realistic: bool = False) -> Image.Image:
     """Build a paletted image from indices.
 

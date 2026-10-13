@@ -46,7 +46,7 @@ def build(template: str, fields: list[dict], values: dict, custom_css: str = "",
     """Render a layout.
 
     `values` maps field keys to what to show: text, or a data URI for images.
-    `pixelate` draws images as pixel art: scaled up with hard edges, not dithered.
+    `pixelate` draws images as pixel art: hard edges when enlarged, not dithered.
     """
     if template not in TEMPLATES:
         raise ValueError(f"unknown template: {template}")
