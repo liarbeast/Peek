@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Peek preview</title>
+<style>
+  :root { color-scheme: light dark; --bg: #f6f5f2; --card: #fff; --ink: #1d1d1f; --muted: #6b6b70; --line: #e2e1dc; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #161618; --card: #222225; --ink: #f2f2f2; --muted: #a0a0a6; --line: #333338; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 system-ui, sans-serif; background: var(--bg); color: var(--ink); }
+  main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 24px; margin: 0 0 4px; }
+  h2 { font-size: 17px; margin: 32px 0 12px; }
+  p.lead { color: var(--muted); margin: 0 0 8px; }
+  .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+  .card img { width: 100%; aspect-ratio: 5 / 3; display: block; border-radius: 4px; background: #ddd; }
+  .row { display: flex; gap: 8px; align-items: center; justify-content: space-between; margin-top: 8px; flex-wrap: wrap; }
+  .name { font-weight: 600; text-transform: capitalize; }
+  button, select, input, textarea { font: inherit; color: inherit; }
+  button { border: 1px solid var(--line); background: var(--bg); border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+  form { display: grid; gap: 10px; }
+  label { display: grid; gap: 4px; color: var(--muted); font-size: 13px; }
+  input, select, textarea { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; color: var(--ink); }
+  textarea { min-height: 90px; font-family: ui-monospace, monospace; font-size: 13px; }
+  .two { display: grid; gap: 16px; grid-template-columns: 1fr; }
+  @media (min-width: 800px) { .two { grid-template-columns: 1fr 1fr; } }
+  .status { color: var(--muted); font-size: 13px; min-height: 1.5em; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Peek</h1>
+  <p class="lead">Renderer preview. Images are shown in the panel's approximate real colours; switch to "original" to see what the browser drew before colour reduction.</p>
+
+  <h2>Samples</h2>
+  <div class="grid" id="samples"></div>
+
+  <h2>Try your own</h2>
+  <div class="two">
+    <div class="card">
+      <form id="custom">
+        <label>Layout
+          <select name="template">
+            <option value="photo">Photo</option>
+            <option value="quote">Quote</option>
+            <option value="sprite">Sprite (pixel art)</option>
+          </select>
+        </label>
+        <label>Image <input type="file" name="image" accept="image/*"></label>
+        <label>Title <input name="title" placeholder="Caption, source or name"></label>
+        <label>Text <input name="text" placeholder="Quote or description"></label>
+        <label>Custom CSS <textarea name="custom_css" placeholder=".caption { background: var(--blue); }"></textarea></label>
+        <div class="row" style="justify-content:flex-start">
+          <button type="submit">Preview</button>
+          <button type="button" id="to-frame">Show on frame</button>
+        </div>
+        <div class="status" id="status"></div>
+      </form>
+    </div>
+    <div class="card">
+      <img id="custom-out" alt="Preview of your screen">
+      <div class="row"><span class="name">Your preview</span></div>
+    </div>
+  </div>
+
+  <h2>On the frame now</h2>
+  <div class="grid">
+    <div class="card">
+      <img id="current" alt="Image the frame shows on its next wake">
+      <div class="row"><span class="status">The frame picks this up on its next wake, from /frame.png.</span></div>
+    </div>
+  </div>
+</main>
+<script>
+  const refreshCurrent = () => { document.getElementById("current").src = "/frame/preview.png?t=" + Date.now(); };
+
+  fetch("/api/samples").then(r => r.json()).then(names => {
+    const grid = document.getElementById("samples");
+    for (const name of names) {
+      const card = document.createElement("div");
+      card.className = "card";
+      card.innerHTML = `<img alt="${name} sample"><div class="row"><span class="name">${name}</span>
+        <span><button data-view>Original</button> <button data-frame>Show on frame</button></span></div>`;
+      const img = card.querySelector("img");
+      let view = "preview";
+      img.src = `/render/sample/${name}.png?view=${view}`;
+      card.querySelector("[data-view]").onclick = e => {
+        view = view === "preview" ? "raw" : "preview";
+        e.target.textContent = view === "preview" ? "Original" : "Panel";
+        img.src = `/render/sample/${name}.png?view=${view}`;
+      };
+      card.querySelector("[data-frame]").onclick = () =>
+        fetch(`/frame/sample/${name}`, { method: "POST" }).then(refreshCurrent);
+      grid.appendChild(card);
+    }
+  });
+
+  const form = document.getElementById("custom");
+  const status = document.getElementById("status");
+  async function send(url) {
+    status.textContent = "Rendering…";
+    const res = await fetch(url, { method: "POST", body: new FormData(form) });
+    if (!res.ok) { status.textContent = (await res.json()).detail || "Something went wrong"; return; }
+    document.getElementById("custom-out").src = URL.createObjectURL(await res.blob());
+    status.textContent = "";
+  }
+  form.onsubmit = e => { e.preventDefault(); send("/render"); };
+  document.getElementById("to-frame").onclick = () => send("/frame").then(refreshCurrent);
+  refreshCurrent();
+</script>
+</body>
+</html>

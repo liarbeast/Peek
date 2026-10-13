@@ -1,0 +1,23 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  /* The six panel colours, for use in templates and custom CSS. */
+  :root {
+    --black: #000; --white: #fff; --yellow: #ff0;
+    --red: #f00; --blue: #00f; --green: #0f0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 800px; height: 480px; overflow: hidden;
+    background: var(--white); color: var(--black);
+    font-family: "DejaVu Sans", "Liberation Sans", Arial, sans-serif;
+    -webkit-font-smoothing: none;
+  }
+  {% block style %}{% endblock %}
+</style>
+{% if custom_css %}<style>{{ custom_css | safe }}</style>{% endif %}
+</head>
+<body>{% block body %}{% endblock %}</body>
+</html>
