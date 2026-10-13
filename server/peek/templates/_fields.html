@@ -1,0 +1,11 @@
+{# Draws one field's value with its classes: field field-<key> type-<type>. #}
+{% macro field(e) -%}
+  {%- if e.value -%}
+    {%- set classes = "field field-" ~ e.key ~ " type-" ~ e.type -%}
+    {%- if e.type == "image" -%}
+      <img class="{{ classes }}" src="{{ e.value }}" alt="">
+    {%- else -%}
+      <div class="{{ classes }}">{{ e.value }}</div>
+    {%- endif -%}
+  {%- endif -%}
+{%- endmacro %}

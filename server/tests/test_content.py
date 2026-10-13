@@ -1,4 +1,5 @@
 import io
+import json
 
 import numpy as np
 import pytest
@@ -20,20 +21,33 @@ def client(tmp_path):
 
 
 def make_category(client, **fields):
-    body = {"name": "Birds", "template": "photo", **fields}
+    body = {"name": "Birds", **fields}
     res = client.post("/api/categories", json=body)
+    assert res.status_code == 201, res.text
+    return res.json()
+
+
+def add_item(client, category_id, data=None, images=None):
+    files = [(f"image:{key}", (f"{key}.png", content, "image/png")) for key, content in (images or {}).items()]
+    res = client.post(
+        f"/api/categories/{category_id}/items",
+        data={"data": json.dumps(data or {})},
+        files=files or None,
+    )
     assert res.status_code == 201, res.text
     return res.json()
 
 
 def test_templates_are_listed(client):
     names = [t["name"] for t in client.get("/api/templates").json()]
-    assert names == ["photo", "quote", "sprite"]
+    assert names == ["stack"]
 
 
 def test_category_crud(client):
     cat = make_category(client, custom_css=".caption { color: red; }")
     assert cat["item_count"] == 0 and cat["enabled"] is True
+    assert cat["template"] == "stack"
+    assert [f["key"] for f in cat["fields"]] == ["image", "title", "subtext"]
 
     res = client.patch(f"/api/categories/{cat['id']}", json={"name": "Garden birds", "item_order": "shuffle"})
     assert res.json()["name"] == "Garden birds"
@@ -51,58 +65,102 @@ def test_unknown_template_and_order_are_rejected(client):
     assert client.patch(f"/api/categories/{cat['id']}", json={"item_order": "sideways"}).status_code == 422
 
 
+def test_copy_category_takes_fields_and_style(client):
+    src = make_category(client, custom_css=".field-title { color: red; }")
+    client.patch(f"/api/categories/{src['id']}", json={"fields": src["fields"] + [{"label": "Year", "type": "text"}]})
+    res = client.post("/api/categories", json={"name": "More quotes", "copy_from": src["id"]})
+    assert res.status_code == 201
+    copy = res.json()
+    assert copy["custom_css"] == ".field-title { color: red; }"
+    assert [f["key"] for f in copy["fields"]] == ["image", "title", "subtext", "year"]
+
+
+def test_field_editing(client):
+    cat = make_category(client)
+    fields = cat["fields"] + [{"label": "Pokédex no.", "type": "text"}, {"label": "Year", "type": "text"}]
+    res = client.patch(f"/api/categories/{cat['id']}", json={"fields": fields})
+    assert res.status_code == 200, res.text
+    assert [f["key"] for f in res.json()["fields"]] == ["image", "title", "subtext", "pokedex-no", "year"]
+
+    # Renaming keeps the key, so CSS that targets .field-year keeps working.
+    fields = res.json()["fields"]
+    fields[4]["label"] = "Released"
+    res = client.patch(f"/api/categories/{cat['id']}", json={"fields": fields})
+    assert res.json()["fields"][4] == {"key": "year", "label": "Released", "type": "text"}
+
+    bad = [{"label": "", "type": "text"}]
+    assert client.patch(f"/api/categories/{cat['id']}", json={"fields": bad}).status_code == 422
+    bad = [{"label": "X", "type": "number"}]
+    assert client.patch(f"/api/categories/{cat['id']}", json={"fields": bad}).status_code == 422
+
+
+def test_removing_an_image_field_removes_its_files(client, tmp_path):
+    cat = make_category(client)
+    item = add_item(client, cat["id"], {"title": "Robin"}, {"image": png()})
+    path = tmp_path / "images" / item["data"]["image"]
+    assert path.exists()
+    res = client.patch(f"/api/categories/{cat['id']}", json={"fields": [cat["fields"][1]]})
+    assert res.status_code == 200
+    assert not path.exists()
+    assert client.get(f"/api/categories/{cat['id']}/items").json()[0]["data"] == {"title": "Robin"}
+
+
 def test_items_with_images(client, tmp_path):
     cat = make_category(client)
-    res = client.post(
-        f"/api/categories/{cat['id']}/items",
-        data={"title": "Robin"},
-        files=[("images", ("robin.png", png(), "image/png"))],
-    )
-    assert res.status_code == 201, res.text
-    item = res.json()[0]
-    assert item["title"] == "Robin" and item["image"].endswith(".png")
-    assert client.get(f"/images/{item['image']}").content == png()
+    item = add_item(client, cat["id"], {"title": "Robin"}, {"image": png()})
+    assert item["data"]["title"] == "Robin" and item["data"]["image"].endswith(".png")
+    assert client.get(f"/images/{item['data']['image']}").content == png()
+    assert client.get("/api/categories").json()[0]["cover"] == item["data"]["image"]
 
     # Replacing the image removes the old file.
-    old = tmp_path / "images" / item["image"]
-    res = client.patch(f"/api/items/{item['id']}", files={"image": ("new.png", png((0, 0, 255)), "image/png")})
-    assert res.json()["image"] != item["image"]
+    old = tmp_path / "images" / item["data"]["image"]
+    res = client.patch(f"/api/items/{item['id']}", files={"image:image": ("new.png", png((0, 0, 255)), "image/png")})
+    assert res.status_code == 200, res.text
+    assert res.json()["data"]["image"] != item["data"]["image"]
+    assert res.json()["data"]["title"] == "Robin"
     assert not old.exists()
 
     # Deleting the category removes its items' images.
-    newer = tmp_path / "images" / res.json()["image"]
+    newer = tmp_path / "images" / res.json()["data"]["image"]
     client.delete(f"/api/categories/{cat['id']}")
     assert not newer.exists()
+
+
+def test_unknown_field_is_rejected(client):
+    cat = make_category(client)
+    res = client.post(f"/api/categories/{cat['id']}/items", data={"data": json.dumps({"colour": "red"})})
+    assert res.status_code == 422
 
 
 def test_bulk_upload_names_items_after_files(client):
     cat = make_category(client)
     files = [("images", (f"{n}.png", png(), "image/png")) for n in ("blue_tit", "great-tit")]
-    res = client.post(f"/api/categories/{cat['id']}/items", files=files)
-    assert [i["title"] for i in res.json()] == ["blue tit", "great tit"]
+    res = client.post(f"/api/categories/{cat['id']}/items/images", files=files)
+    assert res.status_code == 201, res.text
+    assert [i["data"]["title"] for i in res.json()] == ["blue tit", "great tit"]
     assert [i["position"] for i in res.json()] == [1, 2]
 
 
 def test_reorder_and_edit_items(client):
-    cat = make_category(client, template="quote")
-    a = client.post(f"/api/categories/{cat['id']}/items", data={"text": "First"}).json()[0]
-    b = client.post(f"/api/categories/{cat['id']}/items", data={"text": "Second"}).json()[0]
+    cat = make_category(client)
+    a = add_item(client, cat["id"], {"title": "First", "subtext": "A"})
+    b = add_item(client, cat["id"], {"title": "Second"})
     client.put(f"/api/categories/{cat['id']}/items/order", json={"item_ids": [b["id"], a["id"]]})
-    assert [i["text"] for i in client.get(f"/api/categories/{cat['id']}/items").json()] == ["Second", "First"]
+    assert [i["data"]["title"] for i in client.get(f"/api/categories/{cat['id']}/items").json()] == ["Second", "First"]
 
-    res = client.patch(f"/api/items/{a['id']}", data={"text": "Edited", "enabled": "false"})
-    assert res.json()["text"] == "Edited" and res.json()["enabled"] is False
+    res = client.patch(f"/api/items/{a['id']}", data={"data": json.dumps({"title": "Edited", "subtext": ""}), "enabled": "false"})
+    assert res.json()["data"] == {"title": "Edited"} and res.json()["enabled"] is False
 
 
 def test_empty_item_is_rejected(client):
     cat = make_category(client)
-    assert client.post(f"/api/categories/{cat['id']}/items", data={}).status_code == 422
+    assert client.post(f"/api/categories/{cat['id']}/items", data={"data": "{}"}).status_code == 422
 
 
 def test_wrong_image_type_is_rejected(client):
     cat = make_category(client)
     res = client.post(
-        f"/api/categories/{cat['id']}/items", files=[("images", ("a.txt", b"hello", "text/plain"))]
+        f"/api/categories/{cat['id']}/items", files=[("image:image", ("a.txt", b"hello", "text/plain"))]
     )
     assert res.status_code == 415
 
@@ -112,14 +170,64 @@ def test_image_path_cannot_escape(client):
     assert not client.get("/images/..%2Fpeek.db").content.startswith(b"SQLite")
 
 
+def test_csv_preview_matches_columns_and_guesses_types(client):
+    cat = make_category(client)
+    csv = "Title;Subtext;Year;Link\n\"Here's looking at you, kid.\";Casablanca;1942;https://example.com/c\nMay the Force be with you.;Star Wars;1977;https://example.com/s\n"
+    res = client.post(f"/api/categories/{cat['id']}/import/preview", files={"file": ("q.csv", csv.encode(), "text/csv")})
+    assert res.status_code == 200, res.text
+    cols = res.json()["columns"]
+    assert [(c["name"], c["field"]) for c in cols] == [("Title", "title"), ("Subtext", "subtext"), ("Year", None), ("Link", None)]
+    assert [c["type"] for c in cols[2:]] == ["text", "text"]
+    assert res.json()["rows"] == 2
+
+
+def test_csv_import_adds_fields_and_items(client, monkeypatch):
+    from peek import csv_import
+
+    monkeypatch.setattr(csv_import, "download_images", lambda urls, allowed: {
+        u: ((png(), ".png") if "good" in u else None) for u in urls
+    })
+    cat = make_category(client)
+    csv = (
+        "Name,Sprite,No.,Notes\n"
+        "Pikachu,https://img.example/good/25.png,25,Electric\n"
+        "Missingno,https://img.example/bad.png,0,\n"
+        ",,,\n"
+    )
+    mapping = [{"field": "title"}, {"field": "image"}, {"new": {"label": "No.", "type": "text"}}, None]
+    res = client.post(
+        f"/api/categories/{cat['id']}/import",
+        files={"file": ("p.csv", csv.encode("utf-8-sig"), "text/csv")},
+        data={"mapping": json.dumps(mapping)},
+    )
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["created"] == 2 and body["images_failed"] == 1
+    assert body["category"]["fields"][-1] == {"key": "no", "label": "No.", "type": "text"}
+    items = client.get(f"/api/categories/{cat['id']}/items").json()
+    assert items[0]["data"]["title"] == "Pikachu" and items[0]["data"]["no"] == "25"
+    assert items[0]["data"]["image"].endswith(".png")
+    assert "image" not in items[1]["data"]
+
+
+def test_every_field_gets_its_own_class(client):
+    from peek import layouts
+
+    fields = layouts.TEMPLATE_INFO["stack"]["fields"] + [{"key": "year", "label": "Year", "type": "text"}]
+    html = layouts.build("stack", fields, {"title": "Casablanca", "year": "1942"})
+    assert 'class="field field-title type-text"' in html
+    assert 'class="field field-year type-text"' in html
+    assert "field-image" not in html  # empty fields are left out
+
+
 def frame_pixel(client, x=5, y=5):
     img = Image.open(io.BytesIO(client.get("/frame.png").content)).convert("RGB")
     return tuple(np.asarray(img)[y, x])
 
 
 def test_preview_uses_unsaved_css_and_show_sets_frame(client):
-    cat = make_category(client, template="quote", custom_css="body { background: var(--blue); }")
-    item = client.post(f"/api/categories/{cat['id']}/items", data={"text": "Hi"}).json()[0]
+    cat = make_category(client, custom_css="body { background: var(--blue); }")
+    item = add_item(client, cat["id"], {"title": "Hi"})
 
     res = client.post(
         f"/api/categories/{cat['id']}/preview.png",
@@ -134,7 +242,7 @@ def test_preview_uses_unsaved_css_and_show_sets_frame(client):
 
 
 def test_preview_without_items_uses_placeholder(client):
-    cat = make_category(client, template="sprite")
+    cat = make_category(client)
     res = client.post(f"/api/categories/{cat['id']}/preview.png", json={})
     assert res.status_code == 200
     assert Image.open(io.BytesIO(res.content)).size == (800, 480)
@@ -151,8 +259,8 @@ def test_orientation_setting(client):
 def test_portrait_previews_upright_and_frame_gets_turned(client):
     # A quote with a red band across the top of the upright picture.
     css = "body { border-top: 40px solid var(--red); }"
-    cat = make_category(client, template="quote", custom_css=css)
-    item = client.post(f"/api/categories/{cat['id']}/items", data={"text": "Hi"}).json()[0]
+    cat = make_category(client, custom_css=css)
+    item = add_item(client, cat["id"], {"title": "Hi"})
     client.post(f"/api/items/{item['id']}/show")
     assert frame_pixel(client, x=400, y=5) == (255, 0, 0)
 
@@ -167,3 +275,10 @@ def test_portrait_previews_upright_and_frame_gets_turned(client):
     assert frame_pixel(client, x=5, y=240) == (255, 0, 0)
     assert frame_pixel(client, x=400, y=5) != (255, 0, 0)
     assert Image.open(io.BytesIO(client.get("/frame/preview.png").content)).size == (480, 800)
+
+
+def test_mono_style_previews_in_black_and_white(client):
+    cat = make_category(client, custom_css="body { background: var(--blue); }")
+    res = client.post(f"/api/categories/{cat['id']}/preview.png", params={"view": "panel"}, json={"mono": True})
+    img = Image.open(io.BytesIO(res.content)).convert("RGB")
+    assert {c for _, c in img.getcolors()} <= {(0, 0, 0), (255, 255, 255)}

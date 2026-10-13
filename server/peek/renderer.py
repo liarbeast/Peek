@@ -8,7 +8,9 @@ colour, so letters stay crisp and sprites stay blocky.
 
 To know which pixels belong to a photo, the page is screenshotted two more
 times with every photo painted pure white and then pure black. Pixels that
-change between those two shots are photo pixels that nothing covers.
+change between those two shots are photo pixels that nothing covers. In
+black and white, pixel art is found the same way, so its shades can become
+an even dither pattern instead of collapsing to black or white.
 """
 
 from __future__ import annotations
@@ -23,11 +25,19 @@ from playwright.sync_api import sync_playwright
 
 from . import palette
 
-# <img> elements are photos unless marked otherwise; anything else (a CSS
-# background, say) can opt in with data-peek="photo".
+# <img> elements are photos unless marked otherwise or drawn with
+# `image-rendering: pixelated`; anything else (a CSS background, say) can opt
+# in with data-peek="photo".
 PHOTO_SELECTOR = 'img:not([data-peek]), [data-peek="photo"]'
+PIXEL_SELECTOR = '[data-peek="pixel"]'
 
 _MASK_STYLE = "%s { filter: brightness(0) %s !important; }"
+
+_MARK_PIXEL_ART = """
+for (const img of document.querySelectorAll("img:not([data-peek])")) {
+  if (getComputedStyle(img).imageRendering === "pixelated") img.dataset.peek = "pixel";
+}
+"""
 
 # A pixel counts as photo when painting the photos white versus black moves
 # it by more than this much (0-255, summed over RGB / 3).
@@ -77,8 +87,21 @@ def _shot(page) -> Image.Image:
     return Image.open(io.BytesIO(page.screenshot(type="png"))).convert("RGB")
 
 
-def screenshot(html: str, size: tuple[int, int] = (palette.WIDTH, palette.HEIGHT)) -> tuple[Image.Image, np.ndarray]:
-    """Return the page as drawn plus a boolean mask of visible photo pixels."""
+def _mask(page, selector: str) -> np.ndarray:
+    """Which pixels belong to the visible elements matching `selector`."""
+    style = page.add_style_tag(content=_MASK_STYLE % (selector, "invert(1)"))
+    white = np.asarray(_shot(page), dtype=np.int16)
+    style.evaluate("el => el.remove()")
+    style = page.add_style_tag(content=_MASK_STYLE % (selector, ""))
+    black = np.asarray(_shot(page), dtype=np.int16)
+    style.evaluate("el => el.remove()")
+    return np.abs(white - black).mean(axis=2) > _MASK_THRESHOLD
+
+
+def screenshot(html: str, size: tuple[int, int] = (palette.WIDTH, palette.HEIGHT),
+               find_pixel_art: bool = False) -> tuple[Image.Image, np.ndarray, np.ndarray]:
+    """Return the page as drawn plus boolean masks of visible photo pixels and,
+    if asked for, pixel-art pixels."""
     width, height = size
     launch = {"args": ["--disable-dev-shm-usage"]}
     if path := os.environ.get("PEEK_CHROMIUM_PATH"):
@@ -94,33 +117,31 @@ def screenshot(html: str, size: tuple[int, int] = (palette.WIDTH, palette.HEIGHT
             page.evaluate("document.fonts.ready")
             raw = _shot(page)
 
-            has_photos = page.evaluate(
-                f"document.querySelectorAll({PHOTO_SELECTOR!r}).length > 0"
-            )
-            if not has_photos:
-                return raw, np.zeros((height, width), dtype=bool)
-
-            style = page.add_style_tag(content=_MASK_STYLE % (PHOTO_SELECTOR, "invert(1)"))
-            white = np.asarray(_shot(page), dtype=np.int16)
-            style.evaluate("el => el.remove()")
-            page.add_style_tag(content=_MASK_STYLE % (PHOTO_SELECTOR, ""))
-            black = np.asarray(_shot(page), dtype=np.int16)
+            # Images that CSS draws pixelated are pixel art, not photos.
+            page.evaluate(_MARK_PIXEL_ART)
+            masks = []
+            for selector, wanted in ((PHOTO_SELECTOR, True), (PIXEL_SELECTOR, find_pixel_art)):
+                present = wanted and page.evaluate(f"document.querySelectorAll({selector!r}).length > 0")
+                masks.append(_mask(page, selector) if present else np.zeros((height, width), dtype=bool))
         finally:
             browser.close()
-
-    mask = np.abs(white - black).mean(axis=2) > _MASK_THRESHOLD
-    return raw, mask
+    return raw, *masks
 
 
-def reduce(raw: Image.Image, photo_mask: np.ndarray) -> np.ndarray:
-    """Map a full-colour image to palette indices: dither photos only."""
-    idx = palette.to_indices(raw, dither=False)
+def reduce(raw: Image.Image, photo_mask: np.ndarray, mono: bool = False,
+           pixel_mask: np.ndarray | None = None) -> np.ndarray:
+    """Map a full-colour image to palette indices: dither photos only, and in
+    black and white give pixel art an even dither pattern."""
+    idx = palette.to_indices(raw, dither=False, mono=mono)
     if photo_mask.any():
-        dithered = palette.to_indices(raw, dither=True)
+        dithered = palette.to_indices(raw, dither=True, mono=mono)
         idx = np.where(photo_mask, dithered, idx)
+    if mono and pixel_mask is not None and pixel_mask.any():
+        idx = np.where(pixel_mask & ~photo_mask, palette.ordered_mono(raw), idx)
     return idx
 
 
-def render(html: str, orientation: str = "landscape") -> Render:
-    raw, mask = screenshot(html, canvas_size(orientation))
-    return Render(raw=raw, indices=reduce(raw, mask), orientation=orientation)
+def render(html: str, orientation: str = "landscape", mono: bool = False) -> Render:
+    """Render a page; ``mono`` draws it in black and white only."""
+    raw, photos, pixel_art = screenshot(html, canvas_size(orientation), find_pixel_art=mono)
+    return Render(raw=raw, indices=reduce(raw, photos, mono, pixel_art), orientation=orientation)
