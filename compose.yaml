@@ -1,0 +1,13 @@
+services:
+  peek:
+    build: .
+    image: localhost/peek:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      # :Z lets SELinux systems (Fedora, Bazzite) share the folder; others ignore it.
+      - ./data:/data:Z
+    environment:
+      # How long the frame sleeps between wakes, until the scheduler exists.
+      PEEK_SLEEP_SECONDS: "3600"
+    restart: unless-stopped

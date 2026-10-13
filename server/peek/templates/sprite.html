@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block style %}
+  body { display: flex; align-items: center; padding: 0 56px; gap: 40px; }
+  /* Pixel art: whole-number scaling, no smoothing, no dithering. */
+  .sprite { width: 384px; height: 384px; image-rendering: pixelated; flex: none; }
+  .number { font-size: 30px; font-weight: bold; color: var(--red); }
+  .name { font-size: 56px; font-weight: bold; text-transform: capitalize; margin-top: 4px; }
+  .text { font-size: 24px; margin-top: 16px; line-height: 1.35; }
+{% endblock %}
+{% block body %}
+  <img class="sprite" data-peek="pixel" src="{{ image }}" alt="">
+  <div>
+    {% if number %}<div class="number">#{{ number }}</div>{% endif %}
+    <div class="name">{{ title }}</div>
+    {% if text %}<div class="text">{{ text }}</div>{% endif %}
+  </div>
+{% endblock %}

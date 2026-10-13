@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements-dev.txt
+      - run: playwright install --with-deps chromium
+      - run: pytest
+        working-directory: server
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the image
+        run: docker build -t peek:ci .
+      - name: Serve a frame image from the container
+        run: |
+          docker run -d --name peek -p 8080:8080 peek:ci
+          for i in $(seq 1 30); do curl -sf localhost:8080/api/sleep && break; sleep 1; done
+          curl -sf -o frame.png localhost:8080/frame.png
+          file frame.png | grep "800 x 480"
