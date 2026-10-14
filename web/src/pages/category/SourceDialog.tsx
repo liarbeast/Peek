@@ -1,11 +1,17 @@
 import { Button, toast } from "@heroui/react";
 import { useState } from "react";
 import { api, type Category } from "../../api";
-import { TextInput } from "../../components/ui";
+import { Dialog, TextInput } from "../../components/ui";
 
-// A collection's data source: a JSON address whose entries become its items,
-// read again every day.
-export function SourceSection(props: { category: Category; itemCount: number; onSaved: (c: Category) => void }) {
+// Connects a collection to a data source: a JSON address whose entries become
+// its items, read again every day.
+export function SourceDialog(props: {
+  category: Category;
+  itemCount: number;
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSaved: (c: Category) => void;
+}) {
   const { category, onSaved } = props;
   const [url, setUrl] = useState(category.source?.url ?? "");
   const [items, setItems] = useState(category.source?.items ?? "");
@@ -20,6 +26,7 @@ export function SourceSection(props: { category: Category; itemCount: number; on
       await api.updateCategory(category.id, { source } as Partial<Category>);
       const { created, category: synced } = await api.syncCategory(category.id);
       onSaved(synced);
+      props.onOpenChange(false);
       toast.success(`Fetched ${created} ${created === 1 ? "item" : "items"}`);
     } catch (e) {
       toast.danger((e as Error).message);
@@ -29,10 +36,25 @@ export function SourceSection(props: { category: Category; itemCount: number; on
   };
 
   return (
-    <div className="flex max-w-lg flex-col gap-4">
+    <Dialog
+      isOpen={props.isOpen}
+      onOpenChange={props.onOpenChange}
+      title={category.source ? "Data source" : "Connect data source"}
+      size="lg"
+      footer={
+        <>
+          <Button variant="tertiary" onPress={() => props.onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button isDisabled={busy || !url.trim()} onPress={save}>
+            {busy ? "Fetching…" : "Save and fetch now"}
+          </Button>
+        </>
+      }
+    >
       <p className="text-sm text-muted">
-        A web address that returns JSON. Every day its entries replace the items below.
-        {category.synced && ` Last fetched on ${category.synced}.`}
+        A web address that returns JSON. Every day its entries replace the items, which can't be edited by hand while
+        the source is connected.
         {!category.source &&
           props.itemCount > 0 &&
           ` Fetching replaces the ${props.itemCount} items this collection has now.`}
@@ -65,11 +87,6 @@ export function SourceSection(props: { category: Category; itemCount: number; on
           placeholder={f.type === "image" ? "image.url" : "name"}
         />
       ))}
-      <div className="flex flex-wrap gap-2">
-        <Button isDisabled={busy || !url.trim()} onPress={save}>
-          {busy ? "Fetching…" : "Save and fetch now"}
-        </Button>
-      </div>
-    </div>
+    </Dialog>
   );
 }
