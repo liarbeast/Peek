@@ -70,6 +70,18 @@ export function ItemsTab(props: {
     onChange();
   };
 
+  const [confirmingDeleteAll, setConfirmingDeleteAll] = useState(false);
+  const removeAll = async () => {
+    setConfirmingDeleteAll(false);
+    try {
+      await api.deleteAllItems(category.id);
+      toast.success("All items deleted");
+    } catch (e) {
+      toast.danger((e as Error).message);
+    }
+    onChange();
+  };
+
   const remove = async (item: Item) => {
     await api.deleteItem(item.id);
     toast.success("Item deleted");
@@ -110,7 +122,30 @@ export function ItemsTab(props: {
             e.target.value = "";
           }}
         />
+        {items.length > 0 && (
+          <Button variant="danger-soft" className="ml-auto" onPress={() => setConfirmingDeleteAll(true)}>
+            Delete all
+          </Button>
+        )}
       </div>
+      <Dialog
+        isOpen={confirmingDeleteAll}
+        onOpenChange={setConfirmingDeleteAll}
+        title={`Delete all ${items.length} items?`}
+        size="sm"
+        footer={
+          <>
+            <Button variant="tertiary" onPress={() => setConfirmingDeleteAll(false)}>
+              Cancel
+            </Button>
+            <Button variant="danger" onPress={removeAll}>
+              Delete all
+            </Button>
+          </>
+        }
+      >
+        <p>Every item in {category.name} and its images will be deleted. This can't be undone.</p>
+      </Dialog>
 
       {category.fields.length === 0 && (
         <p className="text-muted">This category has no fields yet. Add some on the Fields tab, or import a CSV.</p>
