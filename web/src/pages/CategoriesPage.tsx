@@ -1,7 +1,7 @@
 import { Button, Card, Chip, Spinner } from "@heroui/react";
 import { useEffect, useState } from "react";
 import { api, imageUrl, type Category } from "../api";
-import { Choice, Dialog, TextInput } from "../components/ui";
+import { Dialog, TextInput } from "../components/ui";
 import { go } from "../router";
 import { ORDERS } from "./category/SettingsTab";
 
@@ -56,7 +56,6 @@ export function CategoriesPage() {
       <NewCategoryDialog
         isOpen={creating}
         onOpenChange={setCreating}
-        categories={categories ?? []}
         onCreated={(c) => go(`#/categories/${c.id}`)}
       />
     </div>
@@ -103,20 +102,16 @@ function CategoryGroup(props: { title: string; categories: Category[]; empty?: s
 function NewCategoryDialog(props: {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  categories: Category[];
   onCreated: (c: Category) => void;
 }) {
   const [name, setName] = useState("");
-  // "new", or the id of a category to copy fields and style from.
-  const [start, setStart] = useState("new");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const create = async () => {
     setBusy(true);
     try {
-      const body = start === "new" ? {} : { copy_from: Number(start) };
-      props.onCreated(await api.createCategory({ name: name.trim(), ...body }));
+      props.onCreated(await api.createCategory({ name: name.trim() }));
       props.onOpenChange(false);
       setName("");
     } catch (e) {
@@ -143,21 +138,6 @@ function NewCategoryDialog(props: {
       }
     >
       <TextInput label="Name" value={name} onChange={setName} placeholder="Bird of the day" autoFocus />
-      {props.categories.length > 0 && (
-        <Choice
-          label="Start from"
-          value={start}
-          onChange={setStart}
-          options={[
-            { id: "new", label: "Image, title and subtext", description: "The usual fields; change them any time" },
-            ...props.categories.map((c) => ({
-              id: String(c.id),
-              label: `A copy of ${c.name}`,
-              description: "Its fields and style, without its items",
-            })),
-          ]}
-        />
-      )}
       {error && <p className="text-sm text-danger">{error}</p>}
     </Dialog>
   );
