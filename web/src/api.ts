@@ -205,6 +205,7 @@ export const api = {
   // Also "remove:<key>" to clear an image, and "enabled".
   updateItem: (id: number, form: FormData) => request<Item>(`/api/items/${id}`, { method: "PATCH", body: form }),
   deleteItem: (id: number) => request<void>(`/api/items/${id}`, { method: "DELETE" }),
+  deleteAllItems: (categoryId: number) => request<void>(`/api/categories/${categoryId}/items`, { method: "DELETE" }),
   reorderItems: (categoryId: number, itemIds: number[]) =>
     request<void>(`/api/categories/${categoryId}/items/order`, json("PUT", { item_ids: itemIds })),
 

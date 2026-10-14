@@ -526,6 +526,18 @@ async def update_item(request: Request, item_id: int) -> dict:
     return store.update_item(item_id, changes)
 
 
+@router.delete("/api/categories/{category_id}/items", status_code=204)
+def delete_all_items(request: Request, category_id: int) -> None:
+    store = _store(request)
+    category = _category_or_404(store, category_id)
+    items = store.items(category_id)
+    images = [name for item in items for name in _item_images(category, item)]
+    for item in items:
+        store.delete_item(item["id"])
+    for name in images:
+        _remove_image(store, name)
+
+
 @router.delete("/api/items/{item_id}", status_code=204)
 def delete_item(request: Request, item_id: int) -> None:
     store = _store(request)

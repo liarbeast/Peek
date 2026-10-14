@@ -400,6 +400,18 @@ def test_attached_to_an_empty_field_takes_its_place(client):
     assert found["title"][1] == 100  # where the image would have been
 
 
+def test_delete_all_items(client):
+    cat = make_category(client)
+    other = make_category(client)
+    for n in range(3):
+        add_item(client, cat["id"], {"title": f"Bird {n}"}, images={"image": png()})
+    add_item(client, other["id"], {"title": "Kept"})
+    assert client.delete(f"/api/categories/{cat['id']}/items").status_code == 204
+    assert client.get(f"/api/categories/{cat['id']}/items").json() == []
+    assert len(client.get(f"/api/categories/{other['id']}/items").json()) == 1
+    assert client.delete("/api/categories/999/items").status_code == 404
+
+
 def test_hidden_field_is_kept_but_not_drawn(client):
     cat = make_category(client)
     item = add_item(client, cat["id"], {"title": "Robin", "subtext": "Garden bird"})
