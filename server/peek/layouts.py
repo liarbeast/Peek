@@ -42,17 +42,21 @@ def data_uri(data: bytes, mime: str = "image/png") -> str:
 
 
 def build(template: str, fields: list[dict], values: dict, custom_css: str = "",
-          size: tuple[int, int] = (800, 480), pixelate: bool = False) -> str:
+          size: tuple[int, int] = (800, 480), pixelate: bool = False,
+          positions: dict[str, dict] | None = None) -> str:
     """Render a layout.
 
     `values` maps field keys to what to show: text, or a data URI for images.
     `pixelate` draws images as pixel art: hard edges when enlarged, not dithered.
+    `positions` places fields at a fixed box ({"x", "y", "w", "h"} in pixels),
+    taking them out of the stack; the others stay in it.
     """
+    positions = positions or {}
     if template not in TEMPLATES:
         raise ValueError(f"unknown template: {template}")
     width, height = size
     return _env.get_template(f"{template}.html").render(
-        fields=[{**f, "value": values.get(f["key"]) or ""} for f in fields],
+        fields=[{**f, "value": values.get(f["key"]) or "", "box": positions.get(f["key"])} for f in fields],
         custom_css=custom_css,
         pixelate=pixelate,
         width=width,

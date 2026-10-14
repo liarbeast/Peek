@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import io
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 from PIL import Image
@@ -37,6 +37,15 @@ _MARK_PIXEL_ART = """
 for (const img of document.querySelectorAll("img:not([data-peek])")) {
   if (getComputedStyle(img).imageRendering === "pixelated") img.dataset.peek = "pixel";
 }
+"""
+
+# Where each field ended up on the page, so the app can draw a box around it
+# to drag: {key: [x, y, width, height]}.
+_FIELD_BOXES = """
+() => Object.fromEntries([...document.querySelectorAll("[data-field]")].map((el) => {
+  const r = el.getBoundingClientRect();
+  return [el.dataset.field, [r.x, r.y, r.width, r.height].map(Math.round)];
+}))
 """
 
 # A pixel counts as photo when painting the photos white versus black moves
@@ -63,6 +72,7 @@ class Render:
     raw: Image.Image  # what Chromium drew, full colour, upright
     indices: np.ndarray  # palette index (0-5) per pixel, upright
     orientation: str = "landscape"
+    boxes: dict[str, list[int]] = field(default_factory=dict)  # where each field was drawn
 
     def panel_png(self) -> bytes:
         """The PNG the frame downloads: 800x480, paletted, in PANEL colours."""
@@ -99,9 +109,9 @@ def _mask(page, selector: str) -> np.ndarray:
 
 
 def screenshot(html: str, size: tuple[int, int] = (palette.WIDTH, palette.HEIGHT),
-               find_pixel_art: bool = False) -> tuple[Image.Image, np.ndarray, np.ndarray]:
-    """Return the page as drawn plus boolean masks of visible photo pixels and,
-    if asked for, pixel-art pixels."""
+               find_pixel_art: bool = False) -> tuple[Image.Image, np.ndarray, np.ndarray, dict]:
+    """Return the page as drawn, boolean masks of visible photo pixels and, if
+    asked for, pixel-art pixels, and where each field was drawn."""
     width, height = size
     launch = {"args": ["--disable-dev-shm-usage"]}
     if path := os.environ.get("PEEK_CHROMIUM_PATH"):
@@ -116,6 +126,7 @@ def screenshot(html: str, size: tuple[int, int] = (palette.WIDTH, palette.HEIGHT
             page.set_content(html, wait_until="load")
             page.evaluate("document.fonts.ready")
             raw = _shot(page)
+            boxes = page.evaluate(_FIELD_BOXES)
 
             # Images that CSS draws pixelated are pixel art, not photos.
             page.evaluate(_MARK_PIXEL_ART)
@@ -125,7 +136,7 @@ def screenshot(html: str, size: tuple[int, int] = (palette.WIDTH, palette.HEIGHT
                 masks.append(_mask(page, selector) if present else np.zeros((height, width), dtype=bool))
         finally:
             browser.close()
-    return raw, *masks
+    return raw, *masks, boxes
 
 
 def reduce(raw: Image.Image, photo_mask: np.ndarray, mono: bool = False,
@@ -143,5 +154,5 @@ def reduce(raw: Image.Image, photo_mask: np.ndarray, mono: bool = False,
 
 def render(html: str, orientation: str = "landscape", mono: bool = False) -> Render:
     """Render a page; ``mono`` draws it in black and white only."""
-    raw, photos, pixel_art = screenshot(html, canvas_size(orientation), find_pixel_art=mono)
-    return Render(raw=raw, indices=reduce(raw, photos, mono, pixel_art), orientation=orientation)
+    raw, photos, pixel_art, boxes = screenshot(html, canvas_size(orientation), find_pixel_art=mono)
+    return Render(raw=raw, indices=reduce(raw, photos, mono, pixel_art), orientation=orientation, boxes=boxes)

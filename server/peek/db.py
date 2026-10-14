@@ -87,6 +87,15 @@ MIGRATIONS = [
     ALTER TABLE category ADD COLUMN pixelate INTEGER NOT NULL DEFAULT 0;
     UPDATE category SET pixelate = 1 WHERE custom_css LIKE '%pixelated%';
     """,
+    # Version 6 was a trial (own HTML and decoration images) that never
+    # shipped; databases that ran it are left as they are, and this keeps the
+    # numbering in step for everyone else.
+    "SELECT 1;",
+    # Where fields are dragged to, per orientation:
+    # {"landscape": {"title": {"x": 40, "y": 20, "w": 300, "h": 60}}}.
+    """
+    ALTER TABLE category ADD COLUMN positions TEXT NOT NULL DEFAULT '{}';
+    """,
 ]
 
 # Frame-wide settings and their values until someone changes them.
@@ -180,8 +189,9 @@ class Store:
     def create_category(self, fields: dict) -> dict:
         with self.connect() as conn:
             cur = conn.execute(
-                """INSERT INTO category (name, template, custom_css, item_order, weight, enabled, fields, mono, pixelate)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                """INSERT INTO category (name, template, custom_css, item_order, weight, enabled, fields, mono, pixelate,
+                                         positions)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     fields["name"],
                     fields["template"],
@@ -192,13 +202,15 @@ class Store:
                     json.dumps(fields.get("fields", [])),
                     int(fields.get("mono", False)),
                     int(fields.get("pixelate", False)),
+                    json.dumps(fields.get("positions", {})),
                 ),
             )
             new_id = cur.lastrowid
         return self.category(new_id)
 
     def update_category(self, category_id: int, fields: dict) -> dict | None:
-        allowed = ("name", "template", "custom_css", "item_order", "weight", "enabled", "fields", "mono", "pixelate")
+        allowed = ("name", "template", "custom_css", "item_order", "weight", "enabled", "fields", "mono", "pixelate",
+                   "positions")
         changes = {k: _column(k, v) for k, v in fields.items() if k in allowed}
         if changes:
             sets = ", ".join(f"{k} = ?" for k in changes)
@@ -267,7 +279,7 @@ class Store:
 
 def _column(key: str, value):
     """A value as SQLite stores it: JSON for structures, 0/1 for flags."""
-    if key in ("fields", "data"):
+    if key in ("fields", "data", "positions"):
         return json.dumps(value)
     if key in ("enabled", "mono", "pixelate"):
         return int(value)
@@ -280,6 +292,7 @@ def _category(row: sqlite3.Row) -> dict:
     d["mono"] = bool(d["mono"])
     d["pixelate"] = bool(d["pixelate"])
     d["fields"] = json.loads(d["fields"])
+    d["positions"] = json.loads(d["positions"])
     return d
 
 

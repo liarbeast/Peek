@@ -282,3 +282,40 @@ def test_mono_style_previews_in_black_and_white(client):
     res = client.post(f"/api/categories/{cat['id']}/preview.png", params={"view": "panel"}, json={"mono": True})
     img = Image.open(io.BytesIO(res.content)).convert("RGB")
     assert {c for _, c in img.getcolors()} <= {(0, 0, 0), (255, 255, 255)}
+
+
+def boxes(res) -> dict:
+    assert res.status_code == 200, res.text
+    return json.loads(res.headers["X-Peek-Boxes"])
+
+
+def test_dragged_fields_get_their_box(client):
+    cat = make_category(client)
+    add_item(client, cat["id"], {"title": "Robin", "subtext": "Garden bird"})
+    url = f"/api/categories/{cat['id']}/preview.png"
+
+    # Unplaced fields are stacked, and the preview says where they ended up.
+    stacked = boxes(client.post(url, json={}))
+    assert set(stacked) == {"title", "subtext"}
+    assert stacked["title"][1] < stacked["subtext"][1]
+
+    positions = {"landscape": {"title": {"x": 20, "y": 30, "w": 300, "h": 60}}}
+    res = client.patch(f"/api/categories/{cat['id']}", json={"positions": positions})
+    assert res.json()["positions"] == positions
+    placed = boxes(client.post(url, json={}))
+    assert placed["title"] == [20, 30, 300, 60]
+    assert placed["subtext"] != stacked["subtext"]  # the stack closed up behind it
+
+    # Unsaved positions can be previewed; portrait has its own.
+    draft = {"landscape": {"subtext": {"x": 400, "y": 400, "w": 200, "h": 40}}}
+    assert boxes(client.post(url, json={"positions": draft}))["subtext"] == [400, 400, 200, 40]
+    client.patch("/api/settings", json={"orientation": "portrait"})
+    assert boxes(client.post(url, json={}))["title"] != [20, 30, 300, 60]
+
+    assert client.patch(f"/api/categories/{cat['id']}", json={
+        "positions": {"landscape": {"title": {"x": 0, "y": 0, "w": 0, "h": 10}}}}).status_code == 422
+    assert client.patch(f"/api/categories/{cat['id']}", json={
+        "positions": {"sideways": {}}}).status_code == 422
+
+    copy = client.post("/api/categories", json={"name": "Copy", "copy_from": cat["id"]}).json()
+    assert copy["positions"] == positions

@@ -29,6 +29,23 @@ export interface Template {
   classes: string[];
 }
 
+// Where a dragged field sits, in pixels of the upright page.
+export interface Box {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+// Per orientation, the fields that were dragged to a place.
+export type Positions = Partial<Record<Orientation, Record<string, Box>>>;
+
+// A render, and where each field was drawn on it: [x, y, width, height].
+export interface Preview {
+  image: Blob;
+  boxes: Record<string, [number, number, number, number]>;
+}
+
 export interface Category {
   id: number;
   name: string;
@@ -39,6 +56,7 @@ export interface Category {
   enabled: boolean;
   mono: boolean;
   pixelate: boolean;
+  positions: Positions;
   fields: Field[];
   item_count: number;
   cover: string | null;
@@ -68,22 +86,26 @@ export interface StyleChanges {
   custom_css?: string;
   mono?: boolean;
   pixelate?: boolean;
+  positions?: Positions;
   item_id?: number;
+}
+
+// The server's explanation of a failed request, as an Error.
+async function failure(res: Response): Promise<Error> {
+  let message = `${res.status} ${res.statusText}`;
+  try {
+    const body = await res.json();
+    if (typeof body.detail === "string") message = body.detail;
+    else if (Array.isArray(body.detail)) message = body.detail.map((d: { msg: string }) => d.msg).join(", ");
+  } catch {
+    // not JSON; keep the status text
+  }
+  return new Error(message);
 }
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, init);
-  if (!res.ok) {
-    let message = `${res.status} ${res.statusText}`;
-    try {
-      const body = await res.json();
-      if (typeof body.detail === "string") message = body.detail;
-      else if (Array.isArray(body.detail)) message = body.detail.map((d: { msg: string }) => d.msg).join(", ");
-    } catch {
-      // not JSON; keep the status text
-    }
-    throw new Error(message);
-  }
+  if (!res.ok) throw await failure(res);
   if (res.status === 204) return undefined as T;
   const type = res.headers.get("content-type") ?? "";
   return (type.includes("json") ? res.json() : res.blob()) as Promise<T>;
@@ -126,8 +148,11 @@ export const api = {
     request<Category>(`/api/categories/${id}`, json("PATCH", body)),
   deleteCategory: (id: number) => request<void>(`/api/categories/${id}`, { method: "DELETE" }),
 
-  previewCategory: (id: number, body: StyleChanges) =>
-    request<Blob>(`/api/categories/${id}/preview.png`, json("POST", body)),
+  previewCategory: async (id: number, body: StyleChanges): Promise<Preview> => {
+    const res = await fetch(`/api/categories/${id}/preview.png`, json("POST", body));
+    if (!res.ok) throw await failure(res);
+    return { image: await res.blob(), boxes: JSON.parse(res.headers.get("X-Peek-Boxes") ?? "{}") };
+  },
 
   items: (categoryId: number) => request<Item[]>(`/api/categories/${categoryId}/items`),
   // Form fields: "data" (JSON of text values), "image:<key>" files.
