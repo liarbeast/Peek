@@ -109,8 +109,8 @@ export function StyleTab(props: {
   };
 
   return (
-    <div className="flex flex-wrap items-start gap-8">
-      <div className="flex min-w-0 flex-[999_1_560px] flex-col gap-2">
+    <div className="mb-8 flex flex-wrap items-center gap-x-8 gap-y-12">
+      <div className="relative min-w-0 flex-[999_1_560px]">
         <PanelImage
           alt="Preview of this style on the panel"
           load={() =>
@@ -136,7 +136,7 @@ export function StyleTab(props: {
             onImageDelete={deleteImage}
           />
         </PanelImage>
-        <p className="text-sm text-muted">Drag to move, click to style.</p>
+        <p className="absolute top-full mt-2 text-sm text-muted">Drag to move, click to style.</p>
       </div>
 
       <aside className="flex flex-[1_1_260px] flex-col gap-6 sm:max-w-72">
