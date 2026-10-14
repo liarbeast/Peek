@@ -57,7 +57,7 @@ export function StyleTab(props: {
 
   const layers: Layer[] = [
     ...images.map((image) => ({ key: image.key, label: image.name, type: "image" as const, image })),
-    ...category.fields,
+    ...category.fields.filter((f) => !f.hidden),
   ];
 
   const save = async () => {
