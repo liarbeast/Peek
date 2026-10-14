@@ -84,15 +84,15 @@ function CategoryGroup(props: { title: string; categories: Category[]; empty?: s
                 <div className="flex h-full items-center justify-center text-muted">No image yet</div>
               )}
             </div>
-            <Card.Header>
+            <Card.Header className="flex flex-col gap-1.5">
               <Card.Title>{c.name}</Card.Title>
+              <div className="flex flex-wrap gap-1">
+                <Chip size="sm">
+                  {c.item_count} {c.item_count === 1 ? "item" : "items"}
+                </Chip>
+                <Chip size="sm">{ORDERS.find((o) => o.id === c.item_order)?.label}</Chip>
+              </div>
             </Card.Header>
-            <Card.Footer className="flex flex-wrap gap-2">
-              <Chip size="sm">
-                {c.item_count} {c.item_count === 1 ? "item" : "items"}
-              </Chip>
-              <Chip size="sm">{ORDERS.find((o) => o.id === c.item_order)?.label}</Chip>
-            </Card.Footer>
           </Card>
         ))}
       </div>
