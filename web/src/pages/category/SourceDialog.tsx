@@ -125,8 +125,8 @@ export function SourceDialog(props: {
       }
     >
       <p className="text-sm text-muted">
-        A web address that returns JSON. Its entries replace the items each time the frame switches to this collection
-        (see “Switch collection” in Settings). They can't be edited by hand while the source is connected.
+        A web address that returns JSON. On every wake that shows this collection (see Refresh in Settings), Peek reads
+        it again: new entries are added and gone ones removed, so the items can't be edited by hand.
         {!category.source &&
           props.itemCount > 0 &&
           ` Fetching replaces the ${props.itemCount} items this collection has now.`}
