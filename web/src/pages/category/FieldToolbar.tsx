@@ -44,11 +44,12 @@ const nearest = (weight: number, weights: number[]) =>
 // The selected field's options, shown next to its box. Text gets alignment,
 // size, weight, colour and typeface; images get alignment both ways; style
 // images also choose between crisp and photo, and can be removed. Everything
-// can go to the front or back and be attached below something else.
+// can go to the front or back and be attached to something else, so it
+// moves with it and keeps its distance.
 export function FieldToolbar(props: {
   layer: Layer;
   box: Box;
-  attachable: Layer[]; // what it can be attached below without going round in a circle
+  attachable: Layer[]; // what it can be attached to without going round in a circle
   onChange: (changes: Partial<Box>) => void;
   onAttach: (below: string | null) => void;
   onFront: () => void;
@@ -130,15 +131,15 @@ export function FieldToolbar(props: {
       </IconButton>
       <Dropdown>
         <Dropdown.Trigger
-          aria-label="Attach below another field"
+          aria-label="Attach to another field"
           className="flex h-8 items-center gap-1 rounded-lg px-2 text-sm hover:bg-default"
         >
           <AttachIcon />
-          {attached ? `Below ${attached.label}` : "Attach"}
+          {attached ? `Attached to ${attached.label}` : "Attach to"}
         </Dropdown.Trigger>
         <Dropdown.Popover>
           <Dropdown.Menu
-            aria-label="Attach below"
+            aria-label="Attach to"
             selectionMode="single"
             selectedKeys={[box.below ?? ""]}
             onAction={(key) => props.onAttach(key === "" ? null : String(key))}
@@ -148,8 +149,8 @@ export function FieldToolbar(props: {
               <Dropdown.ItemIndicator />
             </Dropdown.Item>
             {props.attachable.map((f) => (
-              <Dropdown.Item key={f.key} id={f.key} textValue={`Below ${f.label}`}>
-                Below {f.label}
+              <Dropdown.Item key={f.key} id={f.key} textValue={f.label}>
+                {f.label}
                 <Dropdown.ItemIndicator />
               </Dropdown.Item>
             ))}
