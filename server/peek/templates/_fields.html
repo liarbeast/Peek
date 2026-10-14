@@ -17,10 +17,11 @@
         {%- if b.size %}{% set style = style ~ ";font-size:%dpx" % b.size %}{% endif -%}
       {%- endif -%}
     {%- endif -%}
+    {%- set link = ' data-below="%s" data-gap="%d"' % (b.below | e, b.gap or 0) if b and b.below else "" -%}
     {%- if e.type == "image" -%}
-      <img class="{{ classes }}" data-field="{{ e.key }}" src="{{ e.value }}" alt=""{% if b %} style="{{ style }}"{% endif %}>
+      <img class="{{ classes }}" data-field="{{ e.key }}" src="{{ e.value }}" alt=""{% if b %} style="{{ style }}"{% endif %}{{ link | safe }}>
     {%- elif b -%}
-      <div class="{{ classes }}" data-field="{{ e.key }}" data-fit style="{{ style }}"><span>{{ e.value }}</span></div>
+      <div class="{{ classes }}" data-field="{{ e.key }}" data-fit style="{{ style }}"{{ link | safe }}><span>{{ e.value }}</span></div>
     {%- else -%}
       <div class="{{ classes }}" data-field="{{ e.key }}">{{ e.value }}</div>
     {%- endif -%}

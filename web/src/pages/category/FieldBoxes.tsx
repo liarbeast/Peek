@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { Box, Field, Preview } from "../../api";
+import { FieldToolbar } from "./FieldToolbar";
 
 const GRID = 4;
 const MIN_SIZE = 16;
@@ -59,13 +60,63 @@ export function FieldBoxes(props: {
     return () => observer.disconnect();
   }, [canvas.width]);
 
-  const place = (key: string, box: Box) => props.onChange({ ...placed, [key]: box });
+  // Where a field's content ends, measured from its top on the last render
+  // (for text, where its last line ends rather than the bottom of its box).
+  const contentHeight = (key: string) => {
+    const m = measured[key];
+    return m ? m[5] - m[1] : null;
+  };
+
+  // A field's box as it is drawn now: a field linked below another sits
+  // `gap` under where that field's content ends, wherever that field is.
+  const shown = (key: string, seen = new Set<string>()): Box | null => {
+    const box = boxOf(key, placed, measured);
+    if (!box?.below || seen.has(key)) return box;
+    seen.add(key);
+    const above = shown(box.below, seen);
+    const height = contentHeight(box.below);
+    return above && height !== null ? { ...box, y: above.y + height + (box.gap ?? 0) } : box;
+  };
+
+  // Saves a box; for a linked field, its new position becomes its new gap.
+  const place = (key: string, box: Box) => {
+    if (box.below) {
+      const above = shown(box.below);
+      const height = contentHeight(box.below);
+      if (above && height !== null) box = { ...box, gap: Math.round(box.y - (above.y + height)) };
+    }
+    props.onChange({ ...placed, [key]: box });
+  };
+
+  // The fields `key` can be linked below: any other field that isn't (by way
+  // of others) linked below `key` itself.
+  const linkable = (key: string) =>
+    props.fields.filter((f) => {
+      for (let k: string | undefined = f.key, n = 0; k && n <= props.fields.length; k = placed[k]?.below, n++) {
+        if (k === key) return false;
+      }
+      return measured[f.key] !== undefined;
+    });
+
+  const link = (key: string, below: string | null) => {
+    const box = shown(key);
+    if (!box) return;
+    const { below: _, gap: __, ...rest } = box;
+    place(key, below ? { ...rest, below } : rest);
+  };
+
+  const unplace = (key: string) => {
+    const { [key]: _, ...rest } = placed;
+    props.onChange(rest);
+  };
+
+  const [dragging, setDragging] = useState(false);
 
   type Mode = "move" | "scale" | "width" | "height";
 
   const startDrag = (e: React.PointerEvent, field: Field, mode: Mode) => {
     const key = field.key;
-    const start = boxOf(key, placed, measured);
+    const start = shown(key);
     if (!start || e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
@@ -75,9 +126,10 @@ export function FieldBoxes(props: {
     const target = e.currentTarget as HTMLElement;
     target.setPointerCapture(e.pointerId);
     const [x0, y0] = [e.clientX, e.clientY];
+    setDragging(true);
 
     // Guide lines: the canvas edges and centre, and the edges and centres of the other fields.
-    const others = props.fields.filter((f) => f.key !== key).flatMap((f) => boxOf(f.key, placed, measured) ?? []);
+    const others = props.fields.filter((f) => f.key !== key).flatMap((f) => shown(f.key) ?? []);
     const xs = [0, canvas.width / 2, canvas.width, ...others.flatMap((b) => [b.x, b.x + b.w / 2, b.x + b.w])];
     const ys = [0, canvas.height / 2, canvas.height, ...others.flatMap((b) => [b.y, b.y + b.h / 2, b.y + b.h])];
 
@@ -116,6 +168,7 @@ export function FieldBoxes(props: {
     };
     const end = () => {
       setGuides({ x: null, y: null });
+      setDragging(false);
       target.removeEventListener("pointermove", move);
       target.removeEventListener("pointerup", end);
       target.removeEventListener("pointercancel", end);
@@ -128,7 +181,7 @@ export function FieldBoxes(props: {
   // Arrow keys nudge the selected field by a pixel, or ten with Shift.
   const nudge = (e: React.KeyboardEvent, key: string) => {
     const delta = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
-    const box = boxOf(key, placed, measured);
+    const box = shown(key);
     if (!delta || !box) return;
     e.preventDefault();
     const step = e.shiftKey ? 10 : 1;
@@ -137,6 +190,37 @@ export function FieldBoxes(props: {
       x: clamp(box.x + delta[0] * step, 0, canvas.width - box.w),
       y: clamp(box.y + delta[1] * step, 0, canvas.height - box.h),
     });
+  };
+
+  // The selected field's options, under its box (or above it, near the bottom),
+  // lined up with whichever side of the canvas it is on.
+  const toolbar = (key: string) => {
+    const box = shown(key);
+    if (!box) return null;
+    const zs = Object.values(placed).map((b) => b.z ?? 0);
+    const restyle = (changes: Partial<Box>) => place(key, { ...box, ...changes });
+    const right = box.x + box.w / 2 > canvas.width / 2;
+    const low = box.y + box.h > canvas.height - 40;
+    return (
+      <div
+        className="absolute z-20"
+        style={{
+          ...(right ? { right: (canvas.width - box.x - box.w) * scale } : { left: box.x * scale }),
+          ...(low ? { bottom: (canvas.height - box.y) * scale + 26 } : { top: (box.y + box.h) * scale + 8 }),
+        }}
+      >
+        <FieldToolbar
+          box={box}
+          isPlaced={!!placed[key]}
+          linkable={linkable(key)}
+          onChange={restyle}
+          onLink={(below) => link(key, below)}
+          onFront={() => restyle({ z: Math.max(0, ...zs) + 1 })}
+          onBack={() => restyle({ z: Math.min(0, ...zs) - 1 })}
+          onUnplace={() => unplace(key)}
+        />
+      </div>
+    );
   };
 
   // Front-most last, so it is also on top here.
@@ -148,7 +232,7 @@ export function FieldBoxes(props: {
   return (
     <div ref={ref} className="absolute inset-0 touch-none" onPointerDown={() => props.onSelect(null)}>
       {order.map(({ field }) => {
-        const box = boxOf(field.key, placed, measured);
+        const box = shown(field.key);
         if (!box) return null;
         const selected = props.selected === field.key;
         return (
@@ -215,6 +299,7 @@ export function FieldBoxes(props: {
           </div>
         );
       })}
+      {props.selected && !dragging && toolbar(props.selected)}
       {guides.x !== null && (
         <div className="pointer-events-none absolute inset-y-0 w-px" style={{ left: guides.x * scale, background: "var(--danger)" }} />
       )}

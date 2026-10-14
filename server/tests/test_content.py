@@ -359,3 +359,25 @@ def test_fitted_text_stays_in_its_box():
     assert ink[20:80, 20:220].any()
     ink[20:80, 20:220] = False
     assert not ink.any()  # nothing spilled out of the box
+
+
+def test_linked_field_follows_the_text_above(client):
+    cat = make_category(client)
+    url = f"/api/categories/{cat['id']}/preview.png"
+    positions = {"landscape": {
+        "title": {"x": 20, "y": 20, "w": 300, "h": 200, "size": 30, "valign": "top"},
+        "subtext": {"x": 20, "y": 0, "w": 300, "h": 40, "below": "title", "gap": 12},
+    }}
+    found = {}
+    for title in ("Robin", "Robin, the European garden bird"):
+        item = add_item(client, cat["id"], {"title": title, "subtext": "Garden bird"})
+        found[title] = boxes(client.post(url, json={"positions": positions, "item_id": item["id"]}))
+    one, two = found["Robin"], found["Robin, the European garden bird"]
+    assert one["subtext"][1] == one["title"][5] + 12  # 12px under where the title's text ends
+    assert two["subtext"][1] == two["title"][5] + 12
+    assert two["subtext"][1] - one["subtext"][1] > 25  # a second line pushed it down
+
+    # A link to itself, or round in a circle, just stays put.
+    loop = {"landscape": {"title": {"x": 0, "y": 0, "w": 100, "h": 50, "below": "subtext"},
+                          "subtext": {"x": 0, "y": 60, "w": 100, "h": 50, "below": "title"}}}
+    assert client.post(url, json={"positions": loop}).status_code == 200

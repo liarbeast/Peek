@@ -39,15 +39,19 @@ export interface Box {
   align?: "left" | "center" | "right";
   valign?: "top" | "middle" | "bottom";
   z?: number; // higher is drawn in front
+  // Linked below another field: drawn `gap` pixels under where that field's content ends.
+  below?: string;
+  gap?: number;
 }
 
 // Per orientation, the fields that were dragged to a place.
 export type Positions = Partial<Record<Orientation, Record<string, Box>>>;
 
-// A render, and where each field was drawn on it: [x, y, width, height, font size].
+// A render, and where each field was drawn on it:
+// [x, y, width, height, font size, bottom of its content].
 export interface Preview {
   image: Blob;
-  boxes: Record<string, [number, number, number, number, number]>;
+  boxes: Record<string, [number, number, number, number, number, number]>;
 }
 
 export interface Category {
