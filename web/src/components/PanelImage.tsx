@@ -46,11 +46,11 @@ export function PanelImage({ load, deps, alt, onBoxes, children }: Props) {
 
   return (
     <div
-      className={`relative mx-auto overflow-hidden rounded-lg border border-border bg-surface-secondary ${
+      className={`relative mx-auto ${children ? "" : "overflow-hidden"} rounded-lg border border-border bg-surface-secondary ${
         isPortrait(orientation) ? "aspect-[3/5] w-full max-w-[min(100%,calc(70vh*0.6))]" : "aspect-[5/3] w-full"
       }`}
     >
-      {url && <img src={url} alt={alt} draggable={false} className="h-full w-full object-contain" />}
+      {url && <img src={url} alt={alt} draggable={false} className="h-full w-full rounded-lg object-contain" />}
       {url && children}
       {error && <p className="absolute inset-0 flex items-center justify-center p-4 text-center text-sm text-danger">{error}</p>}
       {loading &&

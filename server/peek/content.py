@@ -39,6 +39,10 @@ class Box(BaseModel):
     align: Literal["left", "center", "right"] | None = None
     valign: Literal["top", "middle", "bottom"] | None = None
     z: int | None = Field(default=None, ge=-100, le=100)  # higher is drawn in front
+    # Linked below another field: drawn `gap` pixels under where that field's
+    # content ends, so a title that wraps to two lines pushes it down.
+    below: str | None = Field(default=None, max_length=64)
+    gap: int | None = Field(default=None, ge=-800, le=800)
 
 
 # Per orientation, the fields that were dragged to a place.

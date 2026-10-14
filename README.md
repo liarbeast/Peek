@@ -59,8 +59,9 @@ Fields can also be placed by hand: drag a field's box in the Style tab's preview
 centre and edges and to other fields (hold Alt to stop snapping), and the arrow keys nudge it. The corner scales a
 field (images keep their shape, text grows with its box); a text field's side handles change only its box, so it
 rewraps. Long text on an item shrinks until it fits its box. Each placed field also has left/centre/right and
-top/middle/bottom alignment, and can be brought to the front or sent to the back. Bottom-aligning a title keeps the
-gap to the field below it the same however many lines the title takes.
+top/middle/bottom alignment, and can be brought to the front or sent to the back; these show next to the selected
+field. A field can also be linked below another one: it is then drawn the same distance under where that field's text
+ends, so when a title wraps to two lines, the subtitle linked below it moves down with it.
 
 A placed field leaves the stack and is drawn at its box (class `placed`, absolutely positioned); the rest of the stack
 closes up around it. Boxes are kept per orientation, so landscape and portrait each have their own layout.
