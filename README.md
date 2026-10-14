@@ -62,8 +62,9 @@ separated files all work.
 
 A collection can fill itself from a web address that returns JSON: "Connect data source" on its Items tab. The address
 may hold `{YYYY}`, `{MM}` and `{DD}` for today's date. "Look at response" fetches it, finds the lists of entries in it,
-and offers every value in an entry (with an example) to pick for each field. They're stored as dotted paths
-(`selected`, `pages.0.thumbnail.source`). While a source is connected, its items can't be edited by hand. Every
+and lists every value in an entry with an example, like the columns of a CSV. Each value you use becomes a new field
+(or fills an existing one); fields you don't use are removed, since they'd stay empty. Values are stored as dotted
+paths (`selected`, `pages.0.thumbnail.source`). While a source is connected, its items can't be edited by hand. Every
 day, on the frame's first wake, the entries replace the collection's items, and image addresses are downloaded. If the
 address can't be read, the old items stay and Peek tries again on the next wake.
 

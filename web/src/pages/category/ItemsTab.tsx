@@ -157,7 +157,7 @@ export function ItemsTab(props: {
           <Button variant="tertiary" onPress={() => csvInput.current?.click()}>
             Import CSV
           </Button>
-          <Button variant="tertiary" onPress={() => setConnecting(true)} isDisabled={category.fields.length === 0}>
+          <Button variant="tertiary" onPress={() => setConnecting(true)}>
             Connect data source
           </Button>
           <input

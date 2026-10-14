@@ -66,3 +66,24 @@ def test_inspect_finds_the_list_and_its_values():
         {"path": "text", "example": "Battle of Hastings"},
         {"path": "pages.0.titles.normalized", "example": "Hastings"},
     ]
+
+
+def test_connect_makes_fields_from_the_picked_values(tmp_path, monkeypatch):
+    monkeypatch.setattr(sources.httpx, "get", lambda url, **kw: httpx.Response(
+        200, json=ON_THIS_DAY, request=httpx.Request("GET", url)))
+    client = TestClient(create_app(tmp_path))
+    cat = client.post("/api/categories", json={"name": "On this day"}).json()  # Image, Title, Subtext
+    res = client.put(f"/api/categories/{cat['id']}/source", json={
+        "url": SOURCE["url"], "items": "selected",
+        "columns": [
+            {"path": "text", "field": "title"},  # an existing field
+            {"path": "year", "new": {"label": "Year"}},
+            {"path": "pages.0.titles.normalized", "new": {"label": "Article"}},
+        ],
+    }).json()
+    assert res["created"] == 2
+    fields = res["category"]["fields"]
+    assert [f["label"] for f in fields] == ["Title", "Year", "Article"]  # Image and Subtext went: unused
+    assert res["category"]["source"]["fields"] == {"title": "text", "year": "year", "article": "pages.0.titles.normalized"}
+    assert client.put(f"/api/categories/{cat['id']}/source", json={
+        "url": SOURCE["url"], "columns": [{"path": "text"}]}).status_code == 422

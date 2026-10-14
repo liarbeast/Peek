@@ -749,9 +749,68 @@ def inspect_source(body: InspectIn) -> dict:
     items = body.items if body.items is not None else (lists[0]["path"] if lists else "")
     found = sources.pick(data, items)
     entry = found[0] if isinstance(found, list) and found else found
-    # Values at the top of an entry first: they're the likeliest picks.
-    values = sorted(sources.values(entry), key=lambda v: v["path"].count("."))
-    return {"lists": lists, "items": items, "values": values[:300]}
+    # Values at the top of an entry first: they're the likeliest picks. Each
+    # gets a suggested field name and type, for when it becomes a new field.
+    values = sorted(sources.values(entry), key=lambda v: v["path"].count("."))[:300]
+    for v in values:
+        v["label"] = _label_for(v["path"])
+        v["type"] = csv_import.guess_type(v["path"], [v["example"]])
+        v["example"] = v["example"][:120]
+    return {"lists": lists, "items": items, "values": values}
+
+
+def _label_for(path: str) -> str:
+    """A field name for a value: its last two names, "pages.0.thumbnail.source" -> "Thumbnail source"."""
+    words = [p for p in path.split(".") if not p.isdigit()][-2:] or ["Value"]
+    return " ".join(words).replace("_", " ").capitalize()
+
+
+class ColumnIn(BaseModel):
+    """One value of a source's entries, and where it goes: an existing field,
+    or a new one."""
+
+    path: str
+    field: str | None = None
+    new: FieldIn | None = None
+
+
+class ConnectIn(BaseModel):
+    url: str = Field(min_length=1)
+    items: str = ""
+    columns: list[ColumnIn]
+
+
+@router.put("/api/categories/{category_id}/source")
+def connect_source(request: Request, category_id: int, body: ConnectIn) -> dict:
+    """Connect a data source and fetch it. The category's fields become the
+    ones the columns go to: existing fields that are used, then new ones.
+    Fields left out would stay empty, so they're removed."""
+    store = _store(request)
+    category = _category_or_404(store, category_id)
+    existing = {f["key"]: f for f in category["fields"]}
+    if any(c.field is not None and c.field not in existing for c in body.columns):
+        raise HTTPException(422, "no such field")
+    used = [c.field for c in body.columns if c.field]
+    if len(used) != len(set(used)):
+        raise HTTPException(422, "two values go to the same field")
+    kept = [f for f in category["fields"] if f["key"] in used]
+    new = [c for c in body.columns if c.field is None and c.new]
+    if not kept and not new:
+        raise HTTPException(422, "pick at least one value to use")
+    try:
+        fields = fieldlib.normalize(kept + [c.new.model_dump(exclude={"key"}) for c in new])
+    except fieldlib.FieldError as e:
+        raise HTTPException(422, str(e)) from e
+    paths = {c.field: c.path for c in body.columns if c.field}
+    paths |= {f["key"]: c.path for f, c in zip(fields[len(kept):], new)}
+    _drop_changed_values(store, category, fields)
+    source = {"url": body.url.strip(), "items": body.items.strip(), "fields": paths}
+    category = store.update_category(category_id, {"fields": fields, "source": source})
+    try:
+        created = sync_source(store, category, date.today())
+    except sources.SourceError as e:
+        raise HTTPException(502, str(e)) from e
+    return {"created": created, "category": store.category(category_id)}
 
 
 @router.post("/api/categories/{category_id}/sync")
