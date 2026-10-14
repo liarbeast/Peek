@@ -39,8 +39,8 @@ SWITCH_INTERVALS: dict[str, timedelta | None] = {
     "8h": timedelta(hours=8),
     "1d": timedelta(days=1),
     "1w": timedelta(weeks=1),
-    "finished": None,
     "1mo": None,
+    "finished": None,
 }
 
 

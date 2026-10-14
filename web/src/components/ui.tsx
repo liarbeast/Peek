@@ -1,6 +1,6 @@
 // Small wrappers around HeroUI's compound components, so pages stay short.
-import { Description, Input, Label, ListBox, Modal, Select, Switch, TextArea, TextField } from "@heroui/react";
-import type { ReactNode } from "react";
+import { Description, Input, Label, ListBox, Modal, Select, Separator, Switch, TextArea, TextField } from "@heroui/react";
+import { Fragment, type ReactNode } from "react";
 
 export function Dialog(props: {
   isOpen: boolean;
@@ -56,7 +56,8 @@ export function Choice<K extends string>(props: {
   label: string;
   value: K;
   onChange: (value: K) => void;
-  options: Array<{ id: K; label: string; description?: string }>;
+  // `divider` draws a line above an option, to set it apart from the ones before.
+  options: Array<{ id: K; label: string; description?: string; divider?: boolean }>;
   description?: string;
   hideLabel?: boolean;
 }) {
@@ -76,13 +77,16 @@ export function Choice<K extends string>(props: {
       <Select.Popover>
         <ListBox>
           {props.options.map((o) => (
-            <ListBox.Item key={o.id} id={o.id} textValue={o.label}>
-              <div className="flex flex-col">
-                <span>{o.label}</span>
-                {o.description && <span className="text-xs text-muted">{o.description}</span>}
-              </div>
-              <ListBox.ItemIndicator />
-            </ListBox.Item>
+            <Fragment key={o.id}>
+              {o.divider && <Separator className="my-1.5 bg-default-foreground/25" />}
+              <ListBox.Item id={o.id} textValue={o.label}>
+                <div className="flex flex-col">
+                  <span>{o.label}</span>
+                  {o.description && <span className="text-xs text-muted">{o.description}</span>}
+                </div>
+                <ListBox.ItemIndicator />
+              </ListBox.Item>
+            </Fragment>
           ))}
         </ListBox>
       </Select.Popover>

@@ -23,14 +23,20 @@ const REFRESHES: { id: Refresh; label: string; minutes: number }[] = [
   { id: "1w", label: "Every week, on Monday at midnight", minutes: 10080 },
 ];
 
-const SWITCHES: { id: Switch; label: string; minutes: number }[] = [
+const SWITCHES: { id: Switch; label: string; description?: string; divider?: boolean; minutes: number }[] = [
   { id: "30m", label: "Every 30 minutes", minutes: 30 },
   { id: "1h", label: "Every hour", minutes: 60 },
   { id: "8h", label: "Every 8 hours", minutes: 480 },
   { id: "1d", label: "Every day, at midnight", minutes: 1440 },
   { id: "1w", label: "Every week, on Monday at midnight", minutes: 10080 },
-  { id: "finished", label: "Once a collection is finished", minutes: Infinity },
   { id: "1mo", label: "Every month, on the 1st at midnight", minutes: Infinity },
+  {
+    id: "finished",
+    label: "Once a collection is finished",
+    description: "Not a set time: after every item has been shown",
+    divider: true,
+    minutes: Infinity,
+  },
 ];
 
 export function SettingsPage({ settings, onChange }: { settings: Settings; onChange: (s: Settings) => void }) {
