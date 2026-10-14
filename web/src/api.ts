@@ -16,6 +16,8 @@ export interface Field {
   key: string;
   label: string;
   type: FieldType;
+  // Kept, with its values, but not drawn.
+  hidden?: boolean;
 }
 
 // A field being edited: new fields get their key from the server.
@@ -26,22 +28,69 @@ export interface Template {
   label: string;
   description: string;
   fields: Field[];
-  classes: string[];
+}
+
+// The six colours the panel can show.
+export const PANEL_COLOURS = {
+  black: "#000000",
+  white: "#ffffff",
+  yellow: "#ffff00",
+  red: "#ff0000",
+  blue: "#0000ff",
+  green: "#00ff00",
+} as const;
+export type PanelColour = keyof typeof PANEL_COLOURS;
+
+// Where a field or style image sits, in pixels of the upright page, and how it looks.
+export interface Box {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  size?: number; // text size in pixels; text is as tall as its lines, so `h` is for images
+  align?: "left" | "center" | "right";
+  valign?: "top" | "middle" | "bottom";
+  z?: number; // higher is drawn in front
+  weight?: number; // 100 (thin) to 900 (black); 400 is regular
+  color?: PanelColour;
+  font?: string; // one of api.fonts(); none is the built-in face (400 and 700)
+  // Attached below another field: drawn `gap` pixels under where that field ends.
+  below?: string;
+  gap?: number;
+}
+
+// Per orientation, every field's box (and the style images that were moved).
+export type Positions = Partial<Record<Orientation, Record<string, Box>>>;
+
+// A render, and where each field was drawn on it: [x, y, width, height, font size].
+export interface Preview {
+  image: Blob;
+  boxes: Record<string, [number, number, number, number, number]>;
 }
 
 export interface Category {
   id: number;
   name: string;
   template: string;
-  custom_css: string;
   item_order: ItemOrder;
   weight: number;
   enabled: boolean;
   mono: boolean;
   pixelate: boolean;
+  positions: Positions;
+  default_positions: Positions; // where fields go before anyone moves them
   fields: Field[];
   item_count: number;
   cover: string | null;
+}
+
+// An image drawn the same for every item of a category, such as a frame.
+export interface CategoryImage {
+  id: number;
+  key: string; // its key in positions
+  name: string;
+  file: string;
+  crisp: boolean; // drawn in solid colours like pixel art, instead of dithered like a photo
 }
 
 export interface Item {
@@ -65,25 +114,28 @@ export type ImportTarget = { field: string } | { new: { label: string; type: Fie
 
 export interface StyleChanges {
   template?: string;
-  custom_css?: string;
   mono?: boolean;
   pixelate?: boolean;
+  positions?: Positions;
   item_id?: number;
+}
+
+// The server's explanation of a failed request, as an Error.
+async function failure(res: Response): Promise<Error> {
+  let message = `${res.status} ${res.statusText}`;
+  try {
+    const body = await res.json();
+    if (typeof body.detail === "string") message = body.detail;
+    else if (Array.isArray(body.detail)) message = body.detail.map((d: { msg: string }) => d.msg).join(", ");
+  } catch {
+    // not JSON; keep the status text
+  }
+  return new Error(message);
 }
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, init);
-  if (!res.ok) {
-    let message = `${res.status} ${res.statusText}`;
-    try {
-      const body = await res.json();
-      if (typeof body.detail === "string") message = body.detail;
-      else if (Array.isArray(body.detail)) message = body.detail.map((d: { msg: string }) => d.msg).join(", ");
-    } catch {
-      // not JSON; keep the status text
-    }
-    throw new Error(message);
-  }
+  if (!res.ok) throw await failure(res);
   if (res.status === 204) return undefined as T;
   const type = res.headers.get("content-type") ?? "";
   return (type.includes("json") ? res.json() : res.blob()) as Promise<T>;
@@ -126,8 +178,23 @@ export const api = {
     request<Category>(`/api/categories/${id}`, json("PATCH", body)),
   deleteCategory: (id: number) => request<void>(`/api/categories/${id}`, { method: "DELETE" }),
 
-  previewCategory: (id: number, body: StyleChanges) =>
-    request<Blob>(`/api/categories/${id}/preview.png`, json("POST", body)),
+  previewCategory: async (id: number, body: StyleChanges): Promise<Preview> => {
+    const res = await fetch(`/api/categories/${id}/preview.png`, json("POST", body));
+    if (!res.ok) throw await failure(res);
+    return { image: await res.blob(), boxes: JSON.parse(res.headers.get("X-Peek-Boxes") ?? "{}") };
+  },
+
+  // Each Google Font on offer, with the weights it comes in.
+  fonts: () => request<Record<string, number[]>>("/api/fonts"),
+  categoryImages: (categoryId: number) => request<CategoryImage[]>(`/api/categories/${categoryId}/images`),
+  addCategoryImage: (categoryId: number, file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return request<CategoryImage>(`/api/categories/${categoryId}/images`, { method: "POST", body: form });
+  },
+  updateCategoryImage: (id: number, body: { crisp: boolean }) =>
+    request<CategoryImage>(`/api/category-images/${id}`, json("PATCH", body)),
+  deleteCategoryImage: (id: number) => request<void>(`/api/category-images/${id}`, { method: "DELETE" }),
 
   items: (categoryId: number) => request<Item[]>(`/api/categories/${categoryId}/items`),
   // Form fields: "data" (JSON of text values), "image:<key>" files.
@@ -138,6 +205,7 @@ export const api = {
   // Also "remove:<key>" to clear an image, and "enabled".
   updateItem: (id: number, form: FormData) => request<Item>(`/api/items/${id}`, { method: "PATCH", body: form }),
   deleteItem: (id: number) => request<void>(`/api/items/${id}`, { method: "DELETE" }),
+  deleteAllItems: (categoryId: number) => request<void>(`/api/categories/${categoryId}/items`, { method: "DELETE" }),
   reorderItems: (categoryId: number, itemIds: number[]) =>
     request<void>(`/api/categories/${categoryId}/items/order`, json("PUT", { item_ids: itemIds })),
 

@@ -1,6 +1,7 @@
 """Per-category fields: what each item in a category holds.
 
-A category's fields are a list of {"key", "label", "type"}. The key names the
+A category's fields are a list of {"key", "label", "type"}, plus "hidden":
+true for a field that is kept but not drawn. The key names the
 value in each item's data and the CSS class `.field-<key>`; the label is what
 people see and can change freely.
 """
@@ -61,7 +62,10 @@ def normalize(fields: list[dict]) -> list[dict]:
         if key in seen:
             raise FieldError(f"two fields share the key {key}")
         seen.add(key)
-        out.append({"key": key, "label": label, "type": ftype})
+        field = {"key": key, "label": label, "type": ftype}
+        if f.get("hidden"):
+            field["hidden"] = True
+        out.append(field)
     if len(out) > 50:
         raise FieldError("a category can have at most 50 fields")
     return out

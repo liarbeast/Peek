@@ -33,3 +33,21 @@ def test_panel_image_uses_pure_colours():
     idx = np.arange(6, dtype=np.uint8).reshape(1, 6)
     rgb = np.asarray(palette.indices_to_image(idx).convert("RGB"))[0]
     assert tuple(map(tuple, rgb.tolist())) == palette.PANEL
+
+
+def test_flat_colours_keep_their_hue():
+    # Sprite colours that plain nearest-colour matching turned yellow,
+    # because the panel's green and red are much darker than they are.
+    cases = {
+        (99, 255, 90): "green",  # Gold/Silver Ivysaur
+        (0, 255, 0): "green",
+        (255, 82, 132): "red",  # its pink flower
+        (165, 214, 132): "green",
+        (226, 206, 56): "yellow",
+        (70, 70, 70): "black",
+        (240, 230, 200): "white",
+        (90, 150, 220): "blue",
+    }
+    img = Image.fromarray(np.array([list(cases)], dtype=np.uint8), "RGB")
+    got = [palette.COLOR_NAMES[i] for i in palette.to_indices(img, dither=False)[0]]
+    assert got == list(cases.values())

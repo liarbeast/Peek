@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import io
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 from PIL import Image
@@ -37,6 +37,45 @@ _MARK_PIXEL_ART = """
 for (const img of document.querySelectorAll("img:not([data-peek])")) {
   if (getComputedStyle(img).imageRendering === "pixelated") img.dataset.peek = "pixel";
 }
+"""
+
+# Where each field ended up on the page, so the app can draw a box around it
+# to drag: {key: [x, y, width, height, font size]}.
+_FIELD_BOXES = """
+() => Object.fromEntries([...document.querySelectorAll("[data-field]")].map((el) => {
+  const r = el.getBoundingClientRect();
+  return [el.dataset.field, [r.x, r.y, r.width, r.height, parseFloat(getComputedStyle(el).fontSize)].map(Math.round)];
+}))
+"""
+
+# Fields attached below another move to `gap` pixels under that field, which
+# for text ends where its last line does. An empty field takes no room: what
+# is attached to it moves up to where it would have been.
+_ATTACH_FIELDS = """
+const done = new Set();
+const find = (key) => document.querySelector(`[data-field="${CSS.escape(key)}"]`);
+const empty = (key) => document.querySelector(`[data-empty="${CSS.escape(key)}"]`);
+// Where the next field down starts: under `key` if it is drawn, else where `key` would have been.
+const next = (key, gap, seen) => {
+  const el = find(key);
+  if (el) {
+    place(el, seen);
+    return el.getBoundingClientRect().bottom + gap;
+  }
+  const missing = empty(key);
+  if (!missing || seen.has(missing)) return null;
+  seen.add(missing);
+  const below = missing.dataset.below;
+  return below ? next(below, Number(missing.dataset.gap), seen) : Number(missing.dataset.top);
+};
+const place = (el, seen) => {
+  if (!el.dataset.below || done.has(el) || seen.has(el)) return;
+  seen.add(el);
+  const top = next(el.dataset.below, Number(el.dataset.gap), seen);
+  if (top !== null) el.style.top = `${Math.round(top)}px`;
+  done.add(el);
+};
+for (const el of document.querySelectorAll("[data-field][data-below]")) place(el, new Set());
 """
 
 # A pixel counts as photo when painting the photos white versus black moves
@@ -63,6 +102,7 @@ class Render:
     raw: Image.Image  # what Chromium drew, full colour, upright
     indices: np.ndarray  # palette index (0-5) per pixel, upright
     orientation: str = "landscape"
+    boxes: dict[str, list[int]] = field(default_factory=dict)  # see _FIELD_BOXES
 
     def panel_png(self) -> bytes:
         """The PNG the frame downloads: 800x480, paletted, in PANEL colours."""
@@ -99,9 +139,9 @@ def _mask(page, selector: str) -> np.ndarray:
 
 
 def screenshot(html: str, size: tuple[int, int] = (palette.WIDTH, palette.HEIGHT),
-               find_pixel_art: bool = False) -> tuple[Image.Image, np.ndarray, np.ndarray]:
-    """Return the page as drawn plus boolean masks of visible photo pixels and,
-    if asked for, pixel-art pixels."""
+               find_pixel_art: bool = False) -> tuple[Image.Image, np.ndarray, np.ndarray, dict]:
+    """Return the page as drawn, boolean masks of visible photo pixels and, if
+    asked for, pixel-art pixels, and where each field was drawn."""
     width, height = size
     launch = {"args": ["--disable-dev-shm-usage"]}
     if path := os.environ.get("PEEK_CHROMIUM_PATH"):
@@ -115,6 +155,8 @@ def screenshot(html: str, size: tuple[int, int] = (palette.WIDTH, palette.HEIGHT
             )
             page.set_content(html, wait_until="load")
             page.evaluate("document.fonts.ready")
+            page.evaluate(_ATTACH_FIELDS)
+            boxes = page.evaluate(_FIELD_BOXES)
             raw = _shot(page)
 
             # Images that CSS draws pixelated are pixel art, not photos.
@@ -125,7 +167,7 @@ def screenshot(html: str, size: tuple[int, int] = (palette.WIDTH, palette.HEIGHT
                 masks.append(_mask(page, selector) if present else np.zeros((height, width), dtype=bool))
         finally:
             browser.close()
-    return raw, *masks
+    return raw, *masks, boxes
 
 
 def reduce(raw: Image.Image, photo_mask: np.ndarray, mono: bool = False,
@@ -143,5 +185,5 @@ def reduce(raw: Image.Image, photo_mask: np.ndarray, mono: bool = False,
 
 def render(html: str, orientation: str = "landscape", mono: bool = False) -> Render:
     """Render a page; ``mono`` draws it in black and white only."""
-    raw, photos, pixel_art = screenshot(html, canvas_size(orientation), find_pixel_art=mono)
-    return Render(raw=raw, indices=reduce(raw, photos, mono, pixel_art), orientation=orientation)
+    raw, photos, pixel_art, boxes = screenshot(html, canvas_size(orientation), find_pixel_art=mono)
+    return Render(raw=raw, indices=reduce(raw, photos, mono, pixel_art), orientation=orientation, boxes=boxes)

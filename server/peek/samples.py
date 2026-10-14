@@ -39,8 +39,8 @@ def sunset_photo() -> bytes:
 
 def welcome() -> tuple[str, list[dict], dict]:
     """(template, fields, values) for the screen shown before anything else."""
-    fields = layouts.TEMPLATE_INFO["stack"]["fields"]
-    return "stack", fields, {
+    fields = layouts.TEMPLATE_INFO["canvas"]["fields"]
+    return "canvas", fields, {
         "image": layouts.data_uri(sunset_photo()),
         "title": "Peek",
         "subtext": "Add a category to fill this frame.",
