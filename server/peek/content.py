@@ -106,6 +106,7 @@ class Reorder(BaseModel):
 class SettingsPatch(BaseModel):
     orientation: str | None = None
     refresh: str | None = None
+    switch: str | None = None
 
 
 def _store(request: Request) -> db.Store:
@@ -233,6 +234,8 @@ def update_settings(request: Request, body: SettingsPatch) -> dict:
         raise HTTPException(422, f"unknown orientation: {fields['orientation']}")
     if fields.get("refresh") not in (None, *schedule.REFRESH_INTERVALS):
         raise HTTPException(422, f"unknown refresh interval: {fields['refresh']}")
+    if fields.get("switch") not in (None, *schedule.REFRESH_INTERVALS):
+        raise HTTPException(422, f"unknown switch interval: {fields['switch']}")
     before = _store(request).settings()
     settings = _store(request).update_settings(fields)
     if settings["orientation"] != before["orientation"]:
@@ -564,6 +567,7 @@ def show_item(request: Request, item_id: int) -> Response:
     store = _store(request)
     item = _item_or_404(store, item_id)
     render = render_item(store, store.category(item["category_id"]), item)
+    store.mark_shown(item_id)
     request.app.state.set_current(render, {"item_id": item_id})
     return _png(render, "preview")
 

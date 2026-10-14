@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from contextlib import contextmanager
+from datetime import datetime
 from pathlib import Path
 from typing import Iterator
 
@@ -123,6 +124,7 @@ MIGRATIONS = [
 SETTING_DEFAULTS = {
     "orientation": "landscape",
     "refresh": "1h",  # see schedule.REFRESH_INTERVALS
+    "switch": "1d",  # how often the frame moves on to the next category, also an interval
 }
 
 
@@ -320,6 +322,13 @@ class Store:
             with self.connect() as conn:
                 conn.execute(f"UPDATE item SET {sets} WHERE id = ?", (*changes.values(), item_id))
         return self.item(item_id)
+
+    def mark_shown(self, item_id: int) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                "UPDATE item SET times_shown = times_shown + 1, last_shown = ? WHERE id = ?",
+                (datetime.now().isoformat(), item_id),
+            )
 
     def delete_item(self, item_id: int) -> None:
         with self.connect() as conn:

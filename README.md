@@ -47,7 +47,7 @@ takes a minute. Add `--build` only when `requirements.txt` changes, and go back 
 | Endpoint | What it returns |
 | --- | --- |
 | `GET /api/sleep` | Seconds to sleep before the next wake, as plain text: until the next refresh set in Settings (every 15 minutes up to weekly), on the round time in the server's time zone |
-| `GET /frame.png` | The current 800x480 image, a paletted PNG in the six pure panel colours |
+| `GET /frame.png` | The current 800x480 image, a paletted PNG in the six pure panel colours. Once per refresh it moves on to the next item of the current category (in the category's item order), and once per "Switch category" interval to the next active category. "Show" on an item puts it on the frame until the next refresh |
 
 ## Fields and CSV import
 
