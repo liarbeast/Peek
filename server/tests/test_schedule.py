@@ -71,6 +71,11 @@ def test_switch_setting(client):
     assert client.get("/api/settings").json()["switch"] == "1d"
     assert client.patch("/api/settings", json={"switch": "1w"}).json()["switch"] == "1w"
     assert client.patch("/api/settings", json={"switch": "2m"}).status_code == 422
+    # A longer refresh moves the switch up to the shortest choice that isn't shorter.
+    assert client.patch("/api/settings", json={"switch": "30m", "refresh": "1h"}).json()["switch"] == "1h"
+    assert client.patch("/api/settings", json={"refresh": "3h"}).json()["switch"] == "8h"
+    assert client.patch("/api/settings", json={"refresh": "1w"}).json()["switch"] == "1w"
+    assert client.patch("/api/settings", json={"switch": "1mo"}).json()["switch"] == "1mo"
 
 
 def test_switch_periods():

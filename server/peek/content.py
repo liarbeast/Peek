@@ -238,6 +238,9 @@ def update_settings(request: Request, body: SettingsPatch) -> dict:
         raise HTTPException(422, f"unknown switch interval: {fields['switch']}")
     before = _store(request).settings()
     settings = _store(request).update_settings(fields)
+    if settings["switch"] not in (choices := schedule.switch_choices(settings["refresh"])):
+        # Never switch collections more often than the frame wakes.
+        settings = _store(request).update_settings({"switch": choices[0]})
     if settings["orientation"] != before["orientation"]:
         # Turn what the frame shows now, so it doesn't wait for the next change.
         request.app.state.refresh_current()
