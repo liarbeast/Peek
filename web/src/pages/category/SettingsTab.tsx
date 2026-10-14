@@ -4,7 +4,7 @@ import { api, type Category, type ItemOrder } from "../../api";
 import { Choice, Dialog, TextInput, Toggle } from "../../components/ui";
 import { go } from "../../router";
 
-const ORDERS: Array<{ id: ItemOrder; label: string; description: string }> = [
+export const ORDERS: Array<{ id: ItemOrder; label: string; description: string }> = [
   { id: "in_order", label: "In order", description: "Top to bottom, then start again" },
   { id: "random", label: "Random", description: "Any item each time, repeats possible" },
   { id: "shuffle", label: "Shuffle", description: "Random, but every item once before repeating" },
