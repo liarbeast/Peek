@@ -23,6 +23,8 @@ docker compose up -d --build    # or: podman compose up -d --build
 ```
 
 Open http://localhost:8080. The first build downloads Chromium and takes a few minutes.
+Peek keeps time in the zone set as `TZ` in `compose.yaml` (`Europe/Amsterdam`); change it to yours, so "at midnight"
+and "today" mean your midnight.
 
 Collections, uploaded images and the current frame image live in the `data` folder next to `compose.yaml`.
 To move Peek to another machine, copy the whole folder and run the same command there.
