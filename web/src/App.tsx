@@ -37,7 +37,7 @@ export function App() {
   }, []);
 
   return (
-    <SettingsContext value={settings ?? { orientation: "landscape" }}>
+    <SettingsContext value={settings ?? { orientation: "landscape", refresh: "1h", switch: "1d" }}>
       <div className="min-h-screen bg-background text-foreground">
         <Toast.Provider placement="bottom" />
         <header className="border-b border-separator">

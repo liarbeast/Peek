@@ -50,7 +50,7 @@ export function FieldsTab(props: { category: Category; onSaved: (c: Category) =>
   return (
     <div className="flex max-w-3xl flex-col gap-4">
       <p className="text-muted">
-        Every item in this category has these fields. Place and style them on the Style tab. A field that is not shown keeps its values but is left off the frame.
+        Every item in this collection has these fields. Place and style them on the Style tab. A field that is not shown keeps its values but is left off the frame.
       </p>
 
       {rows.length > 0 && (

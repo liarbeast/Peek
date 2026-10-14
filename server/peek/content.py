@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field, field_validator
 from starlette.datastructures import UploadFile as FormFile
 
-from . import csv_import, db, fonts, layouts, renderer, samples
+from . import csv_import, db, fonts, layouts, renderer, samples, schedule
 from . import fields as fieldlib
 
 router = APIRouter()
@@ -105,6 +105,8 @@ class Reorder(BaseModel):
 
 class SettingsPatch(BaseModel):
     orientation: str | None = None
+    refresh: str | None = None
+    switch: str | None = None
 
 
 def _store(request: Request) -> db.Store:
@@ -121,7 +123,7 @@ def _check(fields: dict) -> None:
 def _category_or_404(store: db.Store, category_id: int) -> dict:
     category = store.category(category_id)
     if category is None:
-        raise HTTPException(404, "no such category")
+        raise HTTPException(404, "no such collection")
     return category
 
 
@@ -230,8 +232,15 @@ def update_settings(request: Request, body: SettingsPatch) -> dict:
     fields = body.model_dump(exclude_none=True)
     if fields.get("orientation") not in (None, *renderer.ORIENTATIONS):
         raise HTTPException(422, f"unknown orientation: {fields['orientation']}")
+    if fields.get("refresh") not in (None, *schedule.REFRESH_INTERVALS):
+        raise HTTPException(422, f"unknown refresh interval: {fields['refresh']}")
+    if fields.get("switch") not in (None, *schedule.SWITCH_INTERVALS):
+        raise HTTPException(422, f"unknown switch interval: {fields['switch']}")
     before = _store(request).settings()
     settings = _store(request).update_settings(fields)
+    if settings["switch"] not in (choices := schedule.switch_choices(settings["refresh"])):
+        # Never switch collections more often than the frame wakes.
+        settings = _store(request).update_settings({"switch": choices[0]})
     if settings["orientation"] != before["orientation"]:
         # Turn what the frame shows now, so it doesn't wait for the next change.
         request.app.state.refresh_current()
@@ -477,7 +486,7 @@ def create_items_from_images(
     category = _category_or_404(store, category_id)
     image_key = next(iter(fieldlib.image_keys(category["fields"])), None)
     if image_key is None:
-        raise HTTPException(422, "this category has no image field")
+        raise HTTPException(422, "this collection has no image field")
     text_key = next((f["key"] for f in category["fields"] if f["type"] == "text"), None)
     images = [i for i in images if i.filename]
     if not images:
@@ -561,6 +570,7 @@ def show_item(request: Request, item_id: int) -> Response:
     store = _store(request)
     item = _item_or_404(store, item_id)
     render = render_item(store, store.category(item["category_id"]), item)
+    store.mark_shown(item_id)
     request.app.state.set_current(render, {"item_id": item_id})
     return _png(render, "preview")
 
