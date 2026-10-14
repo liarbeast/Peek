@@ -94,7 +94,7 @@ function CategoryGroup(props: { title: string; categories: Category[]; empty?: s
                   <Chip size="sm">
                     {/* A pulsing green dot: this collection is fed live. */}
                     <span className="relative mr-1 flex size-2">
-                      <span className="absolute inline-flex size-full animate-[ping_3s_cubic-bezier(0,0,0.2,1)_infinite] rounded-full bg-success opacity-75" />
+                      <span className="absolute inline-flex size-full live-ping rounded-full bg-success opacity-75" />
                       <span className="relative inline-flex size-2 rounded-full bg-success" />
                     </span>
                     Data source
