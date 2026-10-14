@@ -57,7 +57,7 @@ export function Choice<K extends string>(props: {
   value: K;
   onChange: (value: K) => void;
   // `divider` draws a line above an option, to set it apart from the ones before;
-  // `disabled` greys it out, with the reason as its tooltip.
+  // `disabled` greys it out, with the reason under it.
   options: Array<{ id: K; label: string; description?: string; divider?: boolean; disabled?: string }>;
   description?: string;
   hideLabel?: boolean;
@@ -81,15 +81,12 @@ export function Choice<K extends string>(props: {
           {props.options.map((o) => (
             <Fragment key={o.id}>
               {o.divider && <Separator className="my-1.5 bg-default-foreground/25" />}
-              {/* Disabled items take the pointer again (still not clicks), so the tooltip shows. */}
-              <ListBox.Item
-                id={o.id}
-                textValue={o.label}
-                className="aria-disabled:pointer-events-auto aria-disabled:cursor-not-allowed"
-              >
-                <div className="flex flex-col" title={o.disabled}>
+              <ListBox.Item id={o.id} textValue={o.label}>
+                <div className="flex flex-col">
                   <span>{o.label}</span>
-                  {o.description && <span className="text-xs text-muted">{o.description}</span>}
+                  {(o.disabled ?? o.description) && (
+                    <span className="text-xs text-muted">{o.disabled ?? o.description}</span>
+                  )}
                 </div>
                 <ListBox.ItemIndicator />
               </ListBox.Item>
