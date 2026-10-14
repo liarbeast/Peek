@@ -45,24 +45,28 @@ export function SourceSection({ category, onSaved }: { category: Category; onSav
         label="Address"
         value={url}
         onChange={setUrl}
-        placeholder="https://en.wikipedia.org/api/rest_v1/feed/onthisday/selected/{MM}/{DD}"
+        placeholder="https://example.com/api/items.json"
         description="{YYYY}, {MM} and {DD} are filled in with today's date."
       />
       <TextInput
         label="List of entries"
         value={items}
         onChange={setItems}
-        placeholder="selected"
-        description="Where the entries are in the response. Leave empty if the response is the list (or one entry)."
+        placeholder="results"
+        description="Where the entries are in the response, e.g. results or data.items. Leave empty if the response is the list itself, or one entry (like today's weather)."
       />
       {fields.map((f) => (
         <TextInput
           key={f.key}
           label={`${f.label} comes from`}
+          description={
+            f.type === "image"
+              ? "The name of a value in each entry; dots go deeper (image.url) and numbers pick from a list (photos.0). It must be an image address; Peek downloads it."
+              : "The name of a value in each entry; dots go deeper (author.name) and numbers pick from a list (tags.0)."
+          }
           value={paths[f.key] ?? ""}
           onChange={(v) => setPaths({ ...paths, [f.key]: v })}
-          placeholder={f.type === "image" ? "pages.0.thumbnail.source" : "text"}
-          description={f.type === "image" ? "An image address; Peek downloads it." : undefined}
+          placeholder={f.type === "image" ? "image.url" : "name"}
         />
       ))}
       <div className="flex flex-wrap gap-2">
