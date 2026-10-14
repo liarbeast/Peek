@@ -125,7 +125,7 @@ export function SettingsPage({ settings, onChange }: { settings: Settings; onCha
                 ...s,
                 disabled:
                   s.minutes < refresh.minutes
-                    ? `The frame only wakes ${refresh.label.charAt(0).toLowerCase()}${refresh.label.slice(1)} (see Refresh)`
+                    ? `Refresh is ${refresh.label.charAt(0).toLowerCase()}${refresh.label.slice(1)}`
                     : undefined,
               }))}
             />
