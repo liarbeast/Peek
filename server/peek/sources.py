@@ -1,8 +1,8 @@
 """Collections filled from the web: a JSON address, read again once a day.
 
 A source says where to fetch (the address may hold {YYYY}, {MM} and {DD},
-filled in with the day's date, and {RANDOM:1-1025}, a new random number on
-each fetch), where the list of entries sits in the
+filled in with the day's date, and {RANDOM:min-max}, a new random whole
+number in that range on each fetch), where the list of entries sits in the
 response, and which value of an entry goes in each field. Both are dotted
 paths into the JSON, such as "selected" or "pages.0.thumbnail.source"; an
 empty list path means the response itself (one object makes one item).
@@ -25,7 +25,7 @@ class SourceError(Exception):
 
 def url_for(url: str, day: date) -> str:
     url = url.replace("{YYYY}", f"{day:%Y}").replace("{MM}", f"{day:%m}").replace("{DD}", f"{day:%d}")
-    return re.sub(r"\{RANDOM:(\d+)-(\d+)\}", lambda m: str(random.randint(int(m[1]), int(m[2]))), url)
+    return re.sub(r"\{RANDOM:(\d+)-(\d+)\}", lambda m: str(random.randint(*sorted((int(m[1]), int(m[2]))))), url)
 
 
 def pick(data, path: str):

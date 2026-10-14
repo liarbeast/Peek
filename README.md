@@ -61,8 +61,8 @@ separated files all work.
 ## Data sources
 
 A collection can fill itself from a web address that returns JSON: "Connect data source" on its Items tab. The address
-may hold `{YYYY}`, `{MM}` and `{DD}` for today's date, and `{RANDOM:1-1025}` for a random number on each fetch
-(`https://pokeapi.co/api/v2/pokemon/{RANDOM:1-1025}` is a random Pokémon). A source is read again on every wake
+may hold placeholders, filled in on every fetch: `{YYYY}`, `{MM}` and `{DD}` for today's date, and
+`{RANDOM:min-max}` for a random whole number in that range (for an API that has no "random" address of its own). A source is read again on every wake
 that shows its collection, so Refresh in Settings decides how fresh it is. Entries it already had keep their item,
 with their place in the rotation and their downloaded images; new ones are added and gone ones removed. "Look at response" fetches it, finds the lists of entries in it,
 and lists every value in an entry with an example, like the columns of a CSV. Each value you use becomes a new field
