@@ -9,10 +9,10 @@ from typing import Literal
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from starlette.datastructures import UploadFile as FormFile
 
-from . import csv_import, db, layouts, renderer, samples
+from . import csv_import, db, fonts, layouts, renderer, samples
 from . import fields as fieldlib
 
 router = APIRouter()
@@ -27,18 +27,51 @@ IMAGE_TYPES = {
 }
 
 
+class Box(BaseModel):
+    """Where a dragged field sits, in pixels of the upright page."""
+
+    x: int = Field(ge=-800, le=800)
+    y: int = Field(ge=-800, le=800)
+    w: int = Field(ge=8, le=800)
+    h: int = Field(ge=8, le=800)
+    # Text size in pixels. A text box is as tall as its lines, so `h` only
+    # applies to images.
+    size: int | None = Field(default=None, ge=6, le=400)
+    weight: Literal[100, 200, 300, 400, 500, 600, 700, 800, 900] | None = None
+    color: Literal["black", "white", "yellow", "red", "blue", "green"] | None = None
+    font: str | None = None  # a family from fonts.FONTS; none is the built-in face
+    align: Literal["left", "center", "right"] | None = None
+    valign: Literal["top", "middle", "bottom"] | None = None
+    z: int | None = Field(default=None, ge=-100, le=100)  # higher is drawn in front
+    # Linked below another field: drawn `gap` pixels under where that field's
+    # content ends, so a title that wraps to two lines pushes it down.
+    below: str | None = Field(default=None, max_length=64)
+    gap: int | None = Field(default=None, ge=-800, le=800)
+
+    @field_validator("font")
+    @classmethod
+    def _known_font(cls, value: str | None) -> str | None:
+        if value is not None and value not in fonts.FONTS:
+            raise ValueError("unknown font")
+        return value
+
+
+# Per orientation, the fields that were dragged to a place.
+Positions = dict[Literal["landscape", "portrait"], dict[str, Box]]
+
+
 class FieldIn(BaseModel):
     key: str | None = None
     label: str
     type: str = "text"
+    hidden: bool = False
 
 
 class CategoryIn(BaseModel):
     name: str = Field(min_length=1, max_length=80)
-    template: str = "stack"
+    template: str = "canvas"
     # Start from another category's fields and style instead of the defaults.
     copy_from: int | None = None
-    custom_css: str = ""
     item_order: str = "in_order"
     weight: int = Field(1, ge=1, le=10)
     enabled: bool = True
@@ -47,12 +80,12 @@ class CategoryIn(BaseModel):
 class CategoryPatch(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=80)
     template: str | None = None
-    custom_css: str | None = None
     item_order: str | None = None
     weight: int | None = Field(None, ge=1, le=10)
     enabled: bool | None = None
     mono: bool | None = None
     pixelate: bool | None = None
+    positions: Positions | None = None
     fields: list[FieldIn] | None = None
 
 
@@ -60,9 +93,9 @@ class PreviewIn(BaseModel):
     """Unsaved style changes to preview."""
 
     template: str | None = None
-    custom_css: str | None = None
     mono: bool | None = None
     pixelate: bool | None = None
+    positions: Positions | None = None
     item_id: int | None = None
 
 
@@ -148,11 +181,17 @@ def orientation(store: db.Store) -> str:
 
 
 def render_page(store: db.Store, template: str, fields: list[dict], values: dict,
-                custom_css: str = "", mono: bool = False, pixelate: bool = False) -> renderer.Render:
-    """Render a layout the way the frame hangs (landscape or portrait)."""
+                mono: bool = False, pixelate: bool = False,
+                positions: dict | None = None, images: list[dict] | None = None) -> renderer.Render:
+    """Render a layout the way the frame hangs (landscape or portrait), with
+    the fields dragged to a place for that orientation."""
     orientation_ = orientation(store)
     size = renderer.canvas_size(orientation_)
-    html = layouts.build(template, fields, values, custom_css, size, pixelate)
+    boxes = (positions or {}).get(orientation_) or {}
+    cache = fonts.FontCache(store.data_dir / "fonts")
+    faces = sorted({(b["font"], b.get("weight") or 400) for b in boxes.values() if b.get("font")})
+    font_css = "\n".join(cache.css(family, weight) for family, weight in faces)
+    html = layouts.build(template, fields, values, size, pixelate, boxes, font_css, images)
     return renderer.render(html, orientation_, mono)
 
 
@@ -164,13 +203,18 @@ def render_item(store: db.Store, category: dict, item: dict | None, changes: dic
     style = {**category, **{k: v for k, v in (changes or {}).items() if v is not None}}
     template = style["template"] if style["template"] in layouts.TEMPLATES else layouts.TEMPLATES[0]
     values = item_values(store, category, item) if item else samples.placeholder(category["fields"])
-    return render_page(store, template, category["fields"], values, style["custom_css"],
-                       style["mono"], style["pixelate"])
+    images = [{"key": i["key"], "value": uri, "crisp": i["crisp"]}
+              for i in store.category_images(category["id"]) if (uri := _image_uri(store, i["file"]))]
+    return render_page(store, template, category["fields"], values, style["mono"], style["pixelate"],
+                       style["positions"], images)
 
 
 def _png(render: renderer.Render, view: View) -> Response:
+    """The render as a PNG, with where each field was drawn in a header so the
+    app can let people drag them."""
     data = {"panel": render.panel_png, "raw": render.raw_png}.get(view, render.preview_png)()
-    return Response(content=data, media_type="image/png", headers={"Cache-Control": "no-store"})
+    headers = {"Cache-Control": "no-store", "X-Peek-Boxes": json.dumps(render.boxes)}
+    return Response(content=data, media_type="image/png", headers=headers)
 
 
 # Settings
@@ -218,14 +262,26 @@ def create_category(request: Request, body: CategoryIn) -> dict:
     new = body.model_dump(exclude={"copy_from"})
     if body.copy_from is not None:
         source = _category_or_404(store, body.copy_from)
-        for key in ("template", "fields", "mono", "pixelate", "item_order"):
+        for key in ("template", "fields", "mono", "pixelate", "positions", "item_order"):
             new[key] = source[key]
-        new["custom_css"] = body.custom_css or source["custom_css"]
     else:
         _check(new)
         new["fields"] = layouts.TEMPLATE_INFO[body.template]["fields"]
     _check(new)
-    return store.create_category(new)
+    created = store.create_category(new)
+    if body.copy_from is not None:
+        # Style images are copied too, and their boxes follow them to their new keys.
+        keys = {}
+        for image in store.category_images(body.copy_from):
+            path = store.images / image["file"]
+            if path.is_file():
+                file = _save_image_bytes(store, path.read_bytes(), path.suffix)
+                copy = store.create_category_image(created["id"], image["name"], file, image["crisp"])
+                keys[image["key"]] = copy["key"]
+        if keys:
+            positions = {o: {keys.get(k, k): box for k, box in boxes.items()} for o, boxes in new["positions"].items()}
+            created = store.update_category(created["id"], {"positions": positions})
+    return created
 
 
 @router.get("/api/categories/{category_id}")
@@ -274,6 +330,7 @@ def delete_category(request: Request, category_id: int) -> None:
     store = _store(request)
     category = _category_or_404(store, category_id)
     images = [name for item in store.items(category_id) for name in _item_images(category, item)]
+    images += [image["file"] for image in store.category_images(category_id)]
     store.delete_category(category_id)
     for name in images:
         _remove_image(store, name)
@@ -292,6 +349,61 @@ def preview_category(request: Request, category_id: int, body: PreviewIn, view: 
         items = store.items(category_id)
         item = items[0] if items else None
     return _png(render_item(store, category, item, changes), view)
+
+
+# Style images: uploaded once per category, drawn the same for every item.
+
+class CategoryImagePatch(BaseModel):
+    crisp: bool | None = None
+
+
+def _category_image_or_404(store: db.Store, image_id: int) -> dict:
+    image = store.category_image(image_id)
+    if image is None:
+        raise HTTPException(404, "no such image")
+    return image
+
+
+@router.get("/api/categories/{category_id}/images")
+def list_category_images(request: Request, category_id: int) -> list[dict]:
+    store = _store(request)
+    _category_or_404(store, category_id)
+    return store.category_images(category_id)
+
+
+@router.post("/api/categories/{category_id}/images", status_code=201)
+def add_category_image(request: Request, category_id: int, file: UploadFile = File(...)) -> dict:
+    """Upload a style image, named after its file.
+
+    PNG and GIF files usually hold graphics, so they start out crisp; JPEG
+    and WebP files are usually photos, so they start out dithered.
+    """
+    store = _store(request)
+    _category_or_404(store, category_id)
+    name = Path(file.filename or "image").stem[:60] or "image"
+    crisp = file.content_type in ("image/png", "image/gif")
+    return store.create_category_image(category_id, name, _save_image(store, file), crisp)
+
+
+@router.patch("/api/category-images/{image_id}")
+def update_category_image(request: Request, image_id: int, body: CategoryImagePatch) -> dict:
+    store = _store(request)
+    _category_image_or_404(store, image_id)
+    return store.update_category_image(image_id, body.model_dump(exclude_none=True))
+
+
+@router.delete("/api/category-images/{image_id}", status_code=204)
+def delete_category_image(request: Request, image_id: int) -> None:
+    store = _store(request)
+    image = _category_image_or_404(store, image_id)
+    store.delete_category_image(image_id)
+    _remove_image(store, image["file"])
+
+
+@router.get("/api/fonts")
+def list_fonts() -> dict[str, list[int]]:
+    """The Google Fonts text fields can use, with the weights each comes in."""
+    return {family: list(weights) for family, weights in fonts.FONTS.items()}
 
 
 # Items
@@ -412,6 +524,18 @@ async def update_item(request: Request, item_id: int) -> dict:
     if "enabled" in form:
         changes["enabled"] = form["enabled"] == "true"
     return store.update_item(item_id, changes)
+
+
+@router.delete("/api/categories/{category_id}/items", status_code=204)
+def delete_all_items(request: Request, category_id: int) -> None:
+    store = _store(request)
+    category = _category_or_404(store, category_id)
+    items = store.items(category_id)
+    images = [name for item in items for name in _item_images(category, item)]
+    for item in items:
+        store.delete_item(item["id"])
+    for name in images:
+        _remove_image(store, name)
 
 
 @router.delete("/api/items/{item_id}", status_code=204)

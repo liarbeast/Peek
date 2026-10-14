@@ -9,7 +9,7 @@ So far Peek has:
 - **A renderer** that turns a page of fields into a six-colour image, dithering photos while
   keeping text crisp and pixel art blocky.
 - **A web app** to create categories (for example "Pokémon of the day" or "Movie quotes"),
-  give each its own fields, fill them by hand or from a CSV, style them with custom CSS and a live
+  give each its own fields, fill them by hand or from a CSV, lay them out by dragging on a live
   preview, and pick what the frame shows.
 
 ## Run it
@@ -27,6 +27,21 @@ Open http://localhost:8080. The first build downloads Chromium and takes a few m
 Categories, uploaded images and the current frame image live in the `data` folder next to `compose.yaml`.
 To move Peek to another machine, copy the whole folder and run the same command there.
 
+## See changes without rebuilding
+
+`compose.dev.yaml` runs Peek straight from this folder instead of from a built image. The server restarts by itself
+when its code changes, and the web app updates in the open page, so after pulling new code there is nothing to rebuild:
+
+```sh
+docker compose down                         # stop the normal Peek first (it uses the same port)
+docker compose -f compose.dev.yaml up -d    # or: podman compose -f compose.dev.yaml up -d
+git pull                                    # whenever there are changes; they show up within seconds
+```
+
+Open http://localhost:5173 (the frame keeps using port 8080). The first start installs the web app's packages, which
+takes a minute. Add `--build` only when `requirements.txt` changes, and go back with
+`docker compose -f compose.dev.yaml down && docker compose up -d --build`.
+
 ## Endpoints the frame uses
 
 | Endpoint | What it returns |
@@ -41,19 +56,34 @@ Items store one value per field. A CSV file can fill a category: each row become
 fields by name or added as new fields, and image columns hold URLs that Peek downloads. Comma, semicolon and tab
 separated files all work.
 
-## Styling with CSS
+## Styling
 
-Every item is drawn by one layout, Stack (`server/peek/templates/stack.html`): each field in order, centred, inside
-`.stack`. Every field's element has the classes `field field-<key> type-<type>`, so a category's custom CSS can style,
-move or hide any field; the layout's own rules never outweigh it.
+Every item is drawn by one layout, Canvas (`server/peek/templates/canvas.html`): each field sits in a box of its own,
+which you place by dragging it in the Style tab's preview. Until a field is moved, it sits in its default box: fields
+one under the other, full width and centred, each attached below the one before.
 
-Pages are rendered in headless Chromium at 800x480, or at 480x800 when Settings says the frame hangs in portrait; the
-panel always gets 800x480, turned to match. CSS can target portrait with `@media (orientation: portrait)` and use the
-panel colours as `var(--black)`, `var(--white)`, `var(--yellow)`, `var(--red)`, `var(--blue)` and `var(--green)`.
+- **Moving:** drag a box. It snaps to the canvas centre and edges and to other fields (hold Alt to stop snapping), and
+  the arrow keys nudge it. Shift-click picks several fields, which then drag and nudge together.
+- **Size:** a text box has one handle, for its width: the text wraps inside it and the box is as tall as its lines. Its
+  text size is set in pixels. Images scale from their corner and keep their shape.
+- **Style:** click a field for its toolbar: alignment, text size, colour (the panel's six), typeface, weight, front and
+  back, and "Attach to". A field attached to another keeps its distance from where that one ends, so when a title wraps to two
+  lines, the subtitle attached below it moves down with it. An empty field takes no room.
+- **Typefaces** come from Google Fonts (the list is in `server/peek/fonts.py`). Each is downloaded the first time a page
+  uses it (only the weights in use) and kept in the data folder, so the frame keeps working offline. The weight
+  menu lists only the weights each typeface really has.
+- **Style images** are uploaded per category and drawn the same for every item, such as a frame around a sprite. They
+  start out covering the whole page behind the fields, and are dragged and resized like fields. Each is drawn either
+  crisp (solid colours, for graphics) or as a photo (dithered).
+
+Boxes are kept per orientation: pages are rendered in headless Chromium at 800x480, or at 480x800 when Settings says
+the frame hangs in portrait, and the panel always gets 800x480, turned to match.
 
 The Style tab also has two filters. Black and white draws the category in black and white only, turning shades into
 dither patterns (an even, regular one for crisp images). Crisp images resizes images without smoothing and maps each pixel
-to the nearest panel colour instead of dithering it like a photo: for pixel art, icons, logos and QR codes.
+to one panel colour instead of dithering it like a photo: for pixel art, icons, logos and QR codes. Colours are matched
+mostly by hue, because the panel's green and red are dark: a bright sprite green becomes the panel's green, not its yellow.
+Text and shapes are mapped the same way.
 (Under the hood, any image drawn with `image-rendering: pixelated` is treated this way.)
 
 ## Development

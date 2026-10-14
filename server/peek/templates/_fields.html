@@ -1,11 +1,32 @@
-{# Draws one field's value with its classes: field field-<key> type-<type>. #}
+{# A field's element, at its box: position, front-to-back order and
+   alignment; an image also gets its height, while text gets its size,
+   weight, colour and typeface and is as tall as its lines. An empty field leaves a hidden marker,
+   so fields attached below it can still find their place. Style images
+   (keys starting with @) are drawn the same way; crisp ones as pixel art. #}
 {% macro field(e) -%}
+  {%- set b = e.box -%}
+  {%- set link = (' data-below="%s" data-gap="%d"' % (b.below | e, b.gap or 0)) if b.below else "" -%}
   {%- if e.value -%}
-    {%- set classes = "field field-" ~ e.key ~ " type-" ~ e.type -%}
+    {%- set style = "left:%dpx;top:%dpx;width:%dpx" % (b.x, b.y, b.w) -%}
     {%- if e.type == "image" -%}
-      <img class="{{ classes }}" src="{{ e.value }}" alt="">
+      {%- set valign = {"top": "top", "middle": "center", "bottom": "bottom"}[b.valign or "middle"] -%}
+      {%- set style = style ~ ";height:%dpx;object-position:%s %s" % (b.h, b.align or "center", valign) -%}
     {%- else -%}
-      <div class="{{ classes }}">{{ e.value }}</div>
+      {%- set style = style ~ ";text-align:%s" % (b.align or "center") -%}
+      {%- if b.size %}{% set style = style ~ ";font-size:%dpx" % b.size %}{% endif -%}
+      {%- if b.weight %}{% set style = style ~ ";font-weight:%d" % b.weight %}{% endif -%}
+      {%- if b.color %}{% set style = style ~ ";color:var(--%s)" % b.color %}{% endif -%}
+      {%- if b.font %}{% set style = style ~ ";font-family:'%s',sans-serif" % b.font %}{% endif -%}
     {%- endif -%}
+    {%- if b.z is number %}{% set style = style ~ ";z-index:%d" % b.z %}{% endif -%}
+    {%- set classes = "style-image" if e.key.startswith("@") else "field field-" ~ e.key ~ " type-" ~ e.type -%}
+    {%- if e.crisp %}{% set style = style ~ ";image-rendering:pixelated" %}{% endif -%}
+    {%- if e.type == "image" -%}
+      <img class="{{ classes }}" data-field="{{ e.key }}"{% if e.crisp %} data-peek="pixel"{% endif %} src="{{ e.value }}" alt="" style="{{ style }}"{{ link | safe }}>
+    {%- else -%}
+      <div class="{{ classes }}" data-field="{{ e.key }}" style="{{ style }}"{{ link | safe }}>{{ e.value }}</div>
+    {%- endif -%}
+  {%- else -%}
+    <template data-empty="{{ e.key }}" data-top="{{ b.y }}"{{ link | safe }}></template>
   {%- endif -%}
 {%- endmacro %}

@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% import "_fields.html" as f %}
+{% block style %}
+  /* Every field sits in a box of its own, placed by dragging in the app.
+     The body stacks its own children, so style images sent behind
+     (negative z-index) still sit in front of its background. */
+  body { position: relative; z-index: 0; }
+  .field { position: absolute; font-size: 28px; line-height: 1.3; overflow-wrap: anywhere; }
+  .style-image { position: absolute; object-fit: contain; }
+  img.field { object-fit: contain; }
+  {% if pixelate %}
+  /* Pixel art: hard edges whenever an image is drawn larger than it is. */
+  img.field { image-rendering: pixelated; }
+  {% endif %}
+{% endblock %}
+{% block body %}
+  {% for e in images %}{{ f.field(e) }}{% endfor %}
+  {% for e in fields %}{{ f.field(e) }}{% endfor %}
+{% endblock %}

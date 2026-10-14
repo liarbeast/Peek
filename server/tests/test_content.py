@@ -40,19 +40,18 @@ def add_item(client, category_id, data=None, images=None):
 
 def test_templates_are_listed(client):
     names = [t["name"] for t in client.get("/api/templates").json()]
-    assert names == ["stack"]
+    assert names == ["canvas"]
 
 
 def test_category_crud(client):
-    cat = make_category(client, custom_css=".caption { color: red; }")
+    cat = make_category(client)
     assert cat["item_count"] == 0 and cat["enabled"] is True
-    assert cat["template"] == "stack"
+    assert cat["template"] == "canvas"
     assert [f["key"] for f in cat["fields"]] == ["image", "title", "subtext"]
 
     res = client.patch(f"/api/categories/{cat['id']}", json={"name": "Garden birds", "item_order": "shuffle"})
     assert res.json()["name"] == "Garden birds"
     assert res.json()["item_order"] == "shuffle"
-    assert res.json()["custom_css"] == ".caption { color: red; }"
 
     assert [c["name"] for c in client.get("/api/categories").json()] == ["Garden birds"]
     assert client.delete(f"/api/categories/{cat['id']}").status_code == 204
@@ -66,12 +65,15 @@ def test_unknown_template_and_order_are_rejected(client):
 
 
 def test_copy_category_takes_fields_and_style(client):
-    src = make_category(client, custom_css=".field-title { color: red; }")
-    client.patch(f"/api/categories/{src['id']}", json={"fields": src["fields"] + [{"label": "Year", "type": "text"}]})
+    src = make_category(client)
+    client.patch(f"/api/categories/{src['id']}", json={
+        "fields": src["fields"] + [{"label": "Year", "type": "text"}],
+        "positions": {"landscape": {"title": {"x": 1, "y": 2, "w": 300, "h": 40, "color": "red"}}},
+    })
     res = client.post("/api/categories", json={"name": "More quotes", "copy_from": src["id"]})
     assert res.status_code == 201
     copy = res.json()
-    assert copy["custom_css"] == ".field-title { color: red; }"
+    assert copy["positions"]["landscape"]["title"]["color"] == "red"
     assert [f["key"] for f in copy["fields"]] == ["image", "title", "subtext", "year"]
 
 
@@ -213,11 +215,11 @@ def test_csv_import_adds_fields_and_items(client, monkeypatch):
 def test_every_field_gets_its_own_class(client):
     from peek import layouts
 
-    fields = layouts.TEMPLATE_INFO["stack"]["fields"] + [{"key": "year", "label": "Year", "type": "text"}]
-    html = layouts.build("stack", fields, {"title": "Casablanca", "year": "1942"})
+    fields = layouts.TEMPLATE_INFO["canvas"]["fields"] + [{"key": "year", "label": "Year", "type": "text"}]
+    html = layouts.build("canvas", fields, {"title": "Casablanca", "year": "1942"})
     assert 'class="field field-title type-text"' in html
     assert 'class="field field-year type-text"' in html
-    assert "field-image" not in html  # empty fields are left out
+    assert 'class="field field-image' not in html  # empty fields are left out
 
 
 def frame_pixel(client, x=5, y=5):
@@ -225,20 +227,19 @@ def frame_pixel(client, x=5, y=5):
     return tuple(np.asarray(img)[y, x])
 
 
-def test_preview_uses_unsaved_css_and_show_sets_frame(client):
-    cat = make_category(client, custom_css="body { background: var(--blue); }")
-    item = add_item(client, cat["id"], {"title": "Hi"})
+def colours(png_bytes: bytes) -> set:
+    return {c for _, c in Image.open(io.BytesIO(png_bytes)).convert("RGB").getcolors(1 << 20)}
 
-    res = client.post(
-        f"/api/categories/{cat['id']}/preview.png",
-        params={"view": "panel"},
-        json={"custom_css": "body { background: var(--green); }"},
-    )
-    img = np.asarray(Image.open(io.BytesIO(res.content)).convert("RGB"))
-    assert tuple(img[5, 5]) == (0, 255, 0)
+
+def test_preview_uses_unsaved_style_and_show_sets_frame(client):
+    cat = make_category(client)
+    item = add_item(client, cat["id"], {"title": "Hi"}, images={"image": png((255, 0, 0))})
+
+    res = client.post(f"/api/categories/{cat['id']}/preview.png", params={"view": "panel"}, json={"mono": True})
+    assert colours(res.content) <= {(0, 0, 0), (255, 255, 255)}
 
     assert client.post(f"/api/items/{item['id']}/show").status_code == 200
-    assert frame_pixel(client) == (0, 0, 255)
+    assert (255, 0, 0) in colours(client.get("/frame.png").content)
 
 
 def test_preview_without_items_uses_placeholder(client):
@@ -257,10 +258,12 @@ def test_orientation_setting(client):
 
 
 def test_portrait_previews_upright_and_frame_gets_turned(client):
-    # A quote with a red band across the top of the upright picture.
-    css = "body { border-top: 40px solid var(--red); }"
-    cat = make_category(client, custom_css=css)
-    item = add_item(client, cat["id"], {"title": "Hi"})
+    # A red band across the top of the upright picture.
+    cat = make_category(client)
+    band = {"x": 0, "y": 0, "align": "center", "valign": "top"}
+    client.patch(f"/api/categories/{cat['id']}", json={"positions": {
+        "landscape": {"image": {**band, "w": 800, "h": 40}}, "portrait": {"image": {**band, "w": 480, "h": 24}}}})
+    item = add_item(client, cat["id"], {"title": "Hi"}, images={"image": png((255, 0, 0), size=(1000, 50))})
     client.post(f"/api/items/{item['id']}/show")
     assert frame_pixel(client, x=400, y=5) == (255, 0, 0)
 
@@ -278,7 +281,218 @@ def test_portrait_previews_upright_and_frame_gets_turned(client):
 
 
 def test_mono_style_previews_in_black_and_white(client):
-    cat = make_category(client, custom_css="body { background: var(--blue); }")
+    cat = make_category(client)
+    add_item(client, cat["id"], {"title": "Hi"}, images={"image": png((0, 0, 255))})
     res = client.post(f"/api/categories/{cat['id']}/preview.png", params={"view": "panel"}, json={"mono": True})
-    img = Image.open(io.BytesIO(res.content)).convert("RGB")
-    assert {c for _, c in img.getcolors()} <= {(0, 0, 0), (255, 255, 255)}
+    assert colours(res.content) <= {(0, 0, 0), (255, 255, 255)}
+
+
+def boxes(res) -> dict:
+    assert res.status_code == 200, res.text
+    return json.loads(res.headers["X-Peek-Boxes"])
+
+
+def test_dragged_fields_get_their_box(client):
+    cat = make_category(client)
+    add_item(client, cat["id"], {"title": "Robin", "subtext": "Garden bird"})
+    url = f"/api/categories/{cat['id']}/preview.png"
+
+    # Every field starts with a box: one under the other, each attached below
+    # the one before. The preview says where they ended up.
+    defaults = cat["positions"]["landscape"]
+    assert cat["default_positions"] == cat["positions"]
+    assert defaults["title"]["weight"] == 700 and defaults["subtext"]["below"] == "title"
+    assert set(cat["positions"]) == {"landscape", "portrait"}
+    start = boxes(client.post(url, json={}))
+    assert set(start) == {"title", "subtext"}  # the image is empty
+    assert start["title"][1] == 40  # the empty image takes no room
+
+    title = {"x": 20, "y": 30, "w": 300, "h": 60, "size": 30}
+    res = client.patch(f"/api/categories/{cat['id']}", json={"positions": {"landscape": {"title": title}}})
+    assert res.json()["positions"]["landscape"]["title"] == title
+    assert res.json()["positions"]["landscape"]["subtext"] == defaults["subtext"]
+    placed = boxes(client.post(url, json={}))
+    assert placed["title"][:3] == [20, 30, 300]  # text is as tall as its lines
+    assert placed["subtext"][1] == 30 + placed["title"][3] + 16  # still attached below the title
+
+    # Unsaved positions can be previewed; portrait has its own.
+    draft = {"landscape": {"subtext": {"x": 400, "y": 400, "w": 200, "h": 40}}}
+    assert boxes(client.post(url, json={"positions": draft}))["subtext"][:3] == [400, 400, 200]
+    client.patch("/api/settings", json={"orientation": "portrait"})
+    assert boxes(client.post(url, json={}))["title"][:3] != [20, 30, 300]
+
+    assert client.patch(f"/api/categories/{cat['id']}", json={
+        "positions": {"landscape": {"title": {"x": 0, "y": 0, "w": 0, "h": 10}}}}).status_code == 422
+    assert client.patch(f"/api/categories/{cat['id']}", json={
+        "positions": {"sideways": {}}}).status_code == 422
+    assert client.patch(f"/api/categories/{cat['id']}", json={
+        "positions": {"landscape": {"title": {**title, "font": "Comic Sans"}}}}).status_code == 422
+
+    copy = client.post("/api/categories", json={"name": "Copy", "copy_from": cat["id"]}).json()
+    assert copy["positions"] == res.json()["positions"]
+
+
+def test_placed_field_style():
+    from peek import layouts
+
+    fields = [{"key": "title", "label": "Title", "type": "text"}, {"key": "pic", "label": "Pic", "type": "image"}]
+    values = {"title": "Robin", "pic": "data:image/png;base64,AA=="}
+    html = layouts.build("canvas", fields, values, positions={
+        "title": {"x": 1, "y": 2, "w": 300, "h": 60, "size": 50, "align": "right", "valign": "bottom", "z": 3,
+                  "weight": 800, "color": "red", "font": "Alegreya"},
+        "pic": {"x": 5, "y": 6, "w": 70, "h": 80, "align": "left", "valign": "top"},
+    })
+    # Text is as tall as its lines, so it gets no height; vertical alignment is for images.
+    assert ('style="left:1px;top:2px;width:300px;text-align:right;font-size:50px;font-weight:800;'
+            'color:var(--red);font-family:&#39;Alegreya&#39;,sans-serif;z-index:3"') in html
+    assert 'style="left:5px;top:6px;width:70px;height:80px;object-position:left top"' in html
+
+
+def test_placed_text_wraps_in_its_width():
+    import numpy as np
+    from peek import layouts, renderer
+
+    fields = [{"key": "title", "label": "Title", "type": "text"}]
+    long = "A rather long title for such a narrow box, long enough to wrap a few times"
+    html = layouts.build("canvas", fields, {"title": long},
+                         positions={"title": {"x": 20, "y": 20, "w": 200, "h": 8, "size": 30}})
+    render = renderer.render(html)
+    x, y, w, h, size = render.boxes["title"]
+    assert (x, y, w, size) == (20, 20, 200, 30)
+    assert h > 100  # as tall as its lines, whatever h was saved
+    ink = np.asarray(render.raw.convert("L")) < 128
+    assert ink[20:20 + h, 20:220].any()
+    ink[20:20 + h, 20:220] = False
+    assert not ink.any()  # nothing outside its width
+
+
+def test_attached_field_follows_the_text_above(client):
+    cat = make_category(client)
+    url = f"/api/categories/{cat['id']}/preview.png"
+    positions = {"landscape": {
+        "title": {"x": 20, "y": 20, "w": 300, "h": 40, "size": 30},
+        "subtext": {"x": 20, "y": 0, "w": 300, "h": 40, "below": "title", "gap": 12},
+    }}
+    found = {}
+    for title in ("Robin", "Robin, the European garden bird"):
+        item = add_item(client, cat["id"], {"title": title, "subtext": "Garden bird"})
+        found[title] = boxes(client.post(url, json={"positions": positions, "item_id": item["id"]}))
+    one, two = found["Robin"], found["Robin, the European garden bird"]
+    assert one["subtext"][1] == one["title"][1] + one["title"][3] + 12  # 12px under the title's last line
+    assert two["subtext"][1] == two["title"][1] + two["title"][3] + 12
+    assert two["subtext"][1] - one["subtext"][1] > 25  # a second line pushed it down
+
+    # Attached round in a circle, fields just stay put.
+    loop = {"landscape": {"title": {"x": 0, "y": 0, "w": 100, "h": 50, "below": "subtext"},
+                          "subtext": {"x": 0, "y": 60, "w": 100, "h": 50, "below": "title"}}}
+    assert client.post(url, json={"positions": loop}).status_code == 200
+
+
+def test_attached_to_an_empty_field_takes_its_place(client):
+    cat = make_category(client)
+    item = add_item(client, cat["id"], {"title": "Robin", "subtext": "Garden bird"})  # no image
+    positions = {"landscape": {
+        "image": {"x": 0, "y": 100, "w": 200, "h": 200},
+        "title": {"x": 0, "y": 0, "w": 300, "h": 40, "below": "image", "gap": 10},
+    }}
+    found = boxes(client.post(f"/api/categories/{cat['id']}/preview.png",
+                              json={"positions": positions, "item_id": item["id"]}))
+    assert found["title"][1] == 100  # where the image would have been
+
+
+def test_delete_all_items(client):
+    cat = make_category(client)
+    other = make_category(client)
+    for n in range(3):
+        add_item(client, cat["id"], {"title": f"Bird {n}"}, images={"image": png()})
+    add_item(client, other["id"], {"title": "Kept"})
+    assert client.delete(f"/api/categories/{cat['id']}/items").status_code == 204
+    assert client.get(f"/api/categories/{cat['id']}/items").json() == []
+    assert len(client.get(f"/api/categories/{other['id']}/items").json()) == 1
+    assert client.delete("/api/categories/999/items").status_code == 404
+
+
+def test_hidden_field_is_kept_but_not_drawn(client):
+    cat = make_category(client)
+    item = add_item(client, cat["id"], {"title": "Robin", "subtext": "Garden bird"})
+    fields = [{**f, "hidden": f["key"] == "title"} for f in cat["fields"]]
+    cat = client.patch(f"/api/categories/{cat['id']}", json={"fields": fields}).json()
+    assert [f.get("hidden", False) for f in cat["fields"]] == [f["key"] == "title" for f in cat["fields"]]
+    items = client.get(f"/api/categories/{cat['id']}/items").json()
+    assert items[0]["data"]["title"] == "Robin"  # value kept
+    positions = {"landscape": {
+        "title": {"x": 0, "y": 100, "w": 300, "h": 40},
+        "subtext": {"x": 0, "y": 0, "w": 300, "h": 40, "below": "title", "gap": 10},
+    }}
+    found = boxes(client.post(f"/api/categories/{cat['id']}/preview.png",
+                              json={"positions": positions, "item_id": item["id"]}))
+    assert "title" not in found
+    assert found["subtext"][1] == 100  # takes the hidden title's place
+
+
+def test_fonts_are_downloaded_once_and_inlined(tmp_path):
+    from peek import fonts
+
+    sheet = (
+        "/* cyrillic */\n@font-face {\n  font-family: 'Alegreya';\n  src: url(https://fonts.gstatic.com/c.woff2) format('woff2');\n}\n"
+        "/* latin */\n@font-face {\n  font-family: 'Alegreya';\n  src: url(https://fonts.gstatic.com/l.woff2) format('woff2');\n}\n"
+    )
+    fetched = []
+
+    def fetch(url):
+        fetched.append(url)
+        return sheet.encode() if "googleapis" in url else b"font"
+
+    cache = fonts.FontCache(tmp_path, fetch)
+    css = cache.css("Alegreya", 800)
+    assert "data:font/woff2;base64,Zm9udA==" in css and "c.woff2" not in css
+    assert "family=Alegreya%3Awght%40800" in fetched[0]
+    assert cache.css("Alegreya", 800) == css and len(fetched) == 2  # the second time comes from disk
+    assert cache.css("Comic Sans") == ""
+    assert cache.css("Alegreya", 100) == "" and len(fetched) == 2  # a weight it doesn't come in
+
+    def offline(url):
+        raise OSError("no network")
+
+    assert fonts.FontCache(tmp_path / "other", offline).css("Ubuntu") == ""
+
+
+def test_style_images(client, tmp_path):
+    cat = make_category(client)
+    item = add_item(client, cat["id"], {"title": "Robin"})
+    url = f"/api/categories/{cat['id']}/images"
+    frame = client.post(url, files={"file": ("pokedex frame.png", png((255, 0, 0), (800, 480)), "image/png")}).json()
+    assert frame["name"] == "pokedex frame" and frame["crisp"] is True
+    photo = client.post(url, files={"file": ("sky.jpg", png(), "image/jpeg")}).json()
+    assert photo["crisp"] is False
+    assert [i["key"] for i in client.get(url).json()] == [frame["key"], photo["key"]]
+    assert client.patch(f"/api/category-images/{photo['id']}", json={"crisp": True}).json()["crisp"] is True
+    assert client.delete(f"/api/category-images/{photo['id']}").status_code == 204
+
+    # It covers the whole page behind the fields until it is dragged somewhere.
+    preview = f"/api/categories/{cat['id']}/preview.png"
+    found = boxes(client.post(preview, json={"item_id": item["id"]}))
+    assert found[frame["key"]][:4] == [0, 0, 800, 480]
+    # Behind the fields, but in front of the page's own white background.
+    panel = client.post(preview, params={"view": "panel"}, json={"item_id": item["id"]}).content
+    assert (255, 0, 0) in colours(panel)
+    small = {"landscape": {frame["key"]: {"x": 10, "y": 20, "w": 100, "h": 60}}}
+    assert boxes(client.post(preview, json={"positions": small}))[frame["key"]][:4] == [10, 20, 100, 60]
+
+    # A copy gets its own copy of the image, with the box moved to its key.
+    client.patch(f"/api/categories/{cat['id']}", json={"positions": small})
+    copy = client.post("/api/categories", json={"name": "Copy", "copy_from": cat["id"]}).json()
+    [copied] = client.get(f"/api/categories/{copy['id']}/images").json()
+    assert copied["file"] != frame["file"]
+    assert copy["positions"]["landscape"][copied["key"]]["x"] == 10
+
+    images = tmp_path / "images"
+    assert (images / frame["file"]).exists()
+    client.delete(f"/api/categories/{cat['id']}")
+    assert not (images / frame["file"]).exists() and (images / copied["file"]).exists()
+
+
+def test_font_list(client):
+    weights = client.get("/api/fonts").json()
+    assert weights["Poppins"] == [100, 200, 300, 400, 500, 600, 700, 800, 900]
+    assert weights["Jacquard 12"] == [400]
