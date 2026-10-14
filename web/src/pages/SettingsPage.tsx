@@ -10,25 +10,27 @@ const ORIENTATIONS: { id: Orientation; label: string; size: string; shape: strin
   { id: "portrait", label: "Portrait", size: "480 × 800", shape: "h-15 w-9" },
 ];
 
-const REFRESHES: { id: Refresh; label: string }[] = [
-  { id: "15m", label: "Every 15 minutes" },
-  { id: "30m", label: "Every 30 minutes" },
-  { id: "1h", label: "Every hour" },
-  { id: "3h", label: "Every 3 hours" },
-  { id: "6h", label: "Every 6 hours" },
-  { id: "12h", label: "Every 12 hours" },
-  { id: "1d", label: "Every day, at midnight" },
-  { id: "1w", label: "Every week, on Monday at midnight" },
+// Each with its length in minutes, so Switch collection can leave out choices
+// shorter than Refresh (the server does the same).
+const REFRESHES: { id: Refresh; label: string; minutes: number }[] = [
+  { id: "15m", label: "Every 15 minutes", minutes: 15 },
+  { id: "30m", label: "Every 30 minutes", minutes: 30 },
+  { id: "1h", label: "Every hour", minutes: 60 },
+  { id: "3h", label: "Every 3 hours", minutes: 180 },
+  { id: "6h", label: "Every 6 hours", minutes: 360 },
+  { id: "12h", label: "Every 12 hours", minutes: 720 },
+  { id: "1d", label: "Every day, at midnight", minutes: 1440 },
+  { id: "1w", label: "Every week, on Monday at midnight", minutes: 10080 },
 ];
 
-const SWITCHES: { id: Switch; label: string }[] = [
-  { id: "30m", label: "Every 30 minutes" },
-  { id: "1h", label: "Every hour" },
-  { id: "8h", label: "Every 8 hours" },
-  { id: "1d", label: "Every day, at midnight" },
-  { id: "1w", label: "Every week, on Monday at midnight" },
-  { id: "finished", label: "Once a collection is finished" },
-  { id: "1mo", label: "Every month, on the 1st at midnight" },
+const SWITCHES: { id: Switch; label: string; minutes: number }[] = [
+  { id: "30m", label: "Every 30 minutes", minutes: 30 },
+  { id: "1h", label: "Every hour", minutes: 60 },
+  { id: "8h", label: "Every 8 hours", minutes: 480 },
+  { id: "1d", label: "Every day, at midnight", minutes: 1440 },
+  { id: "1w", label: "Every week, on Monday at midnight", minutes: 10080 },
+  { id: "finished", label: "Once a collection is finished", minutes: Infinity },
+  { id: "1mo", label: "Every month, on the 1st at midnight", minutes: Infinity },
 ];
 
 export function SettingsPage({ settings, onChange }: { settings: Settings; onChange: (s: Settings) => void }) {
@@ -114,12 +116,14 @@ export function SettingsPage({ settings, onChange }: { settings: Settings; onCha
               label="Switch collection"
               value={settings.switch}
               onChange={(s) => update({ switch: s })}
-              options={SWITCHES}
+              options={SWITCHES.filter(
+                (s) => s.minutes >= (REFRESHES.find((r) => r.id === settings.refresh)?.minutes ?? 0),
+              )}
             />
             <p className="text-sm text-muted">
               How often the frame moves on to the next active collection, on its first wake after this time.
-              “Finished” moves on once every item of the collection has been shown. Set it to the same as Refresh,
-              or shorter, to change collection on every wake.
+              “Finished” moves on once every item of the collection has been shown. Choices shorter than Refresh
+              are left out; pick the same as Refresh to change collection on every wake.
             </p>
           </div>
         </div>
