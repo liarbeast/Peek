@@ -13,16 +13,15 @@ export const ORDERS: Array<{ id: ItemOrder; label: string; description: string }
 export function SettingsTab({ category, onSaved }: { category: Category; onSaved: (c: Category) => void }) {
   const [name, setName] = useState(category.name);
   const [order, setOrder] = useState<ItemOrder>(category.item_order);
-  const [weight, setWeight] = useState(String(category.weight));
   const [enabled, setEnabled] = useState(category.enabled);
   const [confirming, setConfirming] = useState(false);
   const dirty =
-    name !== category.name || order !== category.item_order || weight !== String(category.weight) || enabled !== category.enabled;
+    name !== category.name || order !== category.item_order || enabled !== category.enabled;
 
   const save = async () => {
     try {
       onSaved(
-        await api.updateCategory(category.id, { name: name.trim(), item_order: order, weight: Number(weight), enabled }),
+        await api.updateCategory(category.id, { name: name.trim(), item_order: order, enabled }),
       );
       toast.success("Settings saved");
     } catch (e) {
@@ -40,18 +39,6 @@ export function SettingsTab({ category, onSaved }: { category: Category; onSaved
     <div className="flex max-w-lg flex-col gap-5">
       <TextInput label="Name" value={name} onChange={setName} />
       <Choice label="Order of items" value={order} onChange={setOrder} options={ORDERS} />
-      <Choice
-        label="How often it comes up"
-        value={weight}
-        onChange={setWeight}
-        description="Used when collections are picked at random."
-        options={[
-          { id: "1", label: "Normal" },
-          { id: "2", label: "Twice as often" },
-          { id: "3", label: "Three times as often" },
-          { id: "5", label: "Five times as often" },
-        ]}
-      />
       <Toggle label="Show this collection on the frame" isSelected={enabled} onChange={setEnabled} />
       <div className="flex gap-2">
         <Button isDisabled={!dirty || !name.trim()} onPress={save}>
