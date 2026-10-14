@@ -1,0 +1,40 @@
+# Peek in development: runs straight from this checkout, so after `git pull`
+# (or any edit) the server restarts and the page reloads by itself, without
+# rebuilding the image. Start it with:
+#
+#   docker compose -f compose.dev.yaml up    (or: podman compose -f compose.dev.yaml up)
+#
+# and open http://localhost:5173. Rebuild (add --build) only when
+# requirements.txt or web/package.json change.
+services:
+  peek:
+    build: .
+    image: localhost/peek:latest
+    command: uvicorn --factory peek.app:main --host 0.0.0.0 --port 8080 --reload --reload-dir /app/peek
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./server/peek:/app/peek:Z
+      - ./data:/data:Z
+    environment:
+      # File events don't always cross into a container on a Mac; polling always works.
+      WATCHFILES_FORCE_POLLING: "true"
+
+  web:
+    image: docker.io/library/node:22-slim
+    working_dir: /src/web
+    command: sh -c "npm install --no-audit --no-fund && npm run dev -- --host 0.0.0.0"
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./web:/src/web:Z
+      # The container's own node_modules, so it doesn't clash with one on the Mac.
+      - node_modules:/src/web/node_modules
+    environment:
+      PEEK_BACKEND: http://peek:8080
+      PEEK_POLL: "1"
+    depends_on:
+      - peek
+
+volumes:
+  node_modules:
