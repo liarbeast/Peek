@@ -56,3 +56,13 @@ def test_sync_replaces_items_once_a_day(tmp_path, monkeypatch):
     removed = client.patch(f"/api/categories/{cat['id']}", json={"source": {"url": ""}}).json()
     assert removed["source"] is None and removed["synced"] is None
     assert removed["item_count"] == 2  # the fetched items stay, now editable
+
+
+def test_inspect_finds_the_list_and_its_values():
+    assert sources.lists(ON_THIS_DAY) == [{"path": "selected", "count": 3}]
+    assert sources.lists({"data": {"items": [{"a": 1}]}, "tags": ["x"]}) == [{"path": "data.items", "count": 1}]
+    assert sources.values(ON_THIS_DAY["selected"][0]) == [
+        {"path": "year", "example": "1066"},
+        {"path": "text", "example": "Battle of Hastings"},
+        {"path": "pages.0.titles.normalized", "example": "Hastings"},
+    ]

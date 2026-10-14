@@ -92,6 +92,12 @@ export interface Category {
   synced: string | null; // the day the source was last read, YYYY-MM-DD
 }
 
+export interface SourceInspection {
+  lists: { path: string; count: number }[];
+  items: string; // the list looked into
+  values: { path: string; example: string }[];
+}
+
 // Where a collection's items come from: a JSON address, read once a day.
 // `items` and each field's entry are dotted paths into the response.
 export interface Source {
@@ -192,6 +198,9 @@ export const api = {
     request<Category>("/api/categories", json("POST", body)),
   updateCategory: (id: number, body: Partial<Omit<Category, "fields">> & { fields?: FieldDraft[] }) =>
     request<Category>(`/api/categories/${id}`, json("PATCH", body)),
+  // What an address returns: its lists of entries, and the values in one entry.
+  inspectSource: (url: string, items?: string) =>
+    request<SourceInspection>("/api/sources/inspect", json("POST", { url, items })),
   syncCategory: (id: number) =>
     request<{ created: number; category: Category }>(`/api/categories/${id}/sync`, { method: "POST" }),
   deleteCategory: (id: number) => request<void>(`/api/categories/${id}`, { method: "DELETE" }),

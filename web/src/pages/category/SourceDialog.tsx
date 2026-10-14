@@ -1,10 +1,14 @@
 import { Button, toast } from "@heroui/react";
-import { useState } from "react";
-import { api, type Category } from "../../api";
-import { Dialog, TextInput } from "../../components/ui";
+import { useEffect, useState } from "react";
+import { api, type Category, type SourceInspection } from "../../api";
+import { Choice, Dialog, TextInput } from "../../components/ui";
+
+// Select can't hold an empty key, so "nothing" and "the whole response" use this.
+const NONE = "-";
 
 // Connects a collection to a data source: a JSON address whose entries become
-// its items, read again every day.
+// its items, read again every day. "Look at response" fetches the address so
+// the list and each field's value can be picked instead of typed.
 export function SourceDialog(props: {
   category: Category;
   itemCount: number;
@@ -16,8 +20,28 @@ export function SourceDialog(props: {
   const [url, setUrl] = useState(category.source?.url ?? "");
   const [items, setItems] = useState(category.source?.items ?? "");
   const [paths, setPaths] = useState<Record<string, string>>(category.source?.fields ?? {});
+  const [inspection, setInspection] = useState<SourceInspection | null>(null);
+  const [looking, setLooking] = useState(false);
   const [busy, setBusy] = useState(false);
   const fields = category.fields.filter((f) => !f.hidden);
+
+  const look = async (list?: string) => {
+    setLooking(true);
+    try {
+      const found = await api.inspectSource(url.trim(), list);
+      setInspection(found);
+      setItems(found.items);
+    } catch (e) {
+      toast.danger((e as Error).message);
+    } finally {
+      setLooking(false);
+    }
+  };
+
+  // Editing a connected source: show what it returns straight away.
+  useEffect(() => {
+    if (props.isOpen && category.source && !inspection) look(category.source.items);
+  }, [props.isOpen]);
 
   const save = async () => {
     setBusy(true);
@@ -34,6 +58,17 @@ export function SourceDialog(props: {
       setBusy(false);
     }
   };
+
+  const listOptions = [
+    ...(inspection?.lists ?? []).map((l) => ({ id: l.path, label: l.path, description: `${l.count} entries` })),
+    { id: NONE, label: "The whole response", description: "One item, e.g. today's weather" },
+  ];
+  const valueOptions = (current: string) => [
+    { id: NONE, label: "Nothing" },
+    ...(inspection?.values ?? []).map((v) => ({ id: v.path, label: v.path, description: v.example })),
+    // A path typed earlier that this response doesn't have, so it isn't lost.
+    ...(current && !inspection?.values.some((v) => v.path === current) ? [{ id: current, label: current }] : []),
+  ];
 
   return (
     <Dialog
@@ -59,34 +94,50 @@ export function SourceDialog(props: {
           props.itemCount > 0 &&
           ` Fetching replaces the ${props.itemCount} items this collection has now.`}
       </p>
-      <TextInput
-        label="Address"
-        value={url}
-        onChange={setUrl}
-        placeholder="https://example.com/api/items.json"
-        description="{YYYY}, {MM} and {DD} are filled in with today's date."
-      />
-      <TextInput
-        label="List of entries"
-        value={items}
-        onChange={setItems}
-        placeholder="results"
-        description="Where the entries are in the response, e.g. results or data.items. Leave empty if the response is the list itself, or one entry (like today's weather)."
-      />
-      {fields.map((f) => (
+      <div className="flex items-end gap-2">
         <TextInput
-          key={f.key}
-          label={`${f.label} comes from`}
-          description={
-            f.type === "image"
-              ? "The name of a value in each entry; dots go deeper (image.url) and numbers pick from a list (photos.0). It must be an image address; Peek downloads it."
-              : "The name of a value in each entry; dots go deeper (author.name) and numbers pick from a list (tags.0)."
-          }
-          value={paths[f.key] ?? ""}
-          onChange={(v) => setPaths({ ...paths, [f.key]: v })}
-          placeholder={f.type === "image" ? "image.url" : "name"}
+          label="Address"
+          value={url}
+          onChange={(v) => {
+            setUrl(v);
+            setInspection(null);
+          }}
+          placeholder="https://example.com/api/items.json"
         />
-      ))}
+        <Button variant="secondary" isDisabled={looking || !url.trim()} onPress={() => look()}>
+          {looking ? "Looking…" : "Look at response"}
+        </Button>
+      </div>
+      <p className="-mt-2 text-xs text-muted">{"{YYYY}, {MM} and {DD} are filled in with today's date."}</p>
+
+      {!inspection && (
+        <p className="text-sm text-muted">
+          Enter the address and press “Look at response”. Peek then shows what the address returns, and you pick which
+          value goes in each field.
+        </p>
+      )}
+
+      {inspection && (
+        <>
+          <Choice
+            label="List of entries"
+            value={items || NONE}
+            onChange={(v) => look(v === NONE ? "" : v)}
+            options={listOptions}
+            description="Each entry becomes an item."
+          />
+          {fields.map((f) => (
+            <Choice
+              key={f.key}
+              label={f.label}
+              value={paths[f.key] || NONE}
+              onChange={(v) => setPaths({ ...paths, [f.key]: v === NONE ? "" : v })}
+              options={valueOptions(paths[f.key] ?? "")}
+              description={f.type === "image" ? "Pick an image address; Peek downloads the image." : undefined}
+            />
+          ))}
+        </>
+      )}
     </Dialog>
   );
 }

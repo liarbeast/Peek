@@ -56,8 +56,9 @@ def entries(data, source: dict) -> list[dict[str, str]]:
     return rows
 
 
-def fetch(source: dict, day: date) -> list[dict[str, str]]:
-    url = url_for(source["url"], day)
+def load(url: str, day: date):
+    """The JSON at an address, with the day's date filled in."""
+    url = url_for(url, day)
     if not url.startswith(("http://", "https://")):
         raise SourceError("the address must start with http:// or https://")
     try:
@@ -68,5 +69,35 @@ def fetch(source: dict, day: date) -> list[dict[str, str]]:
         raise SourceError(f"couldn't load {url}: {e}") from e
     except ValueError as e:
         raise SourceError(f"{url} didn't return JSON") from e
-    return entries(data, source)
+    return data
+
+
+def fetch(source: dict, day: date) -> list[dict[str, str]]:
+    return entries(load(source["url"], day), source)
+
+
+def lists(data, path: str = "", depth: int = 3) -> list[dict]:
+    """Every list of entries (objects) in a response, with its path and length,
+    longest first: the candidates for "List of entries"."""
+    found = []
+    if isinstance(data, list) and data and isinstance(data[0], dict):
+        found.append({"path": path, "count": len(data)})
+    elif isinstance(data, dict) and depth:
+        for key, value in data.items():
+            found += lists(value, f"{path}.{key}" if path else key, depth - 1)
+    return sorted(found, key=lambda f: -f["count"])
+
+
+def values(entry, path: str = "", depth: int = 4) -> list[dict]:
+    """Every plain value in an entry, with its path and an example, to pick
+    from for each field. Lists contribute their first element."""
+    if isinstance(entry, dict) and depth:
+        items = entry.items()
+    elif isinstance(entry, list) and entry and depth:
+        items = [("0", entry[0])]
+    else:
+        if entry in (None, "") or isinstance(entry, (dict, list)):
+            return []
+        return [{"path": path, "example": str(entry)[:120]}]
+    return [v for key, value in items for v in values(value, f"{path}.{key}" if path else key, depth - 1)]
 
