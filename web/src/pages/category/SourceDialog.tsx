@@ -8,7 +8,7 @@ import {
   type SourceColumn,
   type SourceInspection,
 } from "../../api";
-import { Choice, Dialog, TextInput, Toggle } from "../../components/ui";
+import { Choice, Dialog, TextInput } from "../../components/ui";
 
 // Select can't hold an empty key, so "the whole response" uses this.
 const WHOLE = "-";
@@ -33,7 +33,6 @@ export function SourceDialog(props: {
 }) {
   const { category, onSaved } = props;
   const [url, setUrl] = useState(category.source?.url ?? "");
-  const [everyWake, setEveryWake] = useState(category.source?.every_wake ?? false);
   const [inspection, setInspection] = useState<SourceInspection | null>(null);
   const [plans, setPlans] = useState<Record<string, Plan>>({});
   const [looking, setLooking] = useState(false);
@@ -88,7 +87,6 @@ export function SourceDialog(props: {
         url: url.trim(),
         items: inspection.items,
         columns,
-        every_wake: everyWake,
       });
       onSaved(saved);
       props.onOpenChange(false);
@@ -127,8 +125,8 @@ export function SourceDialog(props: {
       }
     >
       <p className="text-sm text-muted">
-        A web address that returns JSON. Its entries replace the items, which can't be edited by hand while the source
-        is connected.
+        A web address that returns JSON. Its entries replace the items each time the frame switches to this collection
+        (see “Switch collection” in Settings). They can't be edited by hand while the source is connected.
         {!category.source &&
           props.itemCount > 0 &&
           ` Fetching replaces the ${props.itemCount} items this collection has now.`}
@@ -150,7 +148,6 @@ export function SourceDialog(props: {
       <p className="-mt-2 text-xs text-muted">
         {"{YYYY}, {MM} and {DD} are filled in with today's date; {RANDOM:1-1025} with a random number on each fetch."}
       </p>
-      <Toggle label="Fetch on every wake, instead of once a day" isSelected={everyWake} onChange={setEveryWake} />
 
       {!inspection && (
         <p className="text-sm text-muted">
