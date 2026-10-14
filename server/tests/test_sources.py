@@ -29,7 +29,7 @@ def test_entries_follow_the_paths():
     assert 1 <= int(sources.url_for("{RANDOM:1-3}", date.today())) <= 3
 
 
-def test_sync_replaces_items_and_refetches_on_switch(tmp_path, monkeypatch):
+def test_every_wake_fetches_and_keeps_known_entries(tmp_path, monkeypatch):
     calls = []
 
     def fake_get(url, **kwargs):
@@ -60,17 +60,24 @@ def test_sync_replaces_items_and_refetches_on_switch(tmp_path, monkeypatch):
         client.get("/frame.png")
         return json.loads(current.read_text())
 
-    client.get("/frame.png")  # the frame switches to the collection: fetched again
+    client.get("/frame.png")  # every wake that shows it fetches it
     assert len(calls) == 3
     first = json.loads(current.read_text())
     assert first["category_id"] == cat["id"]
-    assert wake()["item_id"] != first["item_id"] and len(calls) == 3  # same collection: next item, no fetch
-    wake(switch=True)  # switching (back) to it fetches again
-    assert len(calls) == 4
+    second = wake()
+    assert len(calls) == 4 and second["item_id"] != first["item_id"]  # unchanged entries: rotation carries on
+    ON_THIS_DAY["selected"].insert(0, {"year": 2000, "text": "New"})
+    try:
+        wake()
+        items = client.get(f"/api/categories/{cat['id']}/items").json()
+        assert [i["data"]["year"] for i in items] == ["2000", "1066", "1969"]  # added, in the source's order
+        assert second["item_id"] in [i["id"] for i in items]  # the old items are the same items
+    finally:
+        ON_THIS_DAY["selected"].pop(0)
 
     removed = client.patch(f"/api/categories/{cat['id']}", json={"source": {"url": ""}}).json()
     assert removed["source"] is None and removed["synced"] is None
-    assert removed["item_count"] == 2  # the fetched items stay, now editable
+    assert removed["item_count"] == 3  # the fetched items stay, now editable
 
 
 def test_inspect_finds_the_list_and_its_values():

@@ -696,33 +696,53 @@ def run_import(
 # Data sources
 
 
+# Where an item made from a source keeps the entry it came from, so the next
+# fetch knows it already has it. Field keys never start with "_".
+SOURCE_ENTRY = "_entry"
+
+
 def sync_source(store: db.Store, category: dict, day: date) -> int:
-    """Replace a category's items with what its source holds on `day`; the
-    old items stay if the source can't be read. Returns how many it made."""
+    """Bring a category's items in line with what its source holds on `day`.
+    Entries it already has keep their item (and with it their place in the
+    rotation and their downloaded images); new entries are added and gone
+    ones removed, in the source's order. The old items stay if the source
+    can't be read. Returns how many items there are."""
     rows = sources.fetch(category["source"], day)
     types = {f["key"]: f["type"] for f in category["fields"]}
-    rows = [{k: v for k, v in row.items() if k in types} for row in rows]
-    urls = [v for row in rows for k, v in row.items() if types[k] == "image"]
-    downloads = csv_import.download_images(urls, IMAGE_TYPES) if urls else {}
-    datas = []
+    rows = [row for row in ({k: v for k, v in row.items() if k in types} for row in rows) if row]
+    old: dict[str, list[dict]] = {}
+    for item in store.items(category["id"]):
+        old.setdefault(item["data"].get(SOURCE_ENTRY), []).append(item)
+
+    order: list[int | dict] = []  # an existing item's id, or a new row
     for row in rows:
-        data = {}
-        for key, value in row.items():
-            if types[key] != "image":
-                data[key] = value
-            elif got := downloads.get(value):
-                data[key] = _save_image_bytes(store, *got)
-        if data:
-            datas.append(data)
-    _delete_items(store, category)
-    store.create_items(category["id"], datas)
+        entry = json.dumps(row, sort_keys=True)
+        order.append(old[entry].pop()["id"] if old.get(entry) else {**row, SOURCE_ENTRY: entry})
+
+    new_rows = [o for o in order if isinstance(o, dict)]
+    urls = [v for row in new_rows for k, v in row.items() if types.get(k) == "image"]
+    downloads = csv_import.download_images(urls, IMAGE_TYPES) if urls else {}
+    for row in new_rows:
+        for key in [k for k in row if types.get(k) == "image"]:
+            got = downloads.get(row.pop(key))
+            if got:
+                row[key] = _save_image_bytes(store, *got)
+    created = iter(store.create_items(category["id"], new_rows)) if new_rows else iter([])
+    ids = [o if isinstance(o, int) else next(created)["id"] for o in order]
+
+    for item in (i for items in old.values() for i in items):  # entries the source no longer has
+        images = _item_images(category, item)
+        store.delete_item(item["id"])
+        for name in images:
+            _remove_image(store, name)
+    store.reorder_items(category["id"], ids)
     store.update_category(category["id"], {"synced": day.isoformat()})
-    return len(datas)
+    return len(ids)
 
 
 def fetch_quietly(store: db.Store, category: dict, day: date) -> None:
-    """Refill a category from its source as the frame switches to it; if the
-    source can't be read, the old items stay."""
+    """Fetch a category's source on a wake; if it can't be read, the old
+    items stay."""
     try:
         sync_source(store, category, day)
     except sources.SourceError as e:
