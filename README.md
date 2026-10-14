@@ -66,7 +66,9 @@ the frame hangs in portrait, and the panel always gets 800x480, turned to match.
 
 The Style tab also has two filters. Black and white draws the category in black and white only, turning shades into
 dither patterns (an even, regular one for crisp images). Crisp images resizes images without smoothing and maps each pixel
-to the nearest panel colour instead of dithering it like a photo: for pixel art, icons, logos and QR codes.
+to one panel colour instead of dithering it like a photo: for pixel art, icons, logos and QR codes. Colours are matched
+mostly by hue, because the panel's green and red are dark: a bright sprite green becomes the panel's green, not its yellow.
+Text and shapes are mapped the same way.
 (Under the hood, any image drawn with `image-rendering: pixelated` is treated this way.)
 
 ## Development
