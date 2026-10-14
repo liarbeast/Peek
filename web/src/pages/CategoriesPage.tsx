@@ -90,6 +90,11 @@ function CategoryGroup(props: { title: string; categories: Category[]; empty?: s
                   {c.item_count} {c.item_count === 1 ? "item" : "items"}
                 </Chip>
                 <Chip size="sm">{ORDERS.find((o) => o.id === c.item_order)?.label}</Chip>
+                {c.source && (
+                  <Chip size="sm" color="accent">
+                    Data source
+                  </Chip>
+                )}
               </div>
             </Card.Header>
           </Card>
