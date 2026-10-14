@@ -13,8 +13,8 @@
   :where(.stack > div.field:first-of-type) { font-size: 44px; font-weight: bold; }
   :where(.stack > img.field) { max-width: 100%; max-height: 55%; min-height: 0; object-fit: contain; }
   /* Fields dragged to a place: out of the stack, at their own box. */
-  .stack > .field.placed { position: absolute; margin: 0; max-width: none; max-height: none; overflow: hidden; }
-  .stack > div.field.placed { display: flex; flex-direction: column; }
+  .stack > .field.placed { position: absolute; margin: 0; max-width: none; max-height: none; }
+  .stack > div.field.placed { height: auto; overflow-wrap: anywhere; }
   .stack > img.field.placed { object-fit: contain; }
   {% if pixelate %}
   /* Pixel art: hard edges whenever an image is drawn larger than it is. */

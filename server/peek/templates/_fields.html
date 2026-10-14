@@ -1,29 +1,27 @@
 {# A field's element. A field dragged to a place gets its box as inline style:
-   position, size, front-to-back order, alignment and, for text, its size. #}
+   position, front-to-back order and alignment; an image also gets its size,
+   while text gets its width and font size and is as tall as its lines. #}
 {% macro field(e) -%}
-  {%- set V = {"top": "flex-start", "middle": "center", "bottom": "flex-end"} -%}
   {%- if e.value -%}
     {%- set b = e.box -%}
     {%- set classes = "field field-" ~ e.key ~ " type-" ~ e.type ~ (" placed" if b else "") -%}
     {%- if b -%}
       {%- set align = b.align or "center" -%}
-      {%- set valign = b.valign or "middle" -%}
-      {%- set style = "left:%dpx;top:%dpx;width:%dpx;height:%dpx" % (b.x, b.y, b.w, b.h) -%}
-      {%- if b.z is number %}{% set style = style ~ ";z-index:%d" % b.z %}{% endif -%}
+      {%- set style = "left:%dpx;top:%dpx;width:%dpx" % (b.x, b.y, b.w) -%}
       {%- if e.type == "image" -%}
-        {%- set style = style ~ ";object-position:%s %s" % (align, {"top": "top", "middle": "center", "bottom": "bottom"}[valign]) -%}
+        {%- set valign = {"top": "top", "middle": "center", "bottom": "bottom"}[b.valign or "middle"] -%}
+        {%- set style = style ~ ";height:%dpx;object-position:%s %s" % (b.h, align, valign) -%}
       {%- else -%}
-        {%- set style = style ~ ";text-align:%s;justify-content:%s" % (align, V[valign]) -%}
+        {%- set style = style ~ ";text-align:%s" % align -%}
         {%- if b.size %}{% set style = style ~ ";font-size:%dpx" % b.size %}{% endif -%}
       {%- endif -%}
+      {%- if b.z is number %}{% set style = style ~ ";z-index:%d" % b.z %}{% endif -%}
     {%- endif -%}
     {%- set link = ' data-below="%s" data-gap="%d"' % (b.below | e, b.gap or 0) if b and b.below else "" -%}
     {%- if e.type == "image" -%}
       <img class="{{ classes }}" data-field="{{ e.key }}" src="{{ e.value }}" alt=""{% if b %} style="{{ style }}"{% endif %}{{ link | safe }}>
-    {%- elif b -%}
-      <div class="{{ classes }}" data-field="{{ e.key }}" data-fit style="{{ style }}"{{ link | safe }}><span>{{ e.value }}</span></div>
     {%- else -%}
-      <div class="{{ classes }}" data-field="{{ e.key }}">{{ e.value }}</div>
+      <div class="{{ classes }}" data-field="{{ e.key }}"{% if b %} style="{{ style }}"{% endif %}{{ link | safe }}>{{ e.value }}</div>
     {%- endif -%}
   {%- endif -%}
 {%- endmacro %}

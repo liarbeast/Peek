@@ -39,24 +39,17 @@ for (const img of document.querySelectorAll("img:not([data-peek])")) {
 }
 """
 
-# Each field's font size before text is fitted: the size it was designed at.
-_FONT_SIZES = """
-() => Object.fromEntries([...document.querySelectorAll("[data-field]")].map(
-  (el) => [el.dataset.field, Math.round(parseFloat(getComputedStyle(el).fontSize))]))
-"""
-
 # Where each field ended up on the page, so the app can draw a box around it
-# to drag: {key: [x, y, width, height, font size, bottom of its content]}.
+# to drag: {key: [x, y, width, height, font size]}.
 _FIELD_BOXES = """
-(sizes) => Object.fromEntries([...document.querySelectorAll("[data-field]")].map((el) => {
+() => Object.fromEntries([...document.querySelectorAll("[data-field]")].map((el) => {
   const r = el.getBoundingClientRect();
-  const end = (el.matches("[data-fit]") ? el.firstElementChild : el).getBoundingClientRect().bottom;
-  return [el.dataset.field, [r.x, r.y, r.width, r.height, sizes[el.dataset.field], end].map(Math.round)];
+  return [el.dataset.field, [r.x, r.y, r.width, r.height, parseFloat(getComputedStyle(el).fontSize)].map(Math.round)];
 }))
 """
 
-# Fields linked below another move to `gap` pixels under where that field's
-# content ends (its text, for text in a box of its own).
+# Fields linked below another move to `gap` pixels under that field, which
+# for text ends where its last line does.
 _LINK_FIELDS = """
 const done = new Set();
 const place = (el, seen) => {
@@ -65,24 +58,11 @@ const place = (el, seen) => {
   const above = document.querySelector(`[data-field="${CSS.escape(el.dataset.below)}"]`);
   if (above) {
     if (above.dataset.below) place(above, seen);
-    const end = (above.matches("[data-fit]") ? above.firstElementChild : above).getBoundingClientRect().bottom;
-    el.style.top = `${Math.round(end + Number(el.dataset.gap))}px`;
+    el.style.top = `${Math.round(above.getBoundingClientRect().bottom + Number(el.dataset.gap))}px`;
   }
   done.add(el);
 };
 for (const el of document.querySelectorAll("[data-below]")) place(el, new Set());
-"""
-
-# Text in a box of its own shrinks until it fits, so a long title on one item
-# doesn't spill out of the box designed with a short one.
-_FIT_TEXT = """
-for (const el of document.querySelectorAll("[data-fit]")) {
-  const text = el.firstElementChild;
-  let size = parseFloat(getComputedStyle(el).fontSize);
-  while (size > 6 && (text.offsetHeight > el.clientHeight || text.scrollWidth > el.clientWidth)) {
-    el.style.fontSize = `${--size}px`;
-  }
-}
 """
 
 # A pixel counts as photo when painting the photos white versus black moves
@@ -162,10 +142,8 @@ def screenshot(html: str, size: tuple[int, int] = (palette.WIDTH, palette.HEIGHT
             )
             page.set_content(html, wait_until="load")
             page.evaluate("document.fonts.ready")
-            sizes = page.evaluate(_FONT_SIZES)
-            page.evaluate(_FIT_TEXT)
             page.evaluate(_LINK_FIELDS)
-            boxes = page.evaluate(_FIELD_BOXES, sizes)
+            boxes = page.evaluate(_FIELD_BOXES)
             raw = _shot(page)
 
             # Images that CSS draws pixelated are pixel art, not photos.

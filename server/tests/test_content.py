@@ -303,12 +303,12 @@ def test_dragged_fields_get_their_box(client):
     res = client.patch(f"/api/categories/{cat['id']}", json={"positions": positions})
     assert res.json()["positions"] == positions
     placed = boxes(client.post(url, json={}))
-    assert placed["title"][:4] == [20, 30, 300, 60]
+    assert placed["title"][:3] == [20, 30, 300]  # text is as tall as its lines
     assert placed["subtext"] != stacked["subtext"]  # the stack closed up behind it
 
     # Unsaved positions can be previewed; portrait has its own.
     draft = {"landscape": {"subtext": {"x": 400, "y": 400, "w": 200, "h": 40}}}
-    assert boxes(client.post(url, json={"positions": draft}))["subtext"][:4] == [400, 400, 200, 40]
+    assert boxes(client.post(url, json={"positions": draft}))["subtext"][:3] == [400, 400, 200]
     client.patch("/api/settings", json={"orientation": "portrait"})
     assert boxes(client.post(url, json={}))["title"][:4] != [20, 30, 300, 60]
 
@@ -330,42 +330,34 @@ def test_placed_field_style():
         "title": {"x": 1, "y": 2, "w": 300, "h": 60, "size": 50, "align": "right", "valign": "bottom", "z": 3},
         "pic": {"x": 5, "y": 6, "w": 70, "h": 80, "align": "left", "valign": "top"},
     })
-    assert 'style="left:1px;top:2px;width:300px;height:60px;z-index:3;text-align:right;' \
-           'justify-content:flex-end;font-size:50px"' in html
-    assert '<span>Robin</span>' in html
+    # Text is as tall as its lines, so it gets no height; vertical alignment is for images.
+    assert 'style="left:1px;top:2px;width:300px;text-align:right;font-size:50px;z-index:3"' in html
     assert 'style="left:5px;top:6px;width:70px;height:80px;object-position:left top"' in html
 
 
-def test_long_placed_text_shrinks_to_fit(client):
-    cat = make_category(client)
-    add_item(client, cat["id"], {"title": "A rather long title for such a small box", "subtext": "x"})
-    url = f"/api/categories/{cat['id']}/preview.png"
-    box = {"x": 20, "y": 20, "w": 200, "h": 60, "size": 60}
-    res = client.post(url, json={"positions": {"landscape": {"title": box}}})
-    assert boxes(res)["title"][:5] == [20, 20, 200, 60, 60]  # the size it was designed at
-    assert client.patch(f"/api/categories/{cat['id']}", json={
-        "positions": {"landscape": {"title": {**box, "align": "middle"}}}}).status_code == 422
-
-
-def test_fitted_text_stays_in_its_box():
+def test_placed_text_wraps_in_its_width():
     import numpy as np
     from peek import layouts, renderer
 
     fields = [{"key": "title", "label": "Title", "type": "text"}]
-    long = "A rather long title for such a small box, long enough to wrap a few times"
-    html = layouts.build("stack", fields, {"title": long}, custom_css=".placed { overflow: visible !important; }",
-                         positions={"title": {"x": 20, "y": 20, "w": 200, "h": 60, "size": 60}})
-    ink = np.asarray(renderer.render(html).raw.convert("L")) < 128
-    assert ink[20:80, 20:220].any()
-    ink[20:80, 20:220] = False
-    assert not ink.any()  # nothing spilled out of the box
+    long = "A rather long title for such a narrow box, long enough to wrap a few times"
+    html = layouts.build("stack", fields, {"title": long},
+                         positions={"title": {"x": 20, "y": 20, "w": 200, "h": 8, "size": 30}})
+    render = renderer.render(html)
+    x, y, w, h, size = render.boxes["title"]
+    assert (x, y, w, size) == (20, 20, 200, 30)
+    assert h > 100  # as tall as its lines, whatever h was saved
+    ink = np.asarray(render.raw.convert("L")) < 128
+    assert ink[20:20 + h, 20:220].any()
+    ink[20:20 + h, 20:220] = False
+    assert not ink.any()  # nothing outside its width
 
 
 def test_linked_field_follows_the_text_above(client):
     cat = make_category(client)
     url = f"/api/categories/{cat['id']}/preview.png"
     positions = {"landscape": {
-        "title": {"x": 20, "y": 20, "w": 300, "h": 200, "size": 30, "valign": "top"},
+        "title": {"x": 20, "y": 20, "w": 300, "h": 40, "size": 30},
         "subtext": {"x": 20, "y": 0, "w": 300, "h": 40, "below": "title", "gap": 12},
     }}
     found = {}
@@ -373,8 +365,8 @@ def test_linked_field_follows_the_text_above(client):
         item = add_item(client, cat["id"], {"title": title, "subtext": "Garden bird"})
         found[title] = boxes(client.post(url, json={"positions": positions, "item_id": item["id"]}))
     one, two = found["Robin"], found["Robin, the European garden bird"]
-    assert one["subtext"][1] == one["title"][5] + 12  # 12px under where the title's text ends
-    assert two["subtext"][1] == two["title"][5] + 12
+    assert one["subtext"][1] == one["title"][1] + one["title"][3] + 12  # 12px under the title's last line
+    assert two["subtext"][1] == two["title"][1] + two["title"][3] + 12
     assert two["subtext"][1] - one["subtext"][1] > 25  # a second line pushed it down
 
     # A link to itself, or round in a circle, just stays put.

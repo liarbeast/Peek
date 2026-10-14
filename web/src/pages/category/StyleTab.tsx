@@ -155,8 +155,9 @@ export function StyleTab(props: {
           />
         </PanelImage>
         <p className="text-sm text-muted">
-          Drag a field to place it, and its corner to scale it. Click a field for alignment, layering and linking it
-          below another one. Hold Alt while dragging to stop snapping.
+          Drag a field to place it. Text boxes have a handle for their width and grow as tall as their text; images
+          scale from their corner. Click a field for alignment, text size, layering and linking it below another one.
+          Hold Alt while dragging to stop snapping.
         </p>
         {Object.keys(placed).length > 0 && (
           <div>
