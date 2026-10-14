@@ -108,6 +108,7 @@ export interface Source {
   url: string;
   items: string;
   fields: Record<string, string>;
+  every_wake?: boolean; // fetch on every wake instead of once a day
 }
 
 // An image drawn the same for every item of a category, such as a frame.
@@ -206,7 +207,7 @@ export const api = {
   inspectSource: (url: string, items?: string) =>
     request<SourceInspection>("/api/sources/inspect", json("POST", { url, items })),
   // Connect a source and fetch it; the collection's fields become the ones the columns go to.
-  connectSource: (id: number, body: { url: string; items: string; columns: SourceColumn[] }) =>
+  connectSource: (id: number, body: { url: string; items: string; columns: SourceColumn[]; every_wake: boolean }) =>
     request<{ created: number; category: Category }>(`/api/categories/${id}/source`, json("PUT", body)),
   deleteCategory: (id: number) => request<void>(`/api/categories/${id}`, { method: "DELETE" }),
 

@@ -61,7 +61,9 @@ separated files all work.
 ## Data sources
 
 A collection can fill itself from a web address that returns JSON: "Connect data source" on its Items tab. The address
-may hold `{YYYY}`, `{MM}` and `{DD}` for today's date. "Look at response" fetches it, finds the lists of entries in it,
+may hold `{YYYY}`, `{MM}` and `{DD}` for today's date, and `{RANDOM:1-1025}` for a random number on each fetch
+(`https://pokeapi.co/api/v2/pokemon/{RANDOM:1-1025}` is a random Pokémon). A source is read once a day, or on every
+wake if set so. "Look at response" fetches it, finds the lists of entries in it,
 and lists every value in an entry with an example, like the columns of a CSV. Each value you use becomes a new field
 (or fills an existing one); fields you don't use are removed, since they'd stay empty. Values are stored as dotted
 paths (`selected`, `pages.0.thumbnail.source`). While a source is connected, its items can't be edited by hand. Every
