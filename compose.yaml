@@ -7,4 +7,7 @@ services:
     volumes:
       # :Z lets SELinux systems (Fedora, Bazzite) share the folder; others ignore it.
       - ./data:/data:Z
+    environment:
+      # Your time zone: wakes "at midnight" and "today" for data sources follow it.
+      TZ: Europe/Amsterdam
     restart: unless-stopped
