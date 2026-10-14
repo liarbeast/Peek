@@ -122,6 +122,7 @@ MIGRATIONS = [
 # Frame-wide settings and their values until someone changes them.
 SETTING_DEFAULTS = {
     "orientation": "landscape",
+    "refresh": "1h",  # see schedule.REFRESH_INTERVALS
 }
 
 

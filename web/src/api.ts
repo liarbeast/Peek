@@ -4,8 +4,12 @@ export type ItemOrder = "in_order" | "random" | "shuffle";
 
 export type Orientation = "landscape" | "portrait";
 
+export type Refresh = "15m" | "30m" | "1h" | "3h" | "6h" | "12h" | "1d" | "1w";
+
 export interface Settings {
   orientation: Orientation;
+  // How often the frame wakes for a new image.
+  refresh: Refresh;
 }
 
 export const isPortrait = (o: Orientation) => o === "portrait";

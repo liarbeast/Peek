@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field, field_validator
 from starlette.datastructures import UploadFile as FormFile
 
-from . import csv_import, db, fonts, layouts, renderer, samples
+from . import csv_import, db, fonts, layouts, renderer, samples, schedule
 from . import fields as fieldlib
 
 router = APIRouter()
@@ -105,6 +105,7 @@ class Reorder(BaseModel):
 
 class SettingsPatch(BaseModel):
     orientation: str | None = None
+    refresh: str | None = None
 
 
 def _store(request: Request) -> db.Store:
@@ -230,6 +231,8 @@ def update_settings(request: Request, body: SettingsPatch) -> dict:
     fields = body.model_dump(exclude_none=True)
     if fields.get("orientation") not in (None, *renderer.ORIENTATIONS):
         raise HTTPException(422, f"unknown orientation: {fields['orientation']}")
+    if fields.get("refresh") not in (None, *schedule.REFRESH_INTERVALS):
+        raise HTTPException(422, f"unknown refresh interval: {fields['refresh']}")
     before = _store(request).settings()
     settings = _store(request).update_settings(fields)
     if settings["orientation"] != before["orientation"]:
