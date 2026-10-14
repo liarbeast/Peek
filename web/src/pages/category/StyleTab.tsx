@@ -1,12 +1,12 @@
 import { css } from "@codemirror/lang-css";
-import { Button, Chip, toast } from "@heroui/react";
+import { Button, Chip, ToggleButton, ToggleButtonGroup, toast } from "@heroui/react";
 import CodeMirror from "@uiw/react-codemirror";
 import { useEffect, useState } from "react";
 import { api, describeItem, type Box, type Category, type Item, type Positions, type Preview, type Template } from "../../api";
 import { PanelImage } from "../../components/PanelImage";
 import { Choice, Toggle } from "../../components/ui";
 import { useSettings } from "../../settings";
-import { FieldBoxes } from "./FieldBoxes";
+import { boxOf, FieldBoxes } from "./FieldBoxes";
 
 const COLOURS = ["black", "white", "yellow", "red", "blue", "green"];
 
@@ -77,6 +77,15 @@ export function StyleTab(props: {
     const { [key]: _, ...rest } = placed;
     setPlaced(rest);
   };
+
+  // Changes a field's box, placing it where it is now if it was still in the stack.
+  const restyle = (key: string, changes: Partial<Box>) => {
+    const box = boxOf(key, placed, measured);
+    if (box) setPlaced({ ...placed, [key]: { ...box, ...changes } });
+  };
+
+  const zs = Object.values(placed).map((b) => b.z ?? 0);
+  const selectedBox = selected ? boxOf(selected, placed, measured) : null;
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -159,21 +168,54 @@ export function StyleTab(props: {
             onSelect={setSelected}
           />
         </PanelImage>
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="flex-1 text-sm text-muted">
-            Drag a field to place it, and its corner to resize it. Arrow keys nudge it.
+        {selected && selectedBox ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <Segments
+              label="Horizontal alignment"
+              value={selectedBox.align ?? "center"}
+              options={[
+                ["left", <AlignIcon key="l" lines={[[2, 14], [2, 10], [2, 14]]} />],
+                ["center", <AlignIcon key="c" lines={[[2, 14], [4, 12], [2, 14]]} />],
+                ["right", <AlignIcon key="r" lines={[[2, 14], [6, 14], [2, 14]]} />],
+              ]}
+              onChange={(align) => restyle(selected, { align: align as Box["align"] })}
+            />
+            <Segments
+              label="Vertical alignment"
+              value={selectedBox.valign ?? "middle"}
+              options={[
+                ["top", <AlignIcon key="t" vertical="top" />],
+                ["middle", <AlignIcon key="m" vertical="middle" />],
+                ["bottom", <AlignIcon key="b" vertical="bottom" />],
+              ]}
+              onChange={(valign) => restyle(selected, { valign: valign as Box["valign"] })}
+            />
+            <Button size="sm" variant="tertiary" onPress={() => restyle(selected, { z: Math.max(0, ...zs) + 1 })}>
+              To front
+            </Button>
+            <Button size="sm" variant="tertiary" onPress={() => restyle(selected, { z: Math.min(0, ...zs) - 1 })}>
+              To back
+            </Button>
+            {placed[selected] && (
+              <Button size="sm" variant="tertiary" onPress={() => unplace(selected)}>
+                Back in the stack
+              </Button>
+            )}
+          </div>
+        ) : (
+          <p className="text-sm text-muted">
+            Drag a field to place it. Its corner scales it; for text, the side handles change the box without
+            scaling. Arrow keys nudge it, and holding Alt while dragging turns snapping off. Long text shrinks to fit
+            its box.
           </p>
-          {selected && placed[selected] && (
-            <Button size="sm" variant="tertiary" onPress={() => unplace(selected)}>
-              Back in the stack
-            </Button>
-          )}
-          {Object.keys(placed).length > 0 && (
+        )}
+        {Object.keys(placed).length > 0 && (
+          <div>
             <Button size="sm" variant="tertiary" onPress={() => setPlaced({})}>
-              Reset all
+              Put all fields back in the stack
             </Button>
-          )}
-        </div>
+          </div>
+        )}
         <p className="text-sm text-muted">
           {items.length ? "" : "Showing placeholder content until you add items. "}
           This is how the panel shows it, in its own {mono ? "black and white" : "six colours"}.
@@ -201,5 +243,48 @@ function ChipList({ items }: { items: string[] }) {
         </Chip>
       ))}
     </div>
+  );
+}
+
+function Segments(props: {
+  label: string;
+  value: string;
+  options: [string, React.ReactNode][];
+  onChange: (value: string) => void;
+}) {
+  return (
+    <ToggleButtonGroup
+      aria-label={props.label}
+      size="sm"
+      selectionMode="single"
+      disallowEmptySelection
+      selectedKeys={[props.value]}
+      onSelectionChange={(keys) => {
+        const [key] = keys;
+        if (key) props.onChange(String(key));
+      }}
+    >
+      {props.options.map(([id, icon]) => (
+        <ToggleButton key={id} id={id} isIconOnly aria-label={id}>
+          {icon}
+        </ToggleButton>
+      ))}
+    </ToggleButtonGroup>
+  );
+}
+
+// Three lines, like a text alignment icon; or, for vertical alignment, a bar
+// at the top, middle or bottom of a frame.
+function AlignIcon(props: { lines?: [number, number][]; vertical?: "top" | "middle" | "bottom" }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+      {props.lines?.map(([x1, x2], i) => <line key={i} x1={x1} x2={x2} y1={4 + i * 4} y2={4 + i * 4} />)}
+      {props.vertical && (
+        <>
+          <rect x="2" y="2" width="12" height="12" rx="1.5" strokeOpacity="0.4" />
+          <line x1="5" x2="11" y1={{ top: 5, middle: 8, bottom: 11 }[props.vertical]} y2={{ top: 5, middle: 8, bottom: 11 }[props.vertical]} strokeWidth="2.5" />
+        </>
+      )}
+    </svg>
   );
 }

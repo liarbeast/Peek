@@ -3,9 +3,36 @@ import type { Box, Field, Preview } from "../../api";
 
 const GRID = 4;
 const MIN_SIZE = 16;
+// How close (in screen pixels) an edge or centre must come to a guide to snap to it.
+const SNAP_DISTANCE = 6;
 
 const snap = (n: number) => Math.round(n / GRID) * GRID;
 const clamp = (n: number, lo: number, hi: number) => Math.min(Math.max(n, lo), Math.max(lo, hi));
+
+// A field's box: where it was placed, or else where the stack drew it on the
+// last render (with the text size it was drawn at).
+export function boxOf(key: string, placed: Record<string, Box>, measured: Preview["boxes"]): Box | null {
+  const m = measured[key];
+  if (placed[key]) return { size: m?.[4], ...placed[key] };
+  return m ? { x: m[0], y: m[1], w: m[2], h: m[3], size: m[4] } : null;
+}
+
+// Moves `start` (a box edge) so that its start, centre or end lands on the
+// nearest guide line within `reach`; otherwise onto the grid.
+function snapAxis(start: number, size: number, lines: number[], reach: number) {
+  let best: { pos: number; guide: number } | null = null;
+  for (const line of lines) {
+    for (const offset of [0, size / 2, size]) {
+      const d = line - (start + offset);
+      if (Math.abs(d) <= reach && (!best || Math.abs(d) < Math.abs(best.pos - start))) {
+        best = { pos: Math.round(start + d), guide: line };
+      }
+    }
+  }
+  return best ?? { pos: snap(start), guide: null };
+}
+
+type Guides = { x: number | null; y: number | null };
 
 // Boxes over the preview, one per field, to drag into place and resize.
 // Dragging a field gives it a fixed box; until then it sits where the stack
@@ -19,9 +46,10 @@ export function FieldBoxes(props: {
   selected: string | null;
   onSelect: (key: string | null) => void;
 }) {
-  const { canvas, placed } = props;
+  const { canvas, placed, measured } = props;
   const ref = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
+  const [guides, setGuides] = useState<Guides>({ x: null, y: null });
 
   useEffect(() => {
     const el = ref.current;
@@ -31,42 +59,63 @@ export function FieldBoxes(props: {
     return () => observer.disconnect();
   }, [canvas.width]);
 
-  const boxOf = (key: string): Box | null => {
-    if (placed[key]) return placed[key];
-    const m = props.measured[key];
-    return m ? { x: m[0], y: m[1], w: m[2], h: m[3] } : null;
-  };
-
   const place = (key: string, box: Box) => props.onChange({ ...placed, [key]: box });
 
-  const startDrag = (e: React.PointerEvent, key: string, mode: "move" | "resize") => {
-    const start = boxOf(key);
+  type Mode = "move" | "scale" | "width" | "height";
+
+  const startDrag = (e: React.PointerEvent, field: Field, mode: Mode) => {
+    const key = field.key;
+    const start = boxOf(key, placed, measured);
     if (!start || e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
+    // preventDefault keeps the browser from focusing the box, which the arrow keys need.
+    (e.currentTarget as HTMLElement).closest<HTMLElement>("[data-box]")?.focus({ preventScroll: true });
     props.onSelect(key);
     const target = e.currentTarget as HTMLElement;
     target.setPointerCapture(e.pointerId);
     const [x0, y0] = [e.clientX, e.clientY];
 
+    // Guide lines: the canvas edges and centre, and the edges and centres of the other fields.
+    const others = props.fields.filter((f) => f.key !== key).flatMap((f) => boxOf(f.key, placed, measured) ?? []);
+    const xs = [0, canvas.width / 2, canvas.width, ...others.flatMap((b) => [b.x, b.x + b.w / 2, b.x + b.w])];
+    const ys = [0, canvas.height / 2, canvas.height, ...others.flatMap((b) => [b.y, b.y + b.h / 2, b.y + b.h])];
+
     const move = (ev: PointerEvent) => {
       const dx = (ev.clientX - x0) / scale;
       const dy = (ev.clientY - y0) / scale;
+      const reach = ev.altKey ? -1 : SNAP_DISTANCE / scale; // Alt turns snapping off
       if (mode === "move") {
+        const sx = snapAxis(start.x + dx, start.w, xs, reach);
+        const sy = snapAxis(start.y + dy, start.h, ys, reach);
+        setGuides({ x: sx.guide, y: sy.guide });
         place(key, {
           ...start,
-          x: clamp(snap(start.x + dx), 0, canvas.width - start.w),
-          y: clamp(snap(start.y + dy), 0, canvas.height - start.h),
+          x: clamp(sx.pos, 0, canvas.width - start.w),
+          y: clamp(sy.pos, 0, canvas.height - start.h),
+        });
+      } else if (mode === "scale") {
+        // The corner scales the whole field, so images keep their shape and text grows with its box.
+        const most = Math.min((canvas.width - start.x) / start.w, (canvas.height - start.y) / start.h);
+        const least = MIN_SIZE / Math.min(start.w, start.h);
+        const f = clamp(Math.max((start.w + dx) / start.w, (start.h + dy) / start.h), least, most);
+        place(key, {
+          ...start,
+          w: Math.round(start.w * f),
+          h: Math.round(start.h * f),
+          ...(field.type === "text" && start.size ? { size: clamp(Math.round(start.size * f), 6, 400) } : {}),
         });
       } else {
+        // The side handles change only the box, so text rewraps at the same size.
         place(key, {
           ...start,
-          w: clamp(snap(start.w + dx), MIN_SIZE, canvas.width - start.x),
-          h: clamp(snap(start.h + dy), MIN_SIZE, canvas.height - start.y),
+          w: mode === "width" ? clamp(snap(start.w + dx), MIN_SIZE, canvas.width - start.x) : start.w,
+          h: mode === "height" ? clamp(snap(start.h + dy), MIN_SIZE, canvas.height - start.y) : start.h,
         });
       }
     };
     const end = () => {
+      setGuides({ x: null, y: null });
       target.removeEventListener("pointermove", move);
       target.removeEventListener("pointerup", end);
       target.removeEventListener("pointercancel", end);
@@ -79,7 +128,7 @@ export function FieldBoxes(props: {
   // Arrow keys nudge the selected field by a pixel, or ten with Shift.
   const nudge = (e: React.KeyboardEvent, key: string) => {
     const delta = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
-    const box = boxOf(key);
+    const box = boxOf(key, placed, measured);
     if (!delta || !box) return;
     e.preventDefault();
     const step = e.shiftKey ? 10 : 1;
@@ -90,19 +139,26 @@ export function FieldBoxes(props: {
     });
   };
 
+  // Front-most last, so it is also on top here.
+  const order = props.fields
+    .map((field, i) => ({ field, i, z: placed[field.key]?.z ?? 0 }))
+    .sort((a, b) => a.z - b.z || a.i - b.i);
+
+  const handle = "absolute rounded-sm";
   return (
     <div ref={ref} className="absolute inset-0 touch-none" onPointerDown={() => props.onSelect(null)}>
-      {props.fields.map((field) => {
-        const box = boxOf(field.key);
+      {order.map(({ field }) => {
+        const box = boxOf(field.key, placed, measured);
         if (!box) return null;
         const selected = props.selected === field.key;
         return (
           <div
             key={field.key}
+            data-box
             role="button"
             tabIndex={0}
             aria-label={`${field.label}: drag to move`}
-            onPointerDown={(e) => startDrag(e, field.key, "move")}
+            onPointerDown={(e) => startDrag(e, field, "move")}
             onKeyDown={(e) => nudge(e, field.key)}
             onFocus={() => props.onSelect(field.key)}
             className={`group absolute cursor-move outline-none ${selected ? "z-10" : ""}`}
@@ -128,16 +184,43 @@ export function FieldBoxes(props: {
               {placed[field.key] ? "" : " · in stack"}
             </span>
             {selected && (
-              <span
-                aria-hidden="true"
-                onPointerDown={(e) => startDrag(e, field.key, "resize")}
-                className="absolute -bottom-1.5 -right-1.5 h-3 w-3 cursor-nwse-resize rounded-sm"
-                style={{ background: "var(--accent)" }}
-              />
+              <>
+                <span
+                  aria-hidden="true"
+                  title="Drag to resize"
+                  onPointerDown={(e) => startDrag(e, field, "scale")}
+                  className={`${handle} -bottom-1.5 -right-1.5 h-3 w-3 cursor-nwse-resize`}
+                  style={{ background: "var(--accent)" }}
+                />
+                {field.type === "text" && (
+                  <>
+                    <span
+                      aria-hidden="true"
+                      title="Drag to change the width"
+                      onPointerDown={(e) => startDrag(e, field, "width")}
+                      className={`${handle} -right-1 top-1/2 h-4 w-1.5 -translate-y-1/2 cursor-ew-resize`}
+                      style={{ background: "var(--accent)" }}
+                    />
+                    <span
+                      aria-hidden="true"
+                      title="Drag to change the height"
+                      onPointerDown={(e) => startDrag(e, field, "height")}
+                      className={`${handle} -bottom-1 left-1/2 h-1.5 w-4 -translate-x-1/2 cursor-ns-resize`}
+                      style={{ background: "var(--accent)" }}
+                    />
+                  </>
+                )}
+              </>
             )}
           </div>
         );
       })}
+      {guides.x !== null && (
+        <div className="pointer-events-none absolute inset-y-0 w-px" style={{ left: guides.x * scale, background: "var(--danger)" }} />
+      )}
+      {guides.y !== null && (
+        <div className="pointer-events-none absolute inset-x-0 h-px" style={{ top: guides.y * scale, background: "var(--danger)" }} />
+      )}
     </div>
   );
 }

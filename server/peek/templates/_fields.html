@@ -1,13 +1,28 @@
-{# Draws one field's value with its classes: field field-<key> type-<type>.
-   A field dragged to a place gets that box, outside the normal flow. #}
+{# A field's element. A field dragged to a place gets its box as inline style:
+   position, size, front-to-back order, alignment and, for text, its size. #}
 {% macro field(e) -%}
+  {%- set V = {"top": "flex-start", "middle": "center", "bottom": "flex-end"} -%}
   {%- if e.value -%}
-    {%- set classes = "field field-" ~ e.key ~ " type-" ~ e.type ~ (" placed" if e.box else "") -%}
-    {%- set style = "left:%dpx;top:%dpx;width:%dpx;height:%dpx" % (e.box.x, e.box.y, e.box.w, e.box.h) if e.box else "" -%}
+    {%- set b = e.box -%}
+    {%- set classes = "field field-" ~ e.key ~ " type-" ~ e.type ~ (" placed" if b else "") -%}
+    {%- if b -%}
+      {%- set align = b.align or "center" -%}
+      {%- set valign = b.valign or "middle" -%}
+      {%- set style = "left:%dpx;top:%dpx;width:%dpx;height:%dpx" % (b.x, b.y, b.w, b.h) -%}
+      {%- if b.z is number %}{% set style = style ~ ";z-index:%d" % b.z %}{% endif -%}
+      {%- if e.type == "image" -%}
+        {%- set style = style ~ ";object-position:%s %s" % (align, {"top": "top", "middle": "center", "bottom": "bottom"}[valign]) -%}
+      {%- else -%}
+        {%- set style = style ~ ";text-align:%s;justify-content:%s" % (align, V[valign]) -%}
+        {%- if b.size %}{% set style = style ~ ";font-size:%dpx" % b.size %}{% endif -%}
+      {%- endif -%}
+    {%- endif -%}
     {%- if e.type == "image" -%}
-      <img class="{{ classes }}" data-field="{{ e.key }}" src="{{ e.value }}" alt=""{% if style %} style="{{ style }}"{% endif %}>
+      <img class="{{ classes }}" data-field="{{ e.key }}" src="{{ e.value }}" alt=""{% if b %} style="{{ style }}"{% endif %}>
+    {%- elif b -%}
+      <div class="{{ classes }}" data-field="{{ e.key }}" data-fit style="{{ style }}"><span>{{ e.value }}</span></div>
     {%- else -%}
-      <div class="{{ classes }}" data-field="{{ e.key }}"{% if style %} style="{{ style }}"{% endif %}>{{ e.value }}</div>
+      <div class="{{ classes }}" data-field="{{ e.key }}">{{ e.value }}</div>
     {%- endif -%}
   {%- endif -%}
 {%- endmacro %}
