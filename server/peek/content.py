@@ -27,6 +27,19 @@ IMAGE_TYPES = {
 }
 
 
+class Box(BaseModel):
+    """Where a dragged field sits, in pixels of the upright page."""
+
+    x: int = Field(ge=-800, le=800)
+    y: int = Field(ge=-800, le=800)
+    w: int = Field(ge=8, le=800)
+    h: int = Field(ge=8, le=800)
+
+
+# Per orientation, the fields that were dragged to a place.
+Positions = dict[Literal["landscape", "portrait"], dict[str, Box]]
+
+
 class FieldIn(BaseModel):
     key: str | None = None
     label: str
@@ -53,6 +66,7 @@ class CategoryPatch(BaseModel):
     enabled: bool | None = None
     mono: bool | None = None
     pixelate: bool | None = None
+    positions: Positions | None = None
     fields: list[FieldIn] | None = None
 
 
@@ -63,6 +77,7 @@ class PreviewIn(BaseModel):
     custom_css: str | None = None
     mono: bool | None = None
     pixelate: bool | None = None
+    positions: Positions | None = None
     item_id: int | None = None
 
 
@@ -148,11 +163,14 @@ def orientation(store: db.Store) -> str:
 
 
 def render_page(store: db.Store, template: str, fields: list[dict], values: dict,
-                custom_css: str = "", mono: bool = False, pixelate: bool = False) -> renderer.Render:
-    """Render a layout the way the frame hangs (landscape or portrait)."""
+                custom_css: str = "", mono: bool = False, pixelate: bool = False,
+                positions: dict | None = None) -> renderer.Render:
+    """Render a layout the way the frame hangs (landscape or portrait), with
+    the fields dragged to a place for that orientation."""
     orientation_ = orientation(store)
     size = renderer.canvas_size(orientation_)
-    html = layouts.build(template, fields, values, custom_css, size, pixelate)
+    html = layouts.build(template, fields, values, custom_css, size, pixelate,
+                         (positions or {}).get(orientation_))
     return renderer.render(html, orientation_, mono)
 
 
@@ -165,12 +183,15 @@ def render_item(store: db.Store, category: dict, item: dict | None, changes: dic
     template = style["template"] if style["template"] in layouts.TEMPLATES else layouts.TEMPLATES[0]
     values = item_values(store, category, item) if item else samples.placeholder(category["fields"])
     return render_page(store, template, category["fields"], values, style["custom_css"],
-                       style["mono"], style["pixelate"])
+                       style["mono"], style["pixelate"], style["positions"])
 
 
 def _png(render: renderer.Render, view: View) -> Response:
+    """The render as a PNG, with where each field was drawn in a header so the
+    app can let people drag them."""
     data = {"panel": render.panel_png, "raw": render.raw_png}.get(view, render.preview_png)()
-    return Response(content=data, media_type="image/png", headers={"Cache-Control": "no-store"})
+    headers = {"Cache-Control": "no-store", "X-Peek-Boxes": json.dumps(render.boxes)}
+    return Response(content=data, media_type="image/png", headers=headers)
 
 
 # Settings
@@ -218,7 +239,7 @@ def create_category(request: Request, body: CategoryIn) -> dict:
     new = body.model_dump(exclude={"copy_from"})
     if body.copy_from is not None:
         source = _category_or_404(store, body.copy_from)
-        for key in ("template", "fields", "mono", "pixelate", "item_order"):
+        for key in ("template", "fields", "mono", "pixelate", "positions", "item_order"):
             new[key] = source[key]
         new["custom_css"] = body.custom_css or source["custom_css"]
     else:

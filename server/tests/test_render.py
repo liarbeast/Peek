@@ -34,28 +34,28 @@ def photo_page(css: str = "") -> str:
 
 
 def test_photo_is_dithered_but_caption_is_solid():
-    _, mask, _ = renderer.screenshot(photo_page())
+    _, mask, _, _ = renderer.screenshot(photo_page())
     # The caption bar along the bottom covers the photo, so it isn't photo.
     assert mask[200].all()
     assert not mask[470].any()
 
 
 def test_text_has_no_photo_pixels():
-    _, mask, _ = renderer.screenshot(layouts.build("stack", FIELDS, {"title": "Here's looking at you, kid."}))
+    _, mask, _, _ = renderer.screenshot(layouts.build("stack", FIELDS, {"title": "Here's looking at you, kid."}))
     assert not mask.any()
 
 
 def test_pixelated_images_are_pixel_art():
     # Pixel art is told apart from photos by its CSS, and is not dithered.
-    _, mask, _ = renderer.screenshot(photo_page(".field-image { image-rendering: pixelated; }"))
+    _, mask, _, _ = renderer.screenshot(photo_page(".field-image { image-rendering: pixelated; }"))
     assert not mask.any()
 
 
 def test_pixelate_filter_makes_pixel_art():
     values = {"image": layouts.data_uri(samples.sunset_photo()), "title": "Evening"}
-    _, mask, _ = renderer.screenshot(layouts.build("stack", FIELDS, values, pixelate=True))
+    _, mask, _, _ = renderer.screenshot(layouts.build("stack", FIELDS, values, pixelate=True))
     assert not mask.any()
-    _, mask, _ = renderer.screenshot(layouts.build("stack", FIELDS, values))
+    _, mask, _, _ = renderer.screenshot(layouts.build("stack", FIELDS, values))
     assert mask.any()
 
 
@@ -67,7 +67,7 @@ def test_frame_png_and_sleep(client):
 
 
 def test_mono_uses_only_black_and_white():
-    raw, mask, _ = renderer.screenshot(photo_page())
+    raw, mask, _, _ = renderer.screenshot(photo_page())
     idx = renderer.reduce(raw, mask, mono=True)
     assert set(np.unique(idx)) <= {0, 1}
     # Photos still dither, so greys come out as a mix of both.

@@ -2,9 +2,11 @@ import { css } from "@codemirror/lang-css";
 import { Button, Chip, toast } from "@heroui/react";
 import CodeMirror from "@uiw/react-codemirror";
 import { useEffect, useState } from "react";
-import { api, describeItem, type Category, type Item, type Template } from "../../api";
+import { api, describeItem, type Box, type Category, type Item, type Positions, type Preview, type Template } from "../../api";
 import { PanelImage } from "../../components/PanelImage";
 import { Choice, Toggle } from "../../components/ui";
+import { useSettings } from "../../settings";
+import { FieldBoxes } from "./FieldBoxes";
 
 const COLOURS = ["black", "white", "yellow", "red", "blue", "green"];
 
@@ -34,16 +36,28 @@ export function StyleTab(props: {
   const [customCss, setCustomCss] = useState(category.custom_css);
   const [mono, setMono] = useState(category.mono);
   const [pixelate, setPixelate] = useState(category.pixelate);
+  const [positions, setPositions] = useState<Positions>(category.positions);
+  const [measured, setMeasured] = useState<Preview["boxes"]>({});
+  const [selected, setSelected] = useState<string | null>(null);
+  const { orientation } = useSettings();
+  const placed = positions[orientation] ?? {};
+  const setPlaced = (next: Record<string, Box>) => setPositions((p) => ({ ...p, [orientation]: next }));
+  const canvas = orientation === "portrait" ? { width: 480, height: 800 } : { width: 800, height: 480 };
   const [previewItem, setPreviewItem] = useState<string>(items[0] ? String(items[0].id) : "");
   const [busy, setBusy] = useState(false);
   const info = templates.find((t) => t.name === category.template) ?? templates[0];
-  const dirty = customCss !== category.custom_css || mono !== category.mono || pixelate !== category.pixelate;
+  const dirty =
+    customCss !== category.custom_css ||
+    mono !== category.mono ||
+    pixelate !== category.pixelate ||
+    JSON.stringify(positions) !== JSON.stringify(category.positions);
   const debouncedCss = useDebounced(customCss, 700);
+  const debouncedPositions = useDebounced(positions, 400);
 
   const save = async () => {
     setBusy(true);
     try {
-      props.onSaved(await api.updateCategory(category.id, { custom_css: customCss, mono, pixelate }));
+      props.onSaved(await api.updateCategory(category.id, { custom_css: customCss, mono, pixelate, positions }));
       toast.success("Style saved");
     } catch (e) {
       toast.danger((e as Error).message);
@@ -56,6 +70,12 @@ export function StyleTab(props: {
     setCustomCss(category.custom_css);
     setMono(category.mono);
     setPixelate(category.pixelate);
+    setPositions(category.positions);
+  };
+
+  const unplace = (key: string) => {
+    const { [key]: _, ...rest } = placed;
+    setPlaced(rest);
   };
 
   return (
@@ -106,7 +126,7 @@ export function StyleTab(props: {
         </div>
       </div>
 
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-3 self-start lg:sticky lg:top-4">
         {items.length > 0 && (
           <Choice
             label="Preview with"
@@ -122,11 +142,38 @@ export function StyleTab(props: {
               custom_css: debouncedCss,
               mono,
               pixelate,
+              positions: debouncedPositions,
               item_id: previewItem ? Number(previewItem) : undefined,
             })
           }
-          deps={[debouncedCss, mono, pixelate, previewItem]}
-        />
+          deps={[debouncedCss, mono, pixelate, previewItem, JSON.stringify(debouncedPositions)]}
+          onBoxes={setMeasured}
+        >
+          <FieldBoxes
+            canvas={canvas}
+            fields={category.fields}
+            measured={measured}
+            placed={placed}
+            onChange={setPlaced}
+            selected={selected}
+            onSelect={setSelected}
+          />
+        </PanelImage>
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="flex-1 text-sm text-muted">
+            Drag a field to place it, and its corner to resize it. Arrow keys nudge it.
+          </p>
+          {selected && placed[selected] && (
+            <Button size="sm" variant="tertiary" onPress={() => unplace(selected)}>
+              Back in the stack
+            </Button>
+          )}
+          {Object.keys(placed).length > 0 && (
+            <Button size="sm" variant="tertiary" onPress={() => setPlaced({})}>
+              Reset all
+            </Button>
+          )}
+        </div>
         <p className="text-sm text-muted">
           {items.length ? "" : "Showing placeholder content until you add items. "}
           This is how the panel shows it, in its own {mono ? "black and white" : "six colours"}.

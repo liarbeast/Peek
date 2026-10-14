@@ -1,11 +1,13 @@
-{# Draws one field's value with its classes: field field-<key> type-<type>. #}
+{# Draws one field's value with its classes: field field-<key> type-<type>.
+   A field dragged to a place gets that box, outside the normal flow. #}
 {% macro field(e) -%}
   {%- if e.value -%}
-    {%- set classes = "field field-" ~ e.key ~ " type-" ~ e.type -%}
+    {%- set classes = "field field-" ~ e.key ~ " type-" ~ e.type ~ (" placed" if e.box else "") -%}
+    {%- set style = "left:%dpx;top:%dpx;width:%dpx;height:%dpx" % (e.box.x, e.box.y, e.box.w, e.box.h) if e.box else "" -%}
     {%- if e.type == "image" -%}
-      <img class="{{ classes }}" src="{{ e.value }}" alt="">
+      <img class="{{ classes }}" data-field="{{ e.key }}" src="{{ e.value }}" alt=""{% if style %} style="{{ style }}"{% endif %}>
     {%- else -%}
-      <div class="{{ classes }}">{{ e.value }}</div>
+      <div class="{{ classes }}" data-field="{{ e.key }}"{% if style %} style="{{ style }}"{% endif %}>{{ e.value }}</div>
     {%- endif -%}
   {%- endif -%}
 {%- endmacro %}
