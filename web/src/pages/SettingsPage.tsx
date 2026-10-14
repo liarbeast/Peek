@@ -33,7 +33,6 @@ const SWITCHES: { id: Switch; label: string; description?: string; divider?: boo
   {
     id: "finished",
     label: "Once a collection is finished",
-    description: "Not a set time: after every item has been shown",
     divider: true,
     minutes: Infinity,
   },
@@ -124,7 +123,7 @@ export function SettingsPage({ settings, onChange }: { settings: Settings; onCha
               onChange={(s) => update({ switch: s })}
               options={SWITCHES.map((s) => ({
                 ...s,
-                disabled: s.minutes < refreshMinutes ? "Shorter than Refresh: the frame doesn't wake that often" : undefined,
+                disabled: s.minutes < refreshMinutes ? "Shorter than Refresh" : undefined,
               }))}
             />
             <p className="text-sm text-muted">
