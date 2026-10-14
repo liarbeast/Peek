@@ -1,14 +1,29 @@
 import { Button, toast } from "@heroui/react";
 import { useEffect, useState } from "react";
-import { api, type Category, type SourceInspection } from "../../api";
+import {
+  api,
+  FIELD_TYPES,
+  type Category,
+  type FieldType,
+  type SourceColumn,
+  type SourceInspection,
+} from "../../api";
 import { Choice, Dialog, TextInput } from "../../components/ui";
 
-// Select can't hold an empty key, so "nothing" and "the whole response" use this.
-const NONE = "-";
+// Select can't hold an empty key, so "the whole response" uses this.
+const WHOLE = "-";
+
+// What the person picked for one value of the entries, like a CSV column.
+interface Plan {
+  target: string; // "skip", "new" or "field:<key>"
+  label: string;
+  type: FieldType;
+}
 
 // Connects a collection to a data source: a JSON address whose entries become
-// its items, read again every day. "Look at response" fetches the address so
-// the list and each field's value can be picked instead of typed.
+// its items, read again every day. "Look at response" lists the values in an
+// entry, and each one used becomes a field (or fills an existing one), much
+// like importing a CSV.
 export function SourceDialog(props: {
   category: Category;
   itemCount: number;
@@ -18,19 +33,26 @@ export function SourceDialog(props: {
 }) {
   const { category, onSaved } = props;
   const [url, setUrl] = useState(category.source?.url ?? "");
-  const [items, setItems] = useState(category.source?.items ?? "");
-  const [paths, setPaths] = useState<Record<string, string>>(category.source?.fields ?? {});
   const [inspection, setInspection] = useState<SourceInspection | null>(null);
+  const [plans, setPlans] = useState<Record<string, Plan>>({});
   const [looking, setLooking] = useState(false);
   const [busy, setBusy] = useState(false);
-  const fields = category.fields.filter((f) => !f.hidden);
 
   const look = async (list?: string) => {
     setLooking(true);
     try {
       const found = await api.inspectSource(url.trim(), list);
       setInspection(found);
-      setItems(found.items);
+      // A value the connected source already uses keeps its field; the rest start skipped.
+      const fieldFor = Object.fromEntries(Object.entries(category.source?.fields ?? {}).map(([k, p]) => [p, k]));
+      setPlans(
+        Object.fromEntries(
+          found.values.map((v) => [
+            v.path,
+            { target: fieldFor[v.path] ? `field:${fieldFor[v.path]}` : "skip", label: v.label, type: v.type },
+          ]),
+        ),
+      );
     } catch (e) {
       toast.danger((e as Error).message);
     } finally {
@@ -43,13 +65,30 @@ export function SourceDialog(props: {
     if (props.isOpen && category.source && !inspection) look(category.source.items);
   }, [props.isOpen]);
 
-  const save = async () => {
+  const update = (path: string, change: Partial<Plan>) => setPlans((old) => ({ ...old, [path]: { ...old[path], ...change } }));
+
+  const columns: SourceColumn[] = Object.entries(plans).flatMap(([path, p]): SourceColumn[] =>
+    p.target === "skip"
+      ? []
+      : p.target === "new"
+        ? [{ path, new: { label: p.label.trim(), type: p.type } }]
+        : [{ path, field: p.target.slice("field:".length) }],
+  );
+  const used = columns.flatMap((c) => ("field" in c ? [c.field] : []));
+  const duplicate = used.find((f, i) => used.indexOf(f) !== i);
+  const missingName = columns.some((c) => "new" in c && !c.new.label);
+  const dropped = category.fields.filter((f) => !used.includes(f.key));
+
+  const connect = async () => {
+    if (!inspection) return;
     setBusy(true);
     try {
-      const source = { url: url.trim(), items: items.trim(), fields: paths };
-      await api.updateCategory(category.id, { source } as Partial<Category>);
-      const { created, category: synced } = await api.syncCategory(category.id);
-      onSaved(synced);
+      const { created, category: saved } = await api.connectSource(category.id, {
+        url: url.trim(),
+        items: inspection.items,
+        columns,
+      });
+      onSaved(saved);
       props.onOpenChange(false);
       toast.success(`Fetched ${created} ${created === 1 ? "item" : "items"}`);
     } catch (e) {
@@ -59,15 +98,10 @@ export function SourceDialog(props: {
     }
   };
 
-  const listOptions = [
-    ...(inspection?.lists ?? []).map((l) => ({ id: l.path, label: l.path, description: `${l.count} entries` })),
-    { id: NONE, label: "The whole response", description: "One item, e.g. today's weather" },
-  ];
-  const valueOptions = (current: string) => [
-    { id: NONE, label: "Nothing" },
-    ...(inspection?.values ?? []).map((v) => ({ id: v.path, label: v.path, description: v.example })),
-    // A path typed earlier that this response doesn't have, so it isn't lost.
-    ...(current && !inspection?.values.some((v) => v.path === current) ? [{ id: current, label: current }] : []),
+  const targets = [
+    { id: "skip", label: "Skip" },
+    { id: "new", label: "New field" },
+    ...category.fields.map((f) => ({ id: `field:${f.key}`, label: f.label, description: "Existing field" })),
   ];
 
   return (
@@ -81,7 +115,10 @@ export function SourceDialog(props: {
           <Button variant="tertiary" onPress={() => props.onOpenChange(false)}>
             Cancel
           </Button>
-          <Button isDisabled={busy || !url.trim()} onPress={save}>
+          <Button
+            isDisabled={busy || !inspection || columns.length === 0 || !!duplicate || missingName}
+            onPress={connect}
+          >
             {busy ? "Fetching…" : "Save and fetch now"}
           </Button>
         </>
@@ -112,8 +149,8 @@ export function SourceDialog(props: {
 
       {!inspection && (
         <p className="text-sm text-muted">
-          Enter the address and press “Look at response”. Peek then shows what the address returns, and you pick which
-          value goes in each field.
+          Enter the address and press “Look at response”. Peek then lists the values in it, and you pick which ones to
+          use.
         </p>
       )}
 
@@ -121,21 +158,68 @@ export function SourceDialog(props: {
         <>
           <Choice
             label="List of entries"
-            value={items || NONE}
-            onChange={(v) => look(v === NONE ? "" : v)}
-            options={listOptions}
+            value={inspection.items || WHOLE}
+            onChange={(v) => look(v === WHOLE ? "" : v)}
+            options={[
+              ...inspection.lists.map((l) => ({ id: l.path, label: l.path, description: `${l.count} entries` })),
+              { id: WHOLE, label: "The whole response", description: "One item, e.g. today's weather" },
+            ]}
             description="Each entry becomes an item."
           />
-          {fields.map((f) => (
-            <Choice
-              key={f.key}
-              label={f.label}
-              value={paths[f.key] || NONE}
-              onChange={(v) => setPaths({ ...paths, [f.key]: v === NONE ? "" : v })}
-              options={valueOptions(paths[f.key] ?? "")}
-              description={f.type === "image" ? "Pick an image address; Peek downloads the image." : undefined}
-            />
-          ))}
+          <div>
+            <p className="text-sm font-medium">Values in each entry</p>
+            <p className="text-sm text-muted">
+              Pick the ones to use. Each becomes a field you can place on the Style tab.
+              {dropped.length > 0 &&
+                ` Fields not used here (${dropped.map((f) => f.label).join(", ")}) are removed, since they'd stay empty.`}
+            </p>
+          </div>
+          <div className="flex flex-col divide-y divide-separator">
+            {inspection.values.map((v) => {
+              const plan = plans[v.path];
+              if (!plan) return null;
+              return (
+                <div key={v.path} className="grid grid-cols-1 gap-2 py-3 sm:grid-cols-[1fr_1.3fr]">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{v.path}</p>
+                    <p className="truncate text-xs text-muted">{v.example}</p>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Choice
+                      label={`Where ${v.path} goes`}
+                      hideLabel
+                      value={plan.target}
+                      onChange={(target) => update(v.path, { target })}
+                      options={targets}
+                    />
+                    {plan.target === "new" && (
+                      <div className="grid grid-cols-2 gap-2">
+                        <TextInput
+                          label="Field name"
+                          hideLabel
+                          value={plan.label}
+                          onChange={(label) => update(v.path, { label })}
+                          placeholder="Field name"
+                        />
+                        <Choice
+                          label="Field type"
+                          hideLabel
+                          value={plan.type}
+                          onChange={(type) => update(v.path, { type })}
+                          options={FIELD_TYPES}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {duplicate && (
+            <p className="text-sm text-danger">
+              Two values go to {category.fields.find((f) => f.key === duplicate)?.label}. Pick one, or skip the other.
+            </p>
+          )}
         </>
       )}
     </Dialog>

@@ -98,6 +98,6 @@ def values(entry, path: str = "", depth: int = 4) -> list[dict]:
     else:
         if entry in (None, "") or isinstance(entry, (dict, list)):
             return []
-        return [{"path": path, "example": str(entry)[:120]}]
+        return [{"path": path, "example": str(entry)}]
     return [v for key, value in items for v in values(value, f"{path}.{key}" if path else key, depth - 1)]
 
