@@ -13,6 +13,8 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator
 
+from . import layouts
+
 ITEM_ORDERS = ("in_order", "random", "shuffle")
 
 # Each entry upgrades the schema by one version; never edit a shipped entry.
@@ -95,6 +97,25 @@ MIGRATIONS = [
     # {"landscape": {"title": {"x": 40, "y": 20, "w": 300, "h": 60}}}.
     """
     ALTER TABLE category ADD COLUMN positions TEXT NOT NULL DEFAULT '{}';
+    """,
+    # The Canvas layout replaces Stack: every field has a box of its own, and
+    # custom CSS is no longer used (the column stays, so nothing is lost).
+    """
+    UPDATE category SET template = 'canvas';
+    """,
+    # Style images: uploaded once per category and drawn the same for every
+    # item, such as a frame around a sprite. (A trial build made this table
+    # already, with the same columns, so it may exist.)
+    """
+    CREATE TABLE IF NOT EXISTS category_image (
+        id INTEGER PRIMARY KEY,
+        category_id INTEGER NOT NULL REFERENCES category(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        file TEXT NOT NULL,
+        crisp INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (category_id, name)
+    );
     """,
 ]
 
@@ -189,13 +210,11 @@ class Store:
     def create_category(self, fields: dict) -> dict:
         with self.connect() as conn:
             cur = conn.execute(
-                """INSERT INTO category (name, template, custom_css, item_order, weight, enabled, fields, mono, pixelate,
-                                         positions)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                """INSERT INTO category (name, template, item_order, weight, enabled, fields, mono, pixelate, positions)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     fields["name"],
                     fields["template"],
-                    fields.get("custom_css", ""),
                     fields.get("item_order", "in_order"),
                     fields.get("weight", 1),
                     int(fields.get("enabled", True)),
@@ -209,8 +228,7 @@ class Store:
         return self.category(new_id)
 
     def update_category(self, category_id: int, fields: dict) -> dict | None:
-        allowed = ("name", "template", "custom_css", "item_order", "weight", "enabled", "fields", "mono", "pixelate",
-                   "positions")
+        allowed = ("name", "template", "item_order", "weight", "enabled", "fields", "mono", "pixelate", "positions")
         changes = {k: _column(k, v) for k, v in fields.items() if k in allowed}
         if changes:
             sets = ", ".join(f"{k} = ?" for k in changes)
@@ -221,6 +239,44 @@ class Store:
     def delete_category(self, category_id: int) -> None:
         with self.connect() as conn:
             conn.execute("DELETE FROM category WHERE id = ?", (category_id,))
+
+    # Style images
+
+    def category_images(self, category_id: int) -> list[dict]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM category_image WHERE category_id = ? ORDER BY id", (category_id,)
+            ).fetchall()
+        return [_category_image(r) for r in rows]
+
+    def category_image(self, image_id: int) -> dict | None:
+        with self.connect() as conn:
+            row = conn.execute("SELECT * FROM category_image WHERE id = ?", (image_id,)).fetchone()
+        return _category_image(row) if row else None
+
+    def create_category_image(self, category_id: int, name: str, file: str, crisp: bool) -> dict:
+        with self.connect() as conn:
+            taken = {r[0] for r in conn.execute("SELECT name FROM category_image WHERE category_id = ?",
+                                                (category_id,))}
+            unique, n = name, 2
+            while unique in taken:
+                unique, n = f"{name} {n}", n + 1
+            cur = conn.execute(
+                "INSERT INTO category_image (category_id, name, file, crisp) VALUES (?, ?, ?, ?)",
+                (category_id, unique, file, int(crisp)),
+            )
+            new_id = cur.lastrowid
+        return self.category_image(new_id)
+
+    def update_category_image(self, image_id: int, fields: dict) -> dict | None:
+        if "crisp" in fields:
+            with self.connect() as conn:
+                conn.execute("UPDATE category_image SET crisp = ? WHERE id = ?", (int(fields["crisp"]), image_id))
+        return self.category_image(image_id)
+
+    def delete_category_image(self, image_id: int) -> None:
+        with self.connect() as conn:
+            conn.execute("DELETE FROM category_image WHERE id = ?", (image_id,))
 
     # Items
 
@@ -292,8 +348,23 @@ def _category(row: sqlite3.Row) -> dict:
     d["mono"] = bool(d["mono"])
     d["pixelate"] = bool(d["pixelate"])
     d["fields"] = json.loads(d["fields"])
-    d["positions"] = json.loads(d["positions"])
+    # Every field has a box: fields never dragged anywhere get their default.
+    d["positions"] = layouts.complete_positions(d["fields"], json.loads(d["positions"]))
+    d["default_positions"] = layouts.complete_positions(d["fields"], {})
     return d
+
+
+def _category_image(row: sqlite3.Row) -> dict:
+    d = dict(row)
+    d["crisp"] = bool(d["crisp"])
+    d["key"] = image_key(d["id"])
+    return d
+
+
+def image_key(image_id: int) -> str:
+    """A style image's key in a category's positions, next to its fields'
+    keys; field keys never start with @."""
+    return f"@{image_id}"
 
 
 def _item(row: sqlite3.Row) -> dict:

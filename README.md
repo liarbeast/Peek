@@ -9,7 +9,7 @@ So far Peek has:
 - **A renderer** that turns a page of fields into a six-colour image, dithering photos while
   keeping text crisp and pixel art blocky.
 - **A web app** to create categories (for example "Pokémon of the day" or "Movie quotes"),
-  give each its own fields, fill them by hand or from a CSV, style them with custom CSS and a live
+  give each its own fields, fill them by hand or from a CSV, lay them out by dragging on a live
   preview, and pick what the frame shows.
 
 ## Run it
@@ -41,29 +41,31 @@ Items store one value per field. A CSV file can fill a category: each row become
 fields by name or added as new fields, and image columns hold URLs that Peek downloads. Comma, semicolon and tab
 separated files all work.
 
-## Styling with CSS
+## Styling
 
-Every item is drawn by one layout, Stack (`server/peek/templates/stack.html`): each field in order, centred, inside
-`.stack`. Every field's element has the classes `field field-<key> type-<type>`, so a category's custom CSS can style,
-move or hide any field; the layout's own rules never outweigh it.
+Every item is drawn by one layout, Canvas (`server/peek/templates/canvas.html`): each field sits in a box of its own,
+which you place by dragging it in the Style tab's preview. Until a field is moved, it sits in its default box: fields
+one under the other, full width and centred, each attached below the one before.
 
-Pages are rendered in headless Chromium at 800x480, or at 480x800 when Settings says the frame hangs in portrait; the
-panel always gets 800x480, turned to match. CSS can target portrait with `@media (orientation: portrait)` and use the
-panel colours as `var(--black)`, `var(--white)`, `var(--yellow)`, `var(--red)`, `var(--blue)` and `var(--green)`.
+- **Moving:** drag a box. It snaps to the canvas centre and edges and to other fields (hold Alt to stop snapping), and
+  the arrow keys nudge it.
+- **Size:** a text box has one handle, for its width: the text wraps inside it and the box is as tall as its lines. Its
+  text size is set in pixels. Images scale from their corner and keep their shape.
+- **Style:** click a field for its toolbar: alignment, text size, bold, colour (the panel's six), typeface, front and
+  back, and Attach. A field attached below another is drawn the same distance under it, so when a title wraps to two
+  lines, the subtitle attached below it moves down with it. An empty field takes no room.
+- **Typefaces** come from Google Fonts (the list is in `server/peek/fonts.py`). Each is downloaded the first time a page
+  uses it and kept in the data folder, so the frame keeps working offline.
+- **Style images** are uploaded per category and drawn the same for every item, such as a frame around a sprite. They
+  start out covering the whole page behind the fields, and are dragged and resized like fields. Each is drawn either
+  crisp (solid colours, for graphics) or as a photo (dithered).
+
+Boxes are kept per orientation: pages are rendered in headless Chromium at 800x480, or at 480x800 when Settings says
+the frame hangs in portrait, and the panel always gets 800x480, turned to match.
 
 The Style tab also has two filters. Black and white draws the category in black and white only, turning shades into
 dither patterns (an even, regular one for crisp images). Crisp images resizes images without smoothing and maps each pixel
 to the nearest panel colour instead of dithering it like a photo: for pixel art, icons, logos and QR codes.
-
-Fields can also be placed by hand: drag a field's box in the Style tab's preview to move it. It snaps to the canvas
-centre and edges and to other fields (hold Alt to stop snapping), and the arrow keys nudge it. A text box has one
-handle, for its width: the text wraps inside it and the box is as tall as its lines. Its size is set in pixels. Images
-scale from their corner and keep their shape. The selected field's toolbar has alignment, text size, front/back, and
-linking below another field: a linked field is drawn the same distance under that field, so when a title wraps to two
-lines, the subtitle linked below it moves down with it.
-
-A placed field leaves the stack and is drawn at its box (class `placed`, absolutely positioned); the rest of the stack
-closes up around it. Boxes are kept per orientation, so landscape and portrait each have their own layout.
 (Under the hood, any image drawn with `image-rendering: pixelated` is treated this way.)
 
 ## Development

@@ -48,21 +48,34 @@ _FIELD_BOXES = """
 }))
 """
 
-# Fields linked below another move to `gap` pixels under that field, which
-# for text ends where its last line does.
-_LINK_FIELDS = """
+# Fields attached below another move to `gap` pixels under that field, which
+# for text ends where its last line does. An empty field takes no room: what
+# is attached to it moves up to where it would have been.
+_ATTACH_FIELDS = """
 const done = new Set();
-const place = (el, seen) => {
-  if (done.has(el) || seen.has(el)) return;
-  seen.add(el);
-  const above = document.querySelector(`[data-field="${CSS.escape(el.dataset.below)}"]`);
-  if (above) {
-    if (above.dataset.below) place(above, seen);
-    el.style.top = `${Math.round(above.getBoundingClientRect().bottom + Number(el.dataset.gap))}px`;
+const find = (key) => document.querySelector(`[data-field="${CSS.escape(key)}"]`);
+const empty = (key) => document.querySelector(`[data-empty="${CSS.escape(key)}"]`);
+// Where the next field down starts: under `key` if it is drawn, else where `key` would have been.
+const next = (key, gap, seen) => {
+  const el = find(key);
+  if (el) {
+    place(el, seen);
+    return el.getBoundingClientRect().bottom + gap;
   }
+  const missing = empty(key);
+  if (!missing || seen.has(missing)) return null;
+  seen.add(missing);
+  const below = missing.dataset.below;
+  return below ? next(below, Number(missing.dataset.gap), seen) : Number(missing.dataset.top);
+};
+const place = (el, seen) => {
+  if (!el.dataset.below || done.has(el) || seen.has(el)) return;
+  seen.add(el);
+  const top = next(el.dataset.below, Number(el.dataset.gap), seen);
+  if (top !== null) el.style.top = `${Math.round(top)}px`;
   done.add(el);
 };
-for (const el of document.querySelectorAll("[data-below]")) place(el, new Set());
+for (const el of document.querySelectorAll("[data-field][data-below]")) place(el, new Set());
 """
 
 # A pixel counts as photo when painting the photos white versus black moves
@@ -142,7 +155,7 @@ def screenshot(html: str, size: tuple[int, int] = (palette.WIDTH, palette.HEIGHT
             )
             page.set_content(html, wait_until="load")
             page.evaluate("document.fonts.ready")
-            page.evaluate(_LINK_FIELDS)
+            page.evaluate(_ATTACH_FIELDS)
             boxes = page.evaluate(_FIELD_BOXES)
             raw = _shot(page)
 

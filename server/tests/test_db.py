@@ -24,7 +24,7 @@ def test_items_move_to_fields(tmp_path):
     quotes, mons = store.categories()[1], store.categories()[0]
     assert [f["key"] for f in quotes["fields"]] == ["text", "title"]
     assert [f["key"] for f in mons["fields"]] == ["image", "title", "subtitle", "text"]
-    assert quotes["template"] == mons["template"] == "stack"
+    assert quotes["template"] == mons["template"] == "canvas"
     # Long text became plain text; images stay images.
     assert [f["type"] for f in mons["fields"]] == ["image", "text", "text", "text"]
     assert store.items(1)[0]["data"] == {"title": "Casablanca", "text": "Here's looking at you, kid."}

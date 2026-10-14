@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <style>
-  /* The six panel colours, for use in templates and custom CSS. */
+  /* The six panel colours. */
   :root {
     --black: #000; --white: #fff; --yellow: #ff0;
     --red: #f00; --blue: #00f; --green: #0f0;
@@ -18,7 +18,7 @@
   .type-text { white-space: pre-line; }
   {% block style %}{% endblock %}
 </style>
-{% if custom_css %}<style>{{ custom_css | safe }}</style>{% endif %}
+{% if font_css %}<style>{{ font_css | safe }}</style>{% endif %}
 </head>
 <body>{% block body %}{% endblock %}</body>
 </html>
