@@ -43,6 +43,12 @@ export function StyleTab(props: {
   const setPlaced = (next: Record<string, Box>) => setPositions((p) => ({ ...p, [orientation]: next }));
   const canvas = orientation === "portrait" ? { width: 480, height: 800 } : { width: 800, height: 480 };
   const [previewItem, setPreviewItem] = useState<string>(items[0] ? String(items[0].id) : "");
+  // The arrows step through the items, round from the last to the first.
+  const step = (by: number) => {
+    const at = items.findIndex((i) => String(i.id) === previewItem);
+    const next = items[(at + by + items.length) % items.length];
+    if (next) setPreviewItem(String(next.id));
+  };
   const [busy, setBusy] = useState(false);
   const upload = useRef<HTMLInputElement>(null);
   const dirty =
@@ -145,12 +151,26 @@ export function StyleTab(props: {
 
       <aside className="flex flex-[1_1_260px] flex-col gap-6 sm:max-w-72">
         {items.length > 0 && (
-          <Choice
-            label="Preview with"
-            value={previewItem}
-            onChange={setPreviewItem}
-            options={items.map((i) => ({ id: String(i.id), label: describeItem(category.fields, i).title }))}
-          />
+          <div className="flex flex-col gap-1">
+            <span className="text-sm font-medium">Preview with</span>
+            <div className="flex items-center gap-1">
+              <Button variant="ghost" isIconOnly aria-label="Previous item" onPress={() => step(-1)}>
+                ‹
+              </Button>
+              <div className="min-w-0 flex-1">
+                <Choice
+                  label="Preview with"
+                  hideLabel
+                  value={previewItem}
+                  onChange={setPreviewItem}
+                  options={items.map((i) => ({ id: String(i.id), label: describeItem(category.fields, i).title }))}
+                />
+              </div>
+              <Button variant="ghost" isIconOnly aria-label="Next item" onPress={() => step(1)}>
+                ›
+              </Button>
+            </div>
+          </div>
         )}
         <div className="flex flex-col gap-4">
           <Filter
