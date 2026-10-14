@@ -4,8 +4,15 @@ import { useEffect, useRef, useState } from "react";
 import { api, describeItem, imageUrl, type Category, type Item } from "../../api";
 import { PanelImage } from "../../components/PanelImage";
 import { Dialog, Toggle } from "../../components/ui";
+import { Label, Radio, RadioGroup } from "react-aria-components";
 import { ImportDialog } from "./ImportDialog";
 import { ItemDialog } from "./ItemDialog";
+import { SourceSection } from "./SourceSection";
+
+const MODES = [
+  { id: "manual", label: "By hand", description: "Add, edit and order items yourself, or import a CSV" },
+  { id: "source", label: "From a data source", description: "Read from a web address every day; not editable" },
+] as const;
 
 export function ItemsTab(props: {
   category: Category;
@@ -21,6 +28,23 @@ export function ItemsTab(props: {
   const imageInput = useRef<HTMLInputElement>(null);
   const csvInput = useRef<HTMLInputElement>(null);
   const hasImageField = category.fields.some((f) => f.type === "image");
+  // Where items come from. Picking "From a data source" only shows its setup;
+  // it takes over once saved. Going back to "By hand" keeps the fetched items.
+  const [mode, setMode] = useState<"manual" | "source">(category.source ? "source" : "manual");
+  const fromSource = mode === "source";
+
+  const chooseMode = async (next: "manual" | "source") => {
+    setMode(next);
+    if (next === "manual" && category.source) {
+      try {
+        props.onCategoryChange(await api.updateCategory(category.id, { source: { url: "" } } as Partial<Category>));
+        toast.success("Items are added by hand again. The fetched items stay, and you can edit them now.");
+      } catch (e) {
+        setMode("source");
+        toast.danger((e as Error).message);
+      }
+    }
+  };
 
   // The list as shown, which runs ahead of the server while dragging.
   const [order, setOrder] = useState(items);
@@ -90,44 +114,82 @@ export function ItemsTab(props: {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap gap-2">
-        <Button onPress={() => setEditing("new")} isDisabled={category.fields.length === 0}>
-          Add item
-        </Button>
-        {hasImageField && (
-          <>
-            <Button variant="tertiary" isDisabled={uploading} onPress={() => imageInput.current?.click()}>
-              {uploading ? "Uploading…" : "Upload several images"}
-            </Button>
-            <input
-              ref={imageInput}
-              type="file"
-              accept="image/png,image/jpeg,image/gif,image/webp"
-              multiple
-              hidden
-              onChange={(e) => uploadMany(e.target.files)}
-            />
-          </>
-        )}
-        <Button variant="tertiary" onPress={() => csvInput.current?.click()}>
-          Import CSV
-        </Button>
-        <input
-          ref={csvInput}
-          type="file"
-          accept=".csv,text/csv"
-          hidden
-          onChange={(e) => {
-            setCsvFile(e.target.files?.[0] ?? null);
-            e.target.value = "";
+      <RadioGroup
+        value={mode}
+        onChange={(m) => chooseMode(m as "manual" | "source")}
+        orientation="horizontal"
+        className="flex flex-col gap-2"
+      >
+        <Label className="text-sm font-medium">Where items come from</Label>
+        <div className="grid max-w-lg grid-cols-2 gap-3">
+          {MODES.map((m) => (
+            <Radio
+              key={m.id}
+              value={m.id}
+              className={({ isSelected, isFocusVisible }) =>
+                `cursor-pointer rounded-xl border-2 bg-surface p-3 transition ${
+                  isSelected ? "border-accent" : "border-border hover:border-default-foreground/30"
+                } ${isFocusVisible ? "ring-2 ring-accent ring-offset-2" : ""}`
+              }
+            >
+              <p className="font-medium">{m.label}</p>
+              <p className="text-sm text-muted">{m.description}</p>
+            </Radio>
+          ))}
+        </div>
+      </RadioGroup>
+
+      {fromSource && (
+        <SourceSection
+          category={category}
+          itemCount={items.length}
+          onSaved={(c) => {
+            props.onCategoryChange(c);
+            onChange();
           }}
         />
-        {items.length > 0 && (
-          <Button variant="danger-soft" className="ml-auto" onPress={() => setConfirmingDeleteAll(true)}>
-            Delete all
+      )}
+
+      {!fromSource && (
+        <div className="flex flex-wrap gap-2">
+          <Button onPress={() => setEditing("new")} isDisabled={category.fields.length === 0}>
+            Add item
           </Button>
-        )}
-      </div>
+          {hasImageField && (
+            <>
+              <Button variant="tertiary" isDisabled={uploading} onPress={() => imageInput.current?.click()}>
+                {uploading ? "Uploading…" : "Upload several images"}
+              </Button>
+              <input
+                ref={imageInput}
+                type="file"
+                accept="image/png,image/jpeg,image/gif,image/webp"
+                multiple
+                hidden
+                onChange={(e) => uploadMany(e.target.files)}
+              />
+            </>
+          )}
+          <Button variant="tertiary" onPress={() => csvInput.current?.click()}>
+            Import CSV
+          </Button>
+          <input
+            ref={csvInput}
+            type="file"
+            accept=".csv,text/csv"
+            hidden
+            onChange={(e) => {
+              setCsvFile(e.target.files?.[0] ?? null);
+              e.target.value = "";
+            }}
+          />
+          {items.length > 0 && (
+            <Button variant="danger-soft" className="ml-auto" onPress={() => setConfirmingDeleteAll(true)}>
+              Delete all
+            </Button>
+          )}
+        </div>
+      )}
       <Dialog
         isOpen={confirmingDeleteAll}
         onOpenChange={setConfirmingDeleteAll}
@@ -150,9 +212,10 @@ export function ItemsTab(props: {
       {category.fields.length === 0 && (
         <p className="text-muted">This collection has no fields yet. Add some on the Fields tab, or import a CSV.</p>
       )}
-      {category.fields.length > 0 && items.length === 0 && (
+      {!fromSource && category.fields.length > 0 && items.length === 0 && (
         <p className="text-muted">
-          No items yet. Add one{hasImageField ? ", upload a batch of images" : ""}, or import a CSV.
+          No items yet. Add one
+          {hasImageField ? ", upload a batch of images" : ""}, or import a CSV.
         </p>
       )}
 
@@ -170,6 +233,7 @@ export function ItemsTab(props: {
               category={category}
               item={item}
               number={index + 1}
+              readOnly={!!category.source}
               isFirst={index === 0}
               isLast={index === order.length - 1}
               onDragEnd={() => saveOrder(orderRef.current)}
@@ -184,7 +248,7 @@ export function ItemsTab(props: {
       )}
 
       <ItemDialog
-        key={editing === "new" ? "new" : editing?.id ?? "none"}
+        key={editing === "new" ? "new" : (editing?.id ?? "none")}
         category={category}
         item={editing === "new" ? null : editing}
         isOpen={editing !== null}
@@ -210,6 +274,8 @@ function ItemRow(props: {
   category: Category;
   item: Item;
   number: number;
+  // Filled from a data source: only previewing is left.
+  readOnly: boolean;
   isFirst: boolean;
   isLast: boolean;
   onDragEnd: () => void;
@@ -230,11 +296,15 @@ function ItemRow(props: {
       dragListener={false}
       dragControls={drag}
       onDragEnd={props.onDragEnd}
-      whileDrag={{ scale: 1.01, boxShadow: "0 8px 24px rgba(0,0,0,0.15)", zIndex: 1 }}
+      whileDrag={{
+        scale: 1.01,
+        boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+        zIndex: 1,
+      }}
       className="relative flex flex-wrap items-center gap-3 border-b border-separator bg-surface p-3 last:border-b-0"
     >
       <div className="flex flex-none items-center gap-1">
-        <DragHandle onPointerDown={(e) => drag.start(e)} />
+        {!props.readOnly && <DragHandle onPointerDown={(e) => drag.start(e)} />}
         <span className="w-7 text-right font-mono text-sm tabular-nums text-muted">{props.number}</span>
       </div>
       <div className={`flex min-w-0 flex-1 items-center gap-3 ${item.enabled ? "" : "opacity-50"}`}>
@@ -257,22 +327,44 @@ function ItemRow(props: {
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-1">
-        <Toggle label="Show" isSelected={item.enabled} onChange={props.onToggle} />
-        <Button size="sm" variant="ghost" isIconOnly aria-label="Move up" isDisabled={props.isFirst} onPress={() => props.onMove(-1)}>
-          ↑
-        </Button>
-        <Button size="sm" variant="ghost" isIconOnly aria-label="Move down" isDisabled={props.isLast} onPress={() => props.onMove(1)}>
-          ↓
-        </Button>
+        {!props.readOnly && (
+          <>
+            <Toggle label="Show" isSelected={item.enabled} onChange={props.onToggle} />
+            <Button
+              size="sm"
+              variant="ghost"
+              isIconOnly
+              aria-label="Move up"
+              isDisabled={props.isFirst}
+              onPress={() => props.onMove(-1)}
+            >
+              ↑
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              isIconOnly
+              aria-label="Move down"
+              isDisabled={props.isLast}
+              onPress={() => props.onMove(1)}
+            >
+              ↓
+            </Button>
+          </>
+        )}
         <Button size="sm" variant="tertiary" onPress={props.onPreview}>
           Preview
         </Button>
-        <Button size="sm" variant="tertiary" onPress={props.onEdit}>
-          Edit
-        </Button>
-        <Button size="sm" variant="danger-soft" onPress={props.onDelete}>
-          Delete
-        </Button>
+        {!props.readOnly && (
+          <>
+            <Button size="sm" variant="tertiary" onPress={props.onEdit}>
+              Edit
+            </Button>
+            <Button size="sm" variant="danger-soft" onPress={props.onDelete}>
+              Delete
+            </Button>
+          </>
+        )}
       </div>
     </Reorder.Item>
   );
@@ -293,7 +385,15 @@ export function DragHandle({ onPointerDown }: { onPointerDown: (e: React.Pointer
   );
 }
 
-function ItemPreviewDialog({ category, item, onClose }: { category: Category; item: Item | null; onClose: () => void }) {
+function ItemPreviewDialog({
+  category,
+  item,
+  onClose,
+}: {
+  category: Category;
+  item: Item | null;
+  onClose: () => void;
+}) {
   const [busy, setBusy] = useState(false);
   const show = async () => {
     if (!item) return;
