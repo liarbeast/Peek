@@ -43,9 +43,9 @@ export function TextInput(props: {
     <TextField value={props.value} onChange={props.onChange} autoFocus={props.autoFocus} fullWidth>
       <Label className={props.hideLabel ? "sr-only" : undefined}>{props.label}</Label>
       {props.multiline ? (
-        <TextArea placeholder={props.placeholder} rows={2} />
+        <TextArea variant="secondary" placeholder={props.placeholder} rows={2} />
       ) : (
-        <Input placeholder={props.placeholder} />
+        <Input variant="secondary" placeholder={props.placeholder} />
       )}
       {props.description && <Description>{props.description}</Description>}
     </TextField>
@@ -65,6 +65,7 @@ export function Choice<K extends string>(props: {
       selectedKey={props.value}
       onSelectionChange={(key) => key != null && props.onChange(String(key) as K)}
       fullWidth
+      variant="secondary"
     >
       <Label className={props.hideLabel ? "sr-only" : undefined}>{props.label}</Label>
       <Select.Trigger>
