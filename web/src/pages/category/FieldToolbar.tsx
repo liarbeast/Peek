@@ -3,25 +3,43 @@ import { useEffect, useState, type ReactNode } from "react";
 import { api, PANEL_COLOURS, type Box, type CategoryImage, type PanelColour } from "../../api";
 import type { Layer } from "./FieldBoxes";
 
-// The Google Fonts on offer, fetched once, and loaded into the page so the
-// menu can show each one in its own face.
-let fontList: Promise<string[]> | null = null;
+// The Google Fonts on offer with their weights, fetched once, and loaded into
+// the page so the menu can show each one in its own face.
+let fontList: Promise<Record<string, number[]>> | null = null;
 function useFonts() {
-  const [fonts, setFonts] = useState<string[]>([]);
+  const [fonts, setFonts] = useState<Record<string, number[]>>({});
   useEffect(() => {
     if (!fontList) {
       fontList = api.fonts();
-      fontList.then((names) => {
+      fontList.then((all) => {
         const link = document.createElement("link");
         link.rel = "stylesheet";
-        link.href = `https://fonts.googleapis.com/css2?${names.map((n) => `family=${encodeURIComponent(n)}`).join("&")}&display=swap`;
+        const families = Object.keys(all).map((n) => `family=${encodeURIComponent(n)}`);
+        link.href = `https://fonts.googleapis.com/css2?${families.join("&")}&display=swap`;
         document.head.append(link);
       });
     }
-    fontList.then(setFonts).catch(() => setFonts([]));
+    fontList.then(setFonts).catch(() => setFonts({}));
   }, []);
   return fonts;
 }
+
+const WEIGHT_NAMES: Record<number, string> = {
+  100: "Thin",
+  200: "Extra light",
+  300: "Light",
+  400: "Regular",
+  500: "Medium",
+  600: "Semibold",
+  700: "Bold",
+  800: "Extra bold",
+  900: "Black",
+};
+const BUILT_IN_WEIGHTS = [400, 700];
+
+// The weight closest to `weight` that `weights` has.
+const nearest = (weight: number, weights: number[]) =>
+  weights.reduce((best, w) => (Math.abs(w - weight) < Math.abs(best - weight) ? w : best), weights[0] ?? 400);
 
 // The selected field's options, shown next to its box. Text gets alignment,
 // size, weight, colour and typeface; images get alignment both ways; style
@@ -39,6 +57,8 @@ export function FieldToolbar(props: {
   onImageDelete: () => void;
 }) {
   const { box, layer } = props;
+  const fonts = useFonts();
+  const weights = box.font ? (fonts[box.font] ?? []) : BUILT_IN_WEIGHTS;
   const attached = props.attachable.find((f) => f.key === box.below);
   const isText = layer.type === "text";
   return (
@@ -62,17 +82,19 @@ export function FieldToolbar(props: {
       {isText ? (
         <>
           <TextSize size={box.size} onChange={(size) => props.onChange({ size })} />
-          <ToggleButton
-            size="sm"
-            isIconOnly
-            aria-label="Bold"
-            isSelected={!!box.bold}
-            onChange={(bold) => props.onChange({ bold })}
-          >
-            <span title="Bold" className="font-bold">B</span>
-          </ToggleButton>
           <ColourMenu value={box.color ?? "black"} onChange={(color) => props.onChange({ color })} />
-          <FontMenu value={box.font} onChange={(font) => props.onChange({ font })} />
+          <FontMenu
+            fonts={fonts}
+            value={box.font}
+            onChange={(font) => {
+              // Keep the weight if the new face has it, else take its closest one.
+              const has = font ? (fonts[font] ?? []) : BUILT_IN_WEIGHTS;
+              props.onChange({ font, weight: nearest(box.weight ?? 400, has) });
+            }}
+          />
+          {weights.length > 1 && (
+            <WeightMenu weights={weights} value={box.weight ?? 400} onChange={(weight) => props.onChange({ weight })} />
+          )}
         </>
       ) : (
         !layer.image && (
@@ -174,8 +196,11 @@ function ColourMenu(props: { value: PanelColour; onChange: (colour: PanelColour)
   );
 }
 
-function FontMenu(props: { value?: string; onChange: (font: string | undefined) => void }) {
-  const fonts = useFonts();
+function FontMenu(props: {
+  fonts: Record<string, number[]>;
+  value?: string;
+  onChange: (font: string | undefined) => void;
+}) {
   return (
     <Dropdown>
       <Dropdown.Trigger
@@ -194,9 +219,36 @@ function FontMenu(props: { value?: string; onChange: (font: string | undefined) 
           selectedKeys={[props.value ?? ""]}
           onAction={(key) => props.onChange(key === "" ? undefined : String(key))}
         >
-          {["", ...fonts].map((f) => (
+          {["", ...Object.keys(props.fonts)].map((f) => (
             <Dropdown.Item key={f} id={f} textValue={f || "Default"}>
               <span style={{ fontFamily: f ? `'${f}'` : undefined }}>{f || "Default"}</span>
+              <Dropdown.ItemIndicator />
+            </Dropdown.Item>
+          ))}
+        </Dropdown.Menu>
+      </Dropdown.Popover>
+    </Dropdown>
+  );
+}
+
+function WeightMenu(props: { weights: number[]; value: number; onChange: (weight: number) => void }) {
+  return (
+    <Dropdown>
+      <Dropdown.Trigger aria-label="Weight" className="flex h-8 items-center rounded-lg px-2 text-sm hover:bg-default">
+        <span title="Weight" style={{ fontWeight: props.value }}>
+          {WEIGHT_NAMES[props.value] ?? props.value}
+        </span>
+      </Dropdown.Trigger>
+      <Dropdown.Popover>
+        <Dropdown.Menu
+          aria-label="Weight"
+          selectionMode="single"
+          selectedKeys={[String(props.value)]}
+          onAction={(key) => props.onChange(Number(key))}
+        >
+          {props.weights.map((w) => (
+            <Dropdown.Item key={w} id={String(w)} textValue={WEIGHT_NAMES[w] ?? String(w)}>
+              <span style={{ fontWeight: w }}>{WEIGHT_NAMES[w] ?? w}</span>
               <Dropdown.ItemIndicator />
             </Dropdown.Item>
           ))}

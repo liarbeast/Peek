@@ -37,7 +37,7 @@ class Box(BaseModel):
     # Text size in pixels. A text box is as tall as its lines, so `h` only
     # applies to images.
     size: int | None = Field(default=None, ge=6, le=400)
-    bold: bool | None = None
+    weight: Literal[100, 200, 300, 400, 500, 600, 700, 800, 900] | None = None
     color: Literal["black", "white", "yellow", "red", "blue", "green"] | None = None
     font: str | None = None  # a family from fonts.FONTS; none is the built-in face
     align: Literal["left", "center", "right"] | None = None
@@ -188,7 +188,8 @@ def render_page(store: db.Store, template: str, fields: list[dict], values: dict
     size = renderer.canvas_size(orientation_)
     boxes = (positions or {}).get(orientation_) or {}
     cache = fonts.FontCache(store.data_dir / "fonts")
-    font_css = "\n".join(cache.css(family) for family in sorted({b.get("font") for b in boxes.values()} - {None}))
+    faces = sorted({(b["font"], b.get("weight") or 400) for b in boxes.values() if b.get("font")})
+    font_css = "\n".join(cache.css(family, weight) for family, weight in faces)
     html = layouts.build(template, fields, values, size, pixelate, boxes, font_css, images)
     return renderer.render(html, orientation_, mono)
 
@@ -399,9 +400,9 @@ def delete_category_image(request: Request, image_id: int) -> None:
 
 
 @router.get("/api/fonts")
-def list_fonts() -> list[str]:
-    """The Google Fonts text fields can use."""
-    return list(fonts.FONTS)
+def list_fonts() -> dict[str, list[int]]:
+    """The Google Fonts text fields can use, with the weights each comes in."""
+    return {family: list(weights) for family, weights in fonts.FONTS.items()}
 
 
 # Items

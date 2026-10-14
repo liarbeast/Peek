@@ -1,7 +1,7 @@
 """Typefaces from Google Fonts, for text fields.
 
-A font is downloaded the first time a page uses it and kept in the data
-folder, so later renders work offline. Pages get it inlined as @font-face
+Each weight of a font is downloaded the first time a page uses it and kept
+in the data folder, so later renders work offline. Pages get it inlined as @font-face
 rules with data URIs, so the renderer never fetches anything itself.
 """
 
@@ -18,18 +18,19 @@ from typing import Callable
 log = logging.getLogger(__name__)
 
 # Family -> the weights it comes in: the typefaces text fields can use.
+# The built-in face (DejaVu Sans) has 400 and 700.
 FONTS = {
-    "Poppins": (400, 700),
-    "Ubuntu": (400, 700),
-    "Mozilla Headline": (400, 700),
-    "Alegreya": (400, 700),
-    "IBM Plex Serif": (400, 700),
+    "Poppins": (100, 200, 300, 400, 500, 600, 700, 800, 900),
+    "Ubuntu": (300, 400, 500, 700),
+    "Mozilla Headline": (200, 300, 400, 500, 600, 700),
+    "Alegreya": (400, 500, 600, 700, 800, 900),
+    "IBM Plex Serif": (100, 200, 300, 400, 500, 600, 700),
     "Permanent Marker": (400,),
     "Metamorphous": (400,),
     # Pixel faces, for sprites
     "Jacquard 12": (400,),
     "Press Start 2P": (400,),
-    "Pixelify Sans": (400, 700),
+    "Pixelify Sans": (400, 500, 600, 700),
 }
 
 # Only these character sets are kept: Latin covers English and the accents
@@ -50,16 +51,17 @@ class FontCache:
         self.folder = folder
         self.fetch = fetch
 
-    def css(self, family: str) -> str:
-        """@font-face rules for `family` with the font files inlined, or ""
-        when it can't be had (the page then falls back to the default face)."""
-        if family not in FONTS:
+    def css(self, family: str, weight: int = 400) -> str:
+        """An @font-face rule for `family` at `weight` with the font file
+        inlined, or "" when it can't be had (the page then falls back to the
+        default face, or the browser thickens the nearest weight itself)."""
+        if weight not in FONTS.get(family, ()):
             return ""
-        path = self.folder / (re.sub(r"[^a-z0-9]+", "-", family.lower()) + ".css")
+        path = self.folder / f"{re.sub(r'[^a-z0-9]+', '-', family.lower())}-{weight}.css"
         if path.exists():
             return path.read_text()
         try:
-            css = self._download(family)
+            css = self._download(family, weight)
         except Exception as e:  # offline, or Google changed something
             log.warning("could not download font %s: %s", family, e)
             return ""
@@ -67,9 +69,8 @@ class FontCache:
         path.write_text(css)
         return css
 
-    def _download(self, family: str) -> str:
-        weights = ";".join(str(w) for w in FONTS[family])
-        query = urllib.parse.urlencode({"family": f"{family}:wght@{weights}", "display": "block"})
+    def _download(self, family: str, weight: int) -> str:
+        query = urllib.parse.urlencode({"family": f"{family}:wght@{weight}", "display": "block"})
         sheet = self.fetch(f"https://fonts.googleapis.com/css2?{query}").decode()
         rules = []
         # Each rule is preceded by a comment naming its character set.

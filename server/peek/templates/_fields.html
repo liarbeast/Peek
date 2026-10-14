@@ -14,7 +14,7 @@
     {%- else -%}
       {%- set style = style ~ ";text-align:%s" % (b.align or "center") -%}
       {%- if b.size %}{% set style = style ~ ";font-size:%dpx" % b.size %}{% endif -%}
-      {%- if b.bold %}{% set style = style ~ ";font-weight:bold" %}{% endif -%}
+      {%- if b.weight %}{% set style = style ~ ";font-weight:%d" % b.weight %}{% endif -%}
       {%- if b.color %}{% set style = style ~ ";color:var(--%s)" % b.color %}{% endif -%}
       {%- if b.font %}{% set style = style ~ ";font-family:'%s',sans-serif" % b.font %}{% endif -%}
     {%- endif -%}

@@ -49,9 +49,9 @@ export interface Box {
   align?: "left" | "center" | "right";
   valign?: "top" | "middle" | "bottom";
   z?: number; // higher is drawn in front
-  bold?: boolean;
+  weight?: number; // 100 (thin) to 900 (black); 400 is regular
   color?: PanelColour;
-  font?: string; // one of api.fonts(); none is the built-in face
+  font?: string; // one of api.fonts(); none is the built-in face (400 and 700)
   // Attached below another field: drawn `gap` pixels under where that field ends.
   below?: string;
   gap?: number;
@@ -182,7 +182,8 @@ export const api = {
     return { image: await res.blob(), boxes: JSON.parse(res.headers.get("X-Peek-Boxes") ?? "{}") };
   },
 
-  fonts: () => request<string[]>("/api/fonts"),
+  // Each Google Font on offer, with the weights it comes in.
+  fonts: () => request<Record<string, number[]>>("/api/fonts"),
   categoryImages: (categoryId: number) => request<CategoryImage[]>(`/api/categories/${categoryId}/images`),
   addCategoryImage: (categoryId: number, file: File) => {
     const form = new FormData();
