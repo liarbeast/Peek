@@ -720,17 +720,13 @@ def sync_source(store: db.Store, category: dict, day: date) -> int:
     return len(datas)
 
 
-def sync_due(store: db.Store, day: date) -> None:
-    """Fetch every active source not yet read on `day`, or set to be read on
-    every wake. One that fails keeps its items and is tried again on the next
-    wake."""
-    for category in store.categories():
-        source = category["source"]
-        if category["enabled"] and source and (source.get("every_wake") or category["synced"] != day.isoformat()):
-            try:
-                sync_source(store, category, day)
-            except sources.SourceError as e:
-                log.warning("%s: %s", category["name"], e)
+def fetch_quietly(store: db.Store, category: dict, day: date) -> None:
+    """Refill a category from its source as the frame switches to it; if the
+    source can't be read, the old items stay."""
+    try:
+        sync_source(store, category, day)
+    except sources.SourceError as e:
+        log.warning("%s: %s", category["name"], e)
 
 
 class InspectIn(BaseModel):
@@ -780,7 +776,6 @@ class ConnectIn(BaseModel):
     url: str = Field(min_length=1)
     items: str = ""
     columns: list[ColumnIn]
-    every_wake: bool = False  # fetch on every wake instead of once a day
 
 
 @router.put("/api/categories/{category_id}/source")
@@ -807,7 +802,7 @@ def connect_source(request: Request, category_id: int, body: ConnectIn) -> dict:
     paths = {c.field: c.path for c in body.columns if c.field}
     paths |= {f["key"]: c.path for f, c in zip(fields[len(kept):], new)}
     _drop_changed_values(store, category, fields)
-    source = {"url": body.url.strip(), "items": body.items.strip(), "fields": paths, "every_wake": body.every_wake}
+    source = {"url": body.url.strip(), "items": body.items.strip(), "fields": paths}
     category = store.update_category(category_id, {"fields": fields, "source": source})
     try:
         created = sync_source(store, category, date.today())

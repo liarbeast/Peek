@@ -62,13 +62,13 @@ separated files all work.
 
 A collection can fill itself from a web address that returns JSON: "Connect data source" on its Items tab. The address
 may hold `{YYYY}`, `{MM}` and `{DD}` for today's date, and `{RANDOM:1-1025}` for a random number on each fetch
-(`https://pokeapi.co/api/v2/pokemon/{RANDOM:1-1025}` is a random Pokémon). A source is read once a day, or on every
-wake if set so. "Look at response" fetches it, finds the lists of entries in it,
+(`https://pokeapi.co/api/v2/pokemon/{RANDOM:1-1025}` is a random Pokémon). A source is read each time the frame
+switches to its collection, so "Switch collection" in Settings decides how fresh it is; with "Once a collection is
+finished", a one-entry source (a random Pokémon) is read on every wake. "Look at response" fetches it, finds the lists of entries in it,
 and lists every value in an entry with an example, like the columns of a CSV. Each value you use becomes a new field
 (or fills an existing one); fields you don't use are removed, since they'd stay empty. Values are stored as dotted
-paths (`selected`, `pages.0.thumbnail.source`). While a source is connected, its items can't be edited by hand. Every
-day, on the frame's first wake, the entries replace the collection's items, and image addresses are downloaded. If the
-address can't be read, the old items stay and Peek tries again on the next wake.
+paths (`selected`, `pages.0.thumbnail.source`). While a source is connected, its items can't be edited by hand. The entries
+replace the collection's items, and image addresses are downloaded. If the address can't be read, the old items stay.
 
 For example, Wikipedia's "On this day":
 `https://en.wikipedia.org/api/rest_v1/feed/onthisday/selected/{MM}/{DD}`, list `selected`, with `year`, `text` and

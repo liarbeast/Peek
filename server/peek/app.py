@@ -73,14 +73,15 @@ def create_app(data_dir: Path) -> FastAPI:
         source, now = read_source(), periods()
         if current.exists() and source.get("refresh_period") == now["refresh_period"]:
             return
-        content.sync_due(store, (datetime.now() + schedule.EARLY_WAKE).date())
         # The category shown last; its item may be gone if a data source replaced it.
         shown_category = source.get("category_id")
         if shown_category is None and "item_id" in source:
             shown_category = (store.item(source["item_id"]) or {}).get("category_id")
         switch = source.get("switch_period") != now["switch_period"]
         lap = source.get("lap", 1) if now["switch_period"] == "finished" else None
-        item = schedule.next_item(store, shown_category, switch, lap)
+        day = (datetime.now() + schedule.EARLY_WAKE).date()
+        item = schedule.next_item(store, shown_category, switch, lap,
+                                  fetch=lambda category: content.fetch_quietly(store, category, day))
         if item:
             store.mark_shown(item["id"])
             # How many items of this category the frame has shown in a row (a

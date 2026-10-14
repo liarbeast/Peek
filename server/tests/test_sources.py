@@ -29,7 +29,7 @@ def test_entries_follow_the_paths():
     assert 1 <= int(sources.url_for("{RANDOM:1-3}", date.today())) <= 3
 
 
-def test_sync_replaces_items_once_a_day(tmp_path, monkeypatch):
+def test_sync_replaces_items_and_refetches_on_switch(tmp_path, monkeypatch):
     calls = []
 
     def fake_get(url, **kwargs):
@@ -49,10 +49,24 @@ def test_sync_replaces_items_once_a_day(tmp_path, monkeypatch):
     assert client.post(f"/api/categories/{cat['id']}/sync").json()["created"] == 2  # replaced, not added
     assert len(client.get(f"/api/categories/{cat['id']}/items").json()) == 2
 
-    client.get("/frame.png")  # synced today already: no new fetch
-    assert len(calls) == 2
-    item = json.loads((tmp_path / "current.json").read_text())
-    assert item["category_id"] == cat["id"]
+    current = tmp_path / "current.json"
+
+    def wake(switch=False):
+        data = json.loads(current.read_text())
+        data["refresh_period"] = "earlier"
+        if switch:
+            data["switch_period"] = "earlier"
+        current.write_text(json.dumps(data))
+        client.get("/frame.png")
+        return json.loads(current.read_text())
+
+    client.get("/frame.png")  # the frame switches to the collection: fetched again
+    assert len(calls) == 3
+    first = json.loads(current.read_text())
+    assert first["category_id"] == cat["id"]
+    assert wake()["item_id"] != first["item_id"] and len(calls) == 3  # same collection: next item, no fetch
+    wake(switch=True)  # switching (back) to it fetches again
+    assert len(calls) == 4
 
     removed = client.patch(f"/api/categories/{cat['id']}", json={"source": {"url": ""}}).json()
     assert removed["source"] is None and removed["synced"] is None
