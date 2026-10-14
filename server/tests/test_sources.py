@@ -53,4 +53,6 @@ def test_sync_replaces_items_once_a_day(tmp_path, monkeypatch):
     item = json.loads((tmp_path / "current.json").read_text())
     assert item["category_id"] == cat["id"]
 
-    assert client.patch(f"/api/categories/{cat['id']}", json={"source": {"url": ""}}).json()["source"] is None
+    removed = client.patch(f"/api/categories/{cat['id']}", json={"source": {"url": ""}}).json()
+    assert removed["source"] is None and removed["synced"] is None
+    assert removed["item_count"] == 2  # the fetched items stay, now editable

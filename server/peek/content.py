@@ -325,6 +325,8 @@ def update_category(request: Request, category_id: int, body: CategoryPatch) -> 
         _drop_changed_values(store, category, changes["fields"])
     if body.source is not None:
         changes["source"] = body.source.model_dump() if body.source.url.strip() else None
+        if changes["source"] is None:
+            changes["synced"] = None
     return store.update_category(category_id, changes)
 
 

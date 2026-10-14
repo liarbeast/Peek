@@ -5,23 +5,19 @@ import { TextInput } from "../../components/ui";
 
 // A collection's data source: a JSON address whose entries become its items,
 // read again every day.
-export function SourceSection({ category, onSaved }: { category: Category; onSaved: (c: Category) => void }) {
+export function SourceSection(props: { category: Category; itemCount: number; onSaved: (c: Category) => void }) {
+  const { category, onSaved } = props;
   const [url, setUrl] = useState(category.source?.url ?? "");
   const [items, setItems] = useState(category.source?.items ?? "");
   const [paths, setPaths] = useState<Record<string, string>>(category.source?.fields ?? {});
   const [busy, setBusy] = useState(false);
   const fields = category.fields.filter((f) => !f.hidden);
 
-  const save = async (remove = false) => {
+  const save = async () => {
     setBusy(true);
     try {
-      const source = remove ? { url: "" } : { url: url.trim(), items: items.trim(), fields: paths };
-      const saved = await api.updateCategory(category.id, { source } as Partial<Category>);
-      if (remove || !saved.source) {
-        onSaved(saved);
-        toast.success("Data source removed. The items stay until you delete them.");
-        return;
-      }
+      const source = { url: url.trim(), items: items.trim(), fields: paths };
+      await api.updateCategory(category.id, { source } as Partial<Category>);
       const { created, category: synced } = await api.syncCategory(category.id);
       onSaved(synced);
       toast.success(`Fetched ${created} ${created === 1 ? "item" : "items"}`);
@@ -33,14 +29,14 @@ export function SourceSection({ category, onSaved }: { category: Category; onSav
   };
 
   return (
-    <div className="flex flex-col gap-4 border-t border-separator pt-6">
-      <div>
-        <h2 className="text-lg font-semibold">Data source</h2>
-        <p className="text-sm text-muted">
-          Fill this collection from a web address that returns JSON. Every day its entries replace the items.
-          {category.synced && ` Last fetched on ${category.synced}.`}
-        </p>
-      </div>
+    <div className="flex max-w-lg flex-col gap-4">
+      <p className="text-sm text-muted">
+        A web address that returns JSON. Every day its entries replace the items below.
+        {category.synced && ` Last fetched on ${category.synced}.`}
+        {!category.source &&
+          props.itemCount > 0 &&
+          ` Fetching replaces the ${props.itemCount} items this collection has now.`}
+      </p>
       <TextInput
         label="Address"
         value={url}
@@ -70,14 +66,9 @@ export function SourceSection({ category, onSaved }: { category: Category; onSav
         />
       ))}
       <div className="flex flex-wrap gap-2">
-        <Button isDisabled={busy || !url.trim()} onPress={() => save()}>
+        <Button isDisabled={busy || !url.trim()} onPress={save}>
           {busy ? "Fetching…" : "Save and fetch now"}
         </Button>
-        {category.source && (
-          <Button variant="tertiary" isDisabled={busy} onPress={() => save(true)}>
-            Remove source
-          </Button>
-        )}
       </div>
     </div>
   );
