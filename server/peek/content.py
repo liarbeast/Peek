@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import logging
 import uuid
+from datetime import date
 from pathlib import Path
 from typing import Literal
 
@@ -12,8 +14,10 @@ from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field, field_validator
 from starlette.datastructures import UploadFile as FormFile
 
-from . import csv_import, db, fonts, layouts, renderer, samples, schedule
+from . import csv_import, db, fonts, layouts, renderer, samples, schedule, sources
 from . import fields as fieldlib
+
+log = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -77,6 +81,14 @@ class CategoryIn(BaseModel):
     enabled: bool = True
 
 
+class SourceIn(BaseModel):
+    """Where a category's items come from; an empty url removes the source."""
+
+    url: str = ""
+    items: str = ""
+    fields: dict[str, str] = {}
+
+
 class CategoryPatch(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=80)
     template: str | None = None
@@ -87,6 +99,7 @@ class CategoryPatch(BaseModel):
     pixelate: bool | None = None
     positions: Positions | None = None
     fields: list[FieldIn] | None = None
+    source: SourceIn | None = None
 
 
 class PreviewIn(BaseModel):
@@ -310,6 +323,8 @@ def update_category(request: Request, category_id: int, body: CategoryPatch) -> 
         except fieldlib.FieldError as e:
             raise HTTPException(422, str(e)) from e
         _drop_changed_values(store, category, changes["fields"])
+    if body.source is not None:
+        changes["source"] = body.source.model_dump() if body.source.url.strip() else None
     return store.update_category(category_id, changes)
 
 
@@ -538,8 +553,11 @@ async def update_item(request: Request, item_id: int) -> dict:
 @router.delete("/api/categories/{category_id}/items", status_code=204)
 def delete_all_items(request: Request, category_id: int) -> None:
     store = _store(request)
-    category = _category_or_404(store, category_id)
-    items = store.items(category_id)
+    _delete_items(store, _category_or_404(store, category_id))
+
+
+def _delete_items(store: db.Store, category: dict) -> None:
+    items = store.items(category["id"])
     images = [name for item in items for name in _item_images(category, item)]
     for item in items:
         store.delete_item(item["id"])
@@ -571,7 +589,7 @@ def show_item(request: Request, item_id: int) -> Response:
     item = _item_or_404(store, item_id)
     render = render_item(store, store.category(item["category_id"]), item)
     store.mark_shown(item_id)
-    request.app.state.set_current(render, {"item_id": item_id})
+    request.app.state.set_current(render, {"item_id": item_id, "category_id": item["category_id"]})
     return _png(render, "preview")
 
 
@@ -671,6 +689,58 @@ def run_import(
         store.update_category(category_id, {"fields": fields})
     created = store.create_items(category_id, datas) if datas else []
     return {"created": len(created), "images_failed": images_failed, "category": store.category(category_id)}
+
+
+# Data sources
+
+
+def sync_source(store: db.Store, category: dict, day: date) -> int:
+    """Replace a category's items with what its source holds on `day`; the
+    old items stay if the source can't be read. Returns how many it made."""
+    rows = sources.fetch(category["source"], day)
+    types = {f["key"]: f["type"] for f in category["fields"]}
+    rows = [{k: v for k, v in row.items() if k in types} for row in rows]
+    urls = [v for row in rows for k, v in row.items() if types[k] == "image"]
+    downloads = csv_import.download_images(urls, IMAGE_TYPES) if urls else {}
+    datas = []
+    for row in rows:
+        data = {}
+        for key, value in row.items():
+            if types[key] != "image":
+                data[key] = value
+            elif got := downloads.get(value):
+                data[key] = _save_image_bytes(store, *got)
+        if data:
+            datas.append(data)
+    _delete_items(store, category)
+    store.create_items(category["id"], datas)
+    store.update_category(category["id"], {"synced": day.isoformat()})
+    return len(datas)
+
+
+def sync_due(store: db.Store, day: date) -> None:
+    """Fetch every active source not yet read on `day`. One that fails keeps
+    its items and is tried again on the next wake."""
+    for category in store.categories():
+        if category["enabled"] and category["source"] and category["synced"] != day.isoformat():
+            try:
+                sync_source(store, category, day)
+            except sources.SourceError as e:
+                log.warning("%s: %s", category["name"], e)
+
+
+@router.post("/api/categories/{category_id}/sync")
+def sync(request: Request, category_id: int) -> dict:
+    """Fetch the category's source now."""
+    store = _store(request)
+    category = _category_or_404(store, category_id)
+    if not category["source"]:
+        raise HTTPException(422, "this collection has no data source")
+    try:
+        created = sync_source(store, category, date.today())
+    except sources.SourceError as e:
+        raise HTTPException(502, str(e)) from e
+    return {"created": created, "category": store.category(category_id)}
 
 
 @router.get("/images/{name}")

@@ -56,6 +56,18 @@ Items store one value per field. A CSV file can fill a collection: each row beco
 fields by name or added as new fields, and image columns hold URLs that Peek downloads. Comma, semicolon and tab
 separated files all work.
 
+## Data sources
+
+A collection can fill itself from a web address that returns JSON, set at the bottom of its Settings tab. The address
+may hold `{YYYY}`, `{MM}` and `{DD}` for today's date. "List of entries" is where the entries sit in the response, and
+each field says which value of an entry it takes, both as dotted paths (`selected`, `pages.0.thumbnail.source`). Every
+day, on the frame's first wake, the entries replace the collection's items, and image addresses are downloaded. If the
+address can't be read, the old items stay and Peek tries again on the next wake.
+
+For example, Wikipedia's "On this day":
+`https://en.wikipedia.org/api/rest_v1/feed/onthisday/selected/{MM}/{DD}`, list `selected`, with `year`, `text` and
+`pages.0.thumbnail.source`.
+
 ## Styling
 
 Every item is drawn by one layout, Canvas (`server/peek/templates/canvas.html`): each field sits in a box of its own,

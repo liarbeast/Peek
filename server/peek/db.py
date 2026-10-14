@@ -118,6 +118,12 @@ MIGRATIONS = [
         UNIQUE (category_id, name)
     );
     """,
+    # Data sources: a category filled from a JSON address (see sources.py),
+    # and the day its items were last fetched.
+    """
+    ALTER TABLE category ADD COLUMN source TEXT;
+    ALTER TABLE category ADD COLUMN synced TEXT;
+    """,
 ]
 
 # Frame-wide settings and their values until someone changes them.
@@ -231,7 +237,8 @@ class Store:
         return self.category(new_id)
 
     def update_category(self, category_id: int, fields: dict) -> dict | None:
-        allowed = ("name", "template", "item_order", "weight", "enabled", "fields", "mono", "pixelate", "positions")
+        allowed = ("name", "template", "item_order", "weight", "enabled", "fields", "mono", "pixelate", "positions",
+                   "source", "synced")
         changes = {k: _column(k, v) for k, v in fields.items() if k in allowed}
         if changes:
             sets = ", ".join(f"{k} = ?" for k in changes)
@@ -345,6 +352,8 @@ class Store:
 
 def _column(key: str, value):
     """A value as SQLite stores it: JSON for structures, 0/1 for flags."""
+    if key == "source":
+        return json.dumps(value) if value else None
     if key in ("fields", "data", "positions"):
         return json.dumps(value)
     if key in ("enabled", "mono", "pixelate"):
@@ -358,6 +367,7 @@ def _category(row: sqlite3.Row) -> dict:
     d["mono"] = bool(d["mono"])
     d["pixelate"] = bool(d["pixelate"])
     d["fields"] = json.loads(d["fields"])
+    d["source"] = json.loads(d["source"]) if d["source"] else None
     # Every field has a box: fields never dragged anywhere get their default.
     d["positions"] = layouts.complete_positions(d["fields"], json.loads(d["positions"]))
     d["default_positions"] = layouts.complete_positions(d["fields"], {})
