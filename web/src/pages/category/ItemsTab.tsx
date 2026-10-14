@@ -117,7 +117,7 @@ export function ItemsTab(props: {
           <Button size="sm" variant="tertiary" onPress={() => setConnecting(true)}>
             Edit
           </Button>
-          <Button size="sm" variant="tertiary" onPress={disconnect}>
+          <Button size="sm" variant="danger-soft" onPress={disconnect}>
             Disconnect
           </Button>
         </div>
