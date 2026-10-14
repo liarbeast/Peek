@@ -4,15 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import { api, describeItem, imageUrl, type Category, type Item } from "../../api";
 import { PanelImage } from "../../components/PanelImage";
 import { Dialog, Toggle } from "../../components/ui";
-import { Label, Radio, RadioGroup } from "react-aria-components";
 import { ImportDialog } from "./ImportDialog";
 import { ItemDialog } from "./ItemDialog";
-import { SourceSection } from "./SourceSection";
+import { SourceDialog } from "./SourceDialog";
 
-const MODES = [
-  { id: "manual", label: "By hand", description: "Add, edit and order items yourself, or import a CSV" },
-  { id: "source", label: "From a data source", description: "Read from a web address every day; not editable" },
-] as const;
 
 export function ItemsTab(props: {
   category: Category;
@@ -28,21 +23,18 @@ export function ItemsTab(props: {
   const imageInput = useRef<HTMLInputElement>(null);
   const csvInput = useRef<HTMLInputElement>(null);
   const hasImageField = category.fields.some((f) => f.type === "image");
-  // Where items come from. Picking "From a data source" only shows its setup;
-  // it takes over once saved. Going back to "By hand" keeps the fetched items.
-  const [mode, setMode] = useState<"manual" | "source">(category.source ? "source" : "manual");
-  const fromSource = mode === "source";
+  // Items come from a data source, or are added by hand; while a source is
+  // connected they can't be changed here.
+  const fromSource = !!category.source;
+  const [connecting, setConnecting] = useState(false);
 
-  const chooseMode = async (next: "manual" | "source") => {
-    setMode(next);
-    if (next === "manual" && category.source) {
-      try {
-        props.onCategoryChange(await api.updateCategory(category.id, { source: { url: "" } } as Partial<Category>));
-        toast.success("Items are added by hand again. The fetched items stay, and you can edit them now.");
-      } catch (e) {
-        setMode("source");
-        toast.danger((e as Error).message);
-      }
+  // Back to items by hand: the fetched items stay, and become editable.
+  const disconnect = async () => {
+    try {
+      props.onCategoryChange(await api.updateCategory(category.id, { source: { url: "" } } as Partial<Category>));
+      toast.success("Disconnected. The fetched items stay, and you can edit them now.");
+    } catch (e) {
+      toast.danger((e as Error).message);
     }
   };
 
@@ -114,41 +106,33 @@ export function ItemsTab(props: {
 
   return (
     <div className="flex flex-col gap-4">
-      <RadioGroup
-        value={mode}
-        onChange={(m) => chooseMode(m as "manual" | "source")}
-        orientation="horizontal"
-        className="flex flex-col gap-2"
-      >
-        <Label className="text-sm font-medium">Where items come from</Label>
-        <div className="grid max-w-lg grid-cols-2 gap-3">
-          {MODES.map((m) => (
-            <Radio
-              key={m.id}
-              value={m.id}
-              className={({ isSelected, isFocusVisible }) =>
-                `cursor-pointer rounded-xl border-2 bg-surface p-3 transition ${
-                  isSelected ? "border-accent" : "border-border hover:border-default-foreground/30"
-                } ${isFocusVisible ? "ring-2 ring-accent ring-offset-2" : ""}`
-              }
-            >
-              <p className="font-medium">{m.label}</p>
-              <p className="text-sm text-muted">{m.description}</p>
-            </Radio>
-          ))}
-        </div>
-      </RadioGroup>
-
       {fromSource && (
-        <SourceSection
-          category={category}
-          itemCount={items.length}
-          onSaved={(c) => {
-            props.onCategoryChange(c);
-            onChange();
-          }}
-        />
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-surface p-3">
+          <div className="min-w-0 flex-1">
+            <p className="font-medium">Filled from a data source</p>
+            <p className="truncate text-sm text-muted">
+              {category.synced ? `Fetched on ${category.synced}, ` : ""}read again every day from {category.source!.url}
+            </p>
+          </div>
+          <Button size="sm" variant="tertiary" onPress={() => setConnecting(true)}>
+            Edit
+          </Button>
+          <Button size="sm" variant="tertiary" onPress={disconnect}>
+            Disconnect
+          </Button>
+        </div>
       )}
+      <SourceDialog
+        key={JSON.stringify(category.source)}
+        category={category}
+        itemCount={items.length}
+        isOpen={connecting}
+        onOpenChange={setConnecting}
+        onSaved={(c) => {
+          props.onCategoryChange(c);
+          onChange();
+        }}
+      />
 
       {!fromSource && (
         <div className="flex flex-wrap gap-2">
@@ -172,6 +156,9 @@ export function ItemsTab(props: {
           )}
           <Button variant="tertiary" onPress={() => csvInput.current?.click()}>
             Import CSV
+          </Button>
+          <Button variant="tertiary" onPress={() => setConnecting(true)} isDisabled={category.fields.length === 0}>
+            Connect data source
           </Button>
           <input
             ref={csvInput}
@@ -214,8 +201,8 @@ export function ItemsTab(props: {
       )}
       {!fromSource && category.fields.length > 0 && items.length === 0 && (
         <p className="text-muted">
-          No items yet. Add one
-          {hasImageField ? ", upload a batch of images" : ""}, or import a CSV.
+          No items yet. Add one{hasImageField ? ", upload a batch of images" : ""}, import a CSV, or connect a data
+          source.
         </p>
       )}
 
