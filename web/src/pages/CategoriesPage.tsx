@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { api, imageUrl, type Category } from "../api";
 import { Choice, Dialog, TextInput } from "../components/ui";
 import { go } from "../router";
+import { ORDERS } from "./category/SettingsTab";
 
 export function CategoriesPage() {
   const [categories, setCategories] = useState<Category[] | null>(null);
@@ -90,6 +91,7 @@ function CategoryGroup(props: { title: string; categories: Category[]; empty?: s
               <Chip size="sm">
                 {c.item_count} {c.item_count === 1 ? "item" : "items"}
               </Chip>
+              <Chip size="sm">{ORDERS.find((o) => o.id === c.item_order)?.label}</Chip>
             </Card.Footer>
           </Card>
         ))}
