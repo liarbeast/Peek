@@ -56,8 +56,9 @@ export function Choice<K extends string>(props: {
   label: string;
   value: K;
   onChange: (value: K) => void;
-  // `divider` draws a line above an option, to set it apart from the ones before.
-  options: Array<{ id: K; label: string; description?: string; divider?: boolean }>;
+  // `divider` draws a line above an option, to set it apart from the ones before;
+  // `disabled` greys it out, with the reason as its tooltip.
+  options: Array<{ id: K; label: string; description?: string; divider?: boolean; disabled?: string }>;
   description?: string;
   hideLabel?: boolean;
 }) {
@@ -67,6 +68,7 @@ export function Choice<K extends string>(props: {
       onSelectionChange={(key) => key != null && props.onChange(String(key) as K)}
       fullWidth
       variant="secondary"
+      disabledKeys={props.options.filter((o) => o.disabled).map((o) => o.id)}
     >
       <Label className={props.hideLabel ? "sr-only" : undefined}>{props.label}</Label>
       <Select.Trigger>
@@ -79,8 +81,13 @@ export function Choice<K extends string>(props: {
           {props.options.map((o) => (
             <Fragment key={o.id}>
               {o.divider && <Separator className="my-1.5 bg-default-foreground/25" />}
-              <ListBox.Item id={o.id} textValue={o.label}>
-                <div className="flex flex-col">
+              {/* Disabled items take the pointer again (still not clicks), so the tooltip shows. */}
+              <ListBox.Item
+                id={o.id}
+                textValue={o.label}
+                className="aria-disabled:pointer-events-auto aria-disabled:cursor-not-allowed"
+              >
+                <div className="flex flex-col" title={o.disabled}>
                   <span>{o.label}</span>
                   {o.description && <span className="text-xs text-muted">{o.description}</span>}
                 </div>
