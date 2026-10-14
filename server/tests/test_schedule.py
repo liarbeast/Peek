@@ -71,3 +71,28 @@ def test_switch_setting(client):
     assert client.get("/api/settings").json()["switch"] == "1d"
     assert client.patch("/api/settings", json={"switch": "1w"}).json()["switch"] == "1w"
     assert client.patch("/api/settings", json={"switch": "2m"}).status_code == 422
+
+
+def test_switch_periods():
+    now = datetime(2026, 10, 14, 21, 23, 40)
+    assert schedule.period_start("8h", now) == datetime(2026, 10, 14, 16, 0)
+    assert schedule.period_start("1mo", now) == datetime(2026, 10, 1, 0, 0)
+
+
+def test_switch_once_a_collection_is_finished(tmp_path, client):
+    client.patch("/api/settings", json={"switch": "finished"})
+    ids = {}
+    for name, n in (("Birds", 2), ("Fish", 3)):
+        cat = client.post("/api/categories", json={"name": name}).json()
+        for i in range(n):
+            item = client.post(f"/api/categories/{cat['id']}/items", data={"data": json.dumps({"title": "x"})}).json()
+            ids[item["id"]] = name
+
+    def wake():
+        source = tmp_path / "current.json"
+        if source.exists():
+            source.write_text(json.dumps({**json.loads(source.read_text()), "refresh_period": "earlier"}))
+        client.get("/frame.png")
+        return ids[json.loads(source.read_text())["item_id"]]
+
+    assert [wake() for _ in range(7)] == ["Birds"] * 2 + ["Fish"] * 3 + ["Birds"] * 2

@@ -234,7 +234,7 @@ def update_settings(request: Request, body: SettingsPatch) -> dict:
         raise HTTPException(422, f"unknown orientation: {fields['orientation']}")
     if fields.get("refresh") not in (None, *schedule.REFRESH_INTERVALS):
         raise HTTPException(422, f"unknown refresh interval: {fields['refresh']}")
-    if fields.get("switch") not in (None, *schedule.REFRESH_INTERVALS):
+    if fields.get("switch") not in (None, *schedule.SWITCH_INTERVALS):
         raise HTTPException(422, f"unknown switch interval: {fields['switch']}")
     before = _store(request).settings()
     settings = _store(request).update_settings(fields)

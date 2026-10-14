@@ -124,7 +124,7 @@ MIGRATIONS = [
 SETTING_DEFAULTS = {
     "orientation": "landscape",
     "refresh": "1h",  # see schedule.REFRESH_INTERVALS
-    "switch": "1d",  # how often the frame moves on to the next category, also an interval
+    "switch": "1d",  # see schedule.SWITCH_INTERVALS
 }
 
 
