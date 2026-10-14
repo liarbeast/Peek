@@ -301,7 +301,7 @@ def test_dragged_fields_get_their_box(client):
     # the one before. The preview says where they ended up.
     defaults = cat["positions"]["landscape"]
     assert cat["default_positions"] == cat["positions"]
-    assert defaults["title"]["bold"] and defaults["subtext"]["below"] == "title"
+    assert defaults["title"]["weight"] == 700 and defaults["subtext"]["below"] == "title"
     assert set(cat["positions"]) == {"landscape", "portrait"}
     start = boxes(client.post(url, json={}))
     assert set(start) == {"title", "subtext"}  # the image is empty
@@ -339,11 +339,11 @@ def test_placed_field_style():
     values = {"title": "Robin", "pic": "data:image/png;base64,AA=="}
     html = layouts.build("canvas", fields, values, positions={
         "title": {"x": 1, "y": 2, "w": 300, "h": 60, "size": 50, "align": "right", "valign": "bottom", "z": 3,
-                  "bold": True, "color": "red", "font": "Alegreya"},
+                  "weight": 800, "color": "red", "font": "Alegreya"},
         "pic": {"x": 5, "y": 6, "w": 70, "h": 80, "align": "left", "valign": "top"},
     })
     # Text is as tall as its lines, so it gets no height; vertical alignment is for images.
-    assert ('style="left:1px;top:2px;width:300px;text-align:right;font-size:50px;font-weight:bold;'
+    assert ('style="left:1px;top:2px;width:300px;text-align:right;font-size:50px;font-weight:800;'
             'color:var(--red);font-family:&#39;Alegreya&#39;,sans-serif;z-index:3"') in html
     assert 'style="left:5px;top:6px;width:70px;height:80px;object-position:left top"' in html
 
@@ -414,11 +414,12 @@ def test_fonts_are_downloaded_once_and_inlined(tmp_path):
         return sheet.encode() if "googleapis" in url else b"font"
 
     cache = fonts.FontCache(tmp_path, fetch)
-    css = cache.css("Alegreya")
+    css = cache.css("Alegreya", 800)
     assert "data:font/woff2;base64,Zm9udA==" in css and "c.woff2" not in css
-    assert "family=Alegreya%3Awght%40400%3B700" in fetched[0]
-    assert cache.css("Alegreya") == css and len(fetched) == 2  # the second time comes from disk
+    assert "family=Alegreya%3Awght%40800" in fetched[0]
+    assert cache.css("Alegreya", 800) == css and len(fetched) == 2  # the second time comes from disk
     assert cache.css("Comic Sans") == ""
+    assert cache.css("Alegreya", 100) == "" and len(fetched) == 2  # a weight it doesn't come in
 
     def offline(url):
         raise OSError("no network")
@@ -462,5 +463,6 @@ def test_style_images(client, tmp_path):
 
 
 def test_font_list(client):
-    names = client.get("/api/fonts").json()
-    assert "Poppins" in names and "Jacquard 12" in names
+    weights = client.get("/api/fonts").json()
+    assert weights["Poppins"] == [100, 200, 300, 400, 500, 600, 700, 800, 900]
+    assert weights["Jacquard 12"] == [400]

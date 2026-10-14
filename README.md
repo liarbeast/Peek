@@ -51,11 +51,12 @@ one under the other, full width and centred, each attached below the one before.
   the arrow keys nudge it.
 - **Size:** a text box has one handle, for its width: the text wraps inside it and the box is as tall as its lines. Its
   text size is set in pixels. Images scale from their corner and keep their shape.
-- **Style:** click a field for its toolbar: alignment, text size, bold, colour (the panel's six), typeface, front and
+- **Style:** click a field for its toolbar: alignment, text size, colour (the panel's six), typeface, weight, front and
   back, and Attach. A field attached below another is drawn the same distance under it, so when a title wraps to two
   lines, the subtitle attached below it moves down with it. An empty field takes no room.
 - **Typefaces** come from Google Fonts (the list is in `server/peek/fonts.py`). Each is downloaded the first time a page
-  uses it and kept in the data folder, so the frame keeps working offline.
+  uses it (only the weights in use) and kept in the data folder, so the frame keeps working offline. The weight
+  menu lists only the weights each typeface really has.
 - **Style images** are uploaded per category and drawn the same for every item, such as a frame around a sprite. They
   start out covering the whole page behind the fields, and are dragged and resized like fields. Each is drawn either
   crisp (solid colours, for graphics) or as a photo (dithered).

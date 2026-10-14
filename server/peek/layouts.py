@@ -55,7 +55,7 @@ def default_positions(fields: list[dict], size: tuple[int, int]) -> dict[str, di
         if f["type"] == "image":
             box.update(h=round(height * 0.45), valign="middle")
         else:
-            box.update(h=60, size=28 if titled else 44, **({} if titled else {"bold": True}))
+            box.update(h=60, size=28 if titled else 44, **({} if titled else {"weight": 700}))
             titled = True
         if previous:
             box.update(below=previous, gap=GAP)
