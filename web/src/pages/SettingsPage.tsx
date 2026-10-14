@@ -92,8 +92,20 @@ export function SettingsPage({ settings, onChange }: { settings: Settings; onCha
               options={REFRESHES}
             />
             <p className="text-sm text-muted">
-              How often the frame wakes for a new image. Wakes fall on the round time, so it stays on schedule. More
-              often uses more battery.
+              How often the frame wakes for a new image: the next item of the current category. Wakes fall on the
+              round time, so it stays on schedule. More often uses more battery.
+            </p>
+          </div>
+          <div className="flex flex-col gap-1">
+            <Choice
+              label="Switch category"
+              value={settings.switch}
+              onChange={(s) => update({ switch: s })}
+              options={REFRESHES}
+            />
+            <p className="text-sm text-muted">
+              How often the frame moves on to the next active category, on its first wake after this time. Set it
+              to the same as Refresh, or shorter, to change category on every wake.
             </p>
           </div>
         </div>

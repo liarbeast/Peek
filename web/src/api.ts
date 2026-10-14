@@ -10,6 +10,7 @@ export interface Settings {
   orientation: Orientation;
   // How often the frame wakes for a new image.
   refresh: Refresh;
+  switch: Refresh; // how often the frame moves on to the next category
 }
 
 export const isPortrait = (o: Orientation) => o === "portrait";
