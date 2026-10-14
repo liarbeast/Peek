@@ -17,10 +17,10 @@ export function CategoriesPage() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Categories</h1>
-          <p className="text-muted">Each category has its own content and its own style.</p>
+          <h1 className="text-2xl font-semibold">Collections</h1>
+          <p className="text-muted">Each collection has its own content and its own style.</p>
         </div>
-        <Button onPress={() => setCreating(true)}>New category</Button>
+        <Button onPress={() => setCreating(true)}>New collection</Button>
       </div>
 
       {error && <p className="text-danger">{error}</p>}
@@ -29,14 +29,14 @@ export function CategoriesPage() {
       {categories?.length === 0 && (
         <Card>
           <Card.Header>
-            <Card.Title>No categories yet</Card.Title>
+            <Card.Title>No collections yet</Card.Title>
             <Card.Description>
               Start with one, for example "Bird of the day" with the Photo layout, or "Movie quotes" with the Quote
               layout.
             </Card.Description>
           </Card.Header>
           <Card.Footer>
-            <Button onPress={() => setCreating(true)}>Create your first category</Button>
+            <Button onPress={() => setCreating(true)}>Create your first collection</Button>
           </Card.Footer>
         </Card>
       )}
@@ -44,7 +44,7 @@ export function CategoriesPage() {
       {categories && categories.length > 0 && (
         <CategoryGroup
           title="Active"
-          empty="No active categories. Turn on “Show this category on the frame” in its Settings tab."
+          empty="No active collections. Turn on “Show this collection on the frame” in its Settings tab."
           categories={categories.filter((c) => c.enabled)}
         />
       )}
@@ -128,7 +128,7 @@ function NewCategoryDialog(props: {
     <Dialog
       isOpen={props.isOpen}
       onOpenChange={props.onOpenChange}
-      title="New category"
+      title="New collection"
       footer={
         <>
           <Button variant="tertiary" onPress={() => props.onOpenChange(false)}>

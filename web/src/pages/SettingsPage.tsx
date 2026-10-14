@@ -40,7 +40,10 @@ export function SettingsPage({ settings, onChange }: { settings: Settings; onCha
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-semibold">Settings</h1>
+        <a href="#/" className="text-sm text-muted hover:underline">
+          ← Collections
+        </a>
+        <h1 className="mt-1 text-2xl font-semibold">Settings</h1>
         <p className="text-muted">These apply to the whole frame.</p>
       </div>
       <div className="grid gap-6 md:grid-cols-2">
@@ -92,20 +95,20 @@ export function SettingsPage({ settings, onChange }: { settings: Settings; onCha
               options={REFRESHES}
             />
             <p className="text-sm text-muted">
-              How often the frame wakes for a new image: the next item of the current category. Wakes fall on the
+              How often the frame wakes for a new image: the next item of the current collection. Wakes fall on the
               round time, so it stays on schedule. More often uses more battery.
             </p>
           </div>
           <div className="flex flex-col gap-1">
             <Choice
-              label="Switch category"
+              label="Switch collection"
               value={settings.switch}
               onChange={(s) => update({ switch: s })}
               options={REFRESHES}
             />
             <p className="text-sm text-muted">
-              How often the frame moves on to the next active category, on its first wake after this time. Set it
-              to the same as Refresh, or shorter, to change category on every wake.
+              How often the frame moves on to the next active collection, on its first wake after this time. Set it
+              to the same as Refresh, or shorter, to change collection on every wake.
             </p>
           </div>
         </div>
