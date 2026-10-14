@@ -78,13 +78,17 @@ export function FieldBoxes(props: {
 
   // A field's box as it is drawn now: a field attached below another sits
   // `gap` under where that field's content ends, wherever that field is.
+  // Attached fields can point at fields this overlay doesn't list (hidden
+  // ones), which still have a saved box.
   const shown = (key: string, seen = new Set<string>()): Box | null => {
     const box = boxOf(key, placed, measured, isText(key));
     if (!box?.below || seen.has(key)) return box;
     seen.add(key);
     const above = shown(box.below, seen);
+    if (!above) return box;
     const height = contentHeight(box.below);
-    return above && height !== null ? { ...box, y: above.y + height + (box.gap ?? 0) } : box;
+    // An empty or hidden field isn't drawn and passes its place on.
+    return { ...box, y: height === null ? above.y : above.y + height + (box.gap ?? 0) };
   };
 
   // Saves a box; for an attached field, its new position becomes its new gap.

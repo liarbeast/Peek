@@ -99,7 +99,9 @@ def build(template: str, fields: list[dict], values: dict, size: tuple[int, int]
     width, height = size
     return _env.get_template(f"{template}.html").render(
         images=[{**i, "type": "image", "box": boxes.get(i["key"]) or default_image_box(size)} for i in images or []],
-        fields=[{**f, "value": values.get(f["key"]) or "", "box": boxes[f["key"]]} for f in fields],
+        # A hidden field is drawn as an empty one, so fields attached to it take its place.
+        fields=[{**f, "value": "" if f.get("hidden") else values.get(f["key"]) or "", "box": boxes[f["key"]]}
+                for f in fields],
         pixelate=pixelate,
         font_css=font_css,
         width=width,

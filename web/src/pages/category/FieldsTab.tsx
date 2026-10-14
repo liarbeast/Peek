@@ -2,7 +2,7 @@ import { Button, toast } from "@heroui/react";
 import { Reorder, useDragControls } from "motion/react";
 import { useState } from "react";
 import { api, FIELD_TYPES, type Category, type FieldDraft, type FieldType } from "../../api";
-import { Choice, Dialog, TextInput } from "../../components/ui";
+import { Choice, Dialog, TextInput, Toggle } from "../../components/ui";
 import { DragHandle } from "./ItemsTab";
 
 // A field in the editor, with a local id so rows keep their identity while
@@ -18,8 +18,8 @@ export function FieldsTab(props: { category: Category; onSaved: (c: Category) =>
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState(false);
 
-  const saved = JSON.stringify(category.fields.map(({ key, label, type }) => ({ key, label, type })));
-  const draft = rows.map(({ key, label, type }) => ({ key, label: label.trim(), type }));
+  const saved = JSON.stringify(category.fields.map(({ key, label, type, hidden }) => ({ key, label, type, hidden: !!hidden })));
+  const draft = rows.map(({ key, label, type, hidden }) => ({ key, label: label.trim(), type, hidden: !!hidden }));
   const dirty = JSON.stringify(draft) !== saved;
   const invalid = draft.some((f) => !f.label);
 
@@ -50,7 +50,7 @@ export function FieldsTab(props: { category: Category; onSaved: (c: Category) =>
   return (
     <div className="flex max-w-3xl flex-col gap-4">
       <p className="text-muted">
-        Every item in this category has these fields. Place and style them on the Style tab.
+        Every item in this category has these fields. Place and style them on the Style tab. A field that is not shown keeps its values but is left off the frame.
       </p>
 
       {rows.length > 0 && (
@@ -130,7 +130,7 @@ function FieldRow(props: { row: Row; onChange: (change: Partial<Row>) => void; o
       className="relative flex flex-wrap items-center gap-3 border-b border-separator bg-surface p-3 last:border-b-0"
     >
       <DragHandle onPointerDown={(e) => drag.start(e)} />
-      <div className="min-w-40 flex-1">
+      <div className={`min-w-40 flex-1 ${row.hidden ? "opacity-50" : ""}`}>
         <TextInput label="Field name" hideLabel value={row.label} onChange={(label) => props.onChange({ label })} placeholder="Field name" />
       </div>
       <div className="w-40">
@@ -142,6 +142,7 @@ function FieldRow(props: { row: Row; onChange: (change: Partial<Row>) => void; o
           options={FIELD_TYPES}
         />
       </div>
+      <Toggle label="Show" isSelected={!row.hidden} onChange={(on) => props.onChange({ hidden: !on })} />
       <Button size="sm" variant="danger-soft" onPress={props.onRemove}>
         Remove
       </Button>

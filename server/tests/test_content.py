@@ -400,6 +400,24 @@ def test_attached_to_an_empty_field_takes_its_place(client):
     assert found["title"][1] == 100  # where the image would have been
 
 
+def test_hidden_field_is_kept_but_not_drawn(client):
+    cat = make_category(client)
+    item = add_item(client, cat["id"], {"title": "Robin", "subtext": "Garden bird"})
+    fields = [{**f, "hidden": f["key"] == "title"} for f in cat["fields"]]
+    cat = client.patch(f"/api/categories/{cat['id']}", json={"fields": fields}).json()
+    assert [f.get("hidden", False) for f in cat["fields"]] == [f["key"] == "title" for f in cat["fields"]]
+    items = client.get(f"/api/categories/{cat['id']}/items").json()
+    assert items[0]["data"]["title"] == "Robin"  # value kept
+    positions = {"landscape": {
+        "title": {"x": 0, "y": 100, "w": 300, "h": 40},
+        "subtext": {"x": 0, "y": 0, "w": 300, "h": 40, "below": "title", "gap": 10},
+    }}
+    found = boxes(client.post(f"/api/categories/{cat['id']}/preview.png",
+                              json={"positions": positions, "item_id": item["id"]}))
+    assert "title" not in found
+    assert found["subtext"][1] == 100  # takes the hidden title's place
+
+
 def test_fonts_are_downloaded_once_and_inlined(tmp_path):
     from peek import fonts
 

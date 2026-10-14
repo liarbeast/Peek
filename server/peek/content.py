@@ -64,6 +64,7 @@ class FieldIn(BaseModel):
     key: str | None = None
     label: str
     type: str = "text"
+    hidden: bool = False
 
 
 class CategoryIn(BaseModel):

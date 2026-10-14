@@ -16,6 +16,8 @@ export interface Field {
   key: string;
   label: string;
   type: FieldType;
+  // Kept, with its values, but not drawn.
+  hidden?: boolean;
 }
 
 // A field being edited: new fields get their key from the server.
