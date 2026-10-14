@@ -91,7 +91,12 @@ function CategoryGroup(props: { title: string; categories: Category[]; empty?: s
                 </Chip>
                 <Chip size="sm">{ORDERS.find((o) => o.id === c.item_order)?.label}</Chip>
                 {c.source && (
-                  <Chip size="sm" color="accent">
+                  <Chip size="sm">
+                    {/* A pulsing green dot: this collection is fed live. */}
+                    <span className="relative mr-1 flex size-2">
+                      <span className="absolute inline-flex size-full animate-ping rounded-full bg-success opacity-75" />
+                      <span className="relative inline-flex size-2 rounded-full bg-success" />
+                    </span>
                     Data source
                   </Chip>
                 )}
