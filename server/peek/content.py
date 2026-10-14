@@ -34,6 +34,11 @@ class Box(BaseModel):
     y: int = Field(ge=-800, le=800)
     w: int = Field(ge=8, le=800)
     h: int = Field(ge=8, le=800)
+    # Text size in pixels; long text shrinks below it to fit the box.
+    size: int | None = Field(default=None, ge=6, le=400)
+    align: Literal["left", "center", "right"] | None = None
+    valign: Literal["top", "middle", "bottom"] | None = None
+    z: int | None = Field(default=None, ge=-100, le=100)  # higher is drawn in front
 
 
 # Per orientation, the fields that were dragged to a place.

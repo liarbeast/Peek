@@ -35,15 +35,19 @@ export interface Box {
   y: number;
   w: number;
   h: number;
+  size?: number; // text size in pixels; long text shrinks below it to fit
+  align?: "left" | "center" | "right";
+  valign?: "top" | "middle" | "bottom";
+  z?: number; // higher is drawn in front
 }
 
 // Per orientation, the fields that were dragged to a place.
 export type Positions = Partial<Record<Orientation, Record<string, Box>>>;
 
-// A render, and where each field was drawn on it: [x, y, width, height].
+// A render, and where each field was drawn on it: [x, y, width, height, font size].
 export interface Preview {
   image: Blob;
-  boxes: Record<string, [number, number, number, number]>;
+  boxes: Record<string, [number, number, number, number, number]>;
 }
 
 export interface Category {

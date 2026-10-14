@@ -303,14 +303,14 @@ def test_dragged_fields_get_their_box(client):
     res = client.patch(f"/api/categories/{cat['id']}", json={"positions": positions})
     assert res.json()["positions"] == positions
     placed = boxes(client.post(url, json={}))
-    assert placed["title"] == [20, 30, 300, 60]
+    assert placed["title"][:4] == [20, 30, 300, 60]
     assert placed["subtext"] != stacked["subtext"]  # the stack closed up behind it
 
     # Unsaved positions can be previewed; portrait has its own.
     draft = {"landscape": {"subtext": {"x": 400, "y": 400, "w": 200, "h": 40}}}
-    assert boxes(client.post(url, json={"positions": draft}))["subtext"] == [400, 400, 200, 40]
+    assert boxes(client.post(url, json={"positions": draft}))["subtext"][:4] == [400, 400, 200, 40]
     client.patch("/api/settings", json={"orientation": "portrait"})
-    assert boxes(client.post(url, json={}))["title"] != [20, 30, 300, 60]
+    assert boxes(client.post(url, json={}))["title"][:4] != [20, 30, 300, 60]
 
     assert client.patch(f"/api/categories/{cat['id']}", json={
         "positions": {"landscape": {"title": {"x": 0, "y": 0, "w": 0, "h": 10}}}}).status_code == 422
@@ -319,3 +319,43 @@ def test_dragged_fields_get_their_box(client):
 
     copy = client.post("/api/categories", json={"name": "Copy", "copy_from": cat["id"]}).json()
     assert copy["positions"] == positions
+
+
+def test_placed_field_style():
+    from peek import layouts
+
+    fields = [{"key": "title", "label": "Title", "type": "text"}, {"key": "pic", "label": "Pic", "type": "image"}]
+    values = {"title": "Robin", "pic": "data:image/png;base64,AA=="}
+    html = layouts.build("stack", fields, values, positions={
+        "title": {"x": 1, "y": 2, "w": 300, "h": 60, "size": 50, "align": "right", "valign": "bottom", "z": 3},
+        "pic": {"x": 5, "y": 6, "w": 70, "h": 80, "align": "left", "valign": "top"},
+    })
+    assert 'style="left:1px;top:2px;width:300px;height:60px;z-index:3;text-align:right;' \
+           'justify-content:flex-end;font-size:50px"' in html
+    assert '<span>Robin</span>' in html
+    assert 'style="left:5px;top:6px;width:70px;height:80px;object-position:left top"' in html
+
+
+def test_long_placed_text_shrinks_to_fit(client):
+    cat = make_category(client)
+    add_item(client, cat["id"], {"title": "A rather long title for such a small box", "subtext": "x"})
+    url = f"/api/categories/{cat['id']}/preview.png"
+    box = {"x": 20, "y": 20, "w": 200, "h": 60, "size": 60}
+    res = client.post(url, json={"positions": {"landscape": {"title": box}}})
+    assert boxes(res)["title"][:5] == [20, 20, 200, 60, 60]  # the size it was designed at
+    assert client.patch(f"/api/categories/{cat['id']}", json={
+        "positions": {"landscape": {"title": {**box, "align": "middle"}}}}).status_code == 422
+
+
+def test_fitted_text_stays_in_its_box():
+    import numpy as np
+    from peek import layouts, renderer
+
+    fields = [{"key": "title", "label": "Title", "type": "text"}]
+    long = "A rather long title for such a small box, long enough to wrap a few times"
+    html = layouts.build("stack", fields, {"title": long}, custom_css=".placed { overflow: visible !important; }",
+                         positions={"title": {"x": 20, "y": 20, "w": 200, "h": 60, "size": 60}})
+    ink = np.asarray(renderer.render(html).raw.convert("L")) < 128
+    assert ink[20:80, 20:220].any()
+    ink[20:80, 20:220] = False
+    assert not ink.any()  # nothing spilled out of the box

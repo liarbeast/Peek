@@ -55,9 +55,15 @@ The Style tab also has two filters. Black and white draws the category in black 
 dither patterns (an even, regular one for crisp images). Crisp images resizes images without smoothing and maps each pixel
 to the nearest panel colour instead of dithering it like a photo: for pixel art, icons, logos and QR codes.
 
-Fields can also be placed by hand: drag a field's box in the Style tab's preview to move it, and its corner to resize
-it. A placed field leaves the stack and is drawn at that box (class `placed`, absolutely positioned), and the rest of
-the stack closes up around it. Boxes are kept per orientation, so landscape and portrait each have their own layout.
+Fields can also be placed by hand: drag a field's box in the Style tab's preview to move it. It snaps to the canvas
+centre and edges and to other fields (hold Alt to stop snapping), and the arrow keys nudge it. The corner scales a
+field (images keep their shape, text grows with its box); a text field's side handles change only its box, so it
+rewraps. Long text on an item shrinks until it fits its box. Each placed field also has left/centre/right and
+top/middle/bottom alignment, and can be brought to the front or sent to the back. Bottom-aligning a title keeps the
+gap to the field below it the same however many lines the title takes.
+
+A placed field leaves the stack and is drawn at its box (class `placed`, absolutely positioned); the rest of the stack
+closes up around it. Boxes are kept per orientation, so landscape and portrait each have their own layout.
 (Under the hood, any image drawn with `image-rendering: pixelated` is treated this way.)
 
 ## Development
