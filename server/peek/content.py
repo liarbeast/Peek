@@ -123,7 +123,7 @@ def _check(fields: dict) -> None:
 def _category_or_404(store: db.Store, category_id: int) -> dict:
     category = store.category(category_id)
     if category is None:
-        raise HTTPException(404, "no such category")
+        raise HTTPException(404, "no such collection")
     return category
 
 
@@ -483,7 +483,7 @@ def create_items_from_images(
     category = _category_or_404(store, category_id)
     image_key = next(iter(fieldlib.image_keys(category["fields"])), None)
     if image_key is None:
-        raise HTTPException(422, "this category has no image field")
+        raise HTTPException(422, "this collection has no image field")
     text_key = next((f["key"] for f in category["fields"] if f["type"] == "text"), None)
     images = [i for i in images if i.filename]
     if not images:

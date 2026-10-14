@@ -8,7 +8,7 @@ So far Peek has:
 
 - **A renderer** that turns a page of fields into a six-colour image, dithering photos while
   keeping text crisp and pixel art blocky.
-- **A web app** to create categories (for example "Pokémon of the day" or "Movie quotes"),
+- **A web app** to create collections (for example "Pokémon of the day" or "Movie quotes"),
   give each its own fields, fill them by hand or from a CSV, lay them out by dragging on a live
   preview, and pick what the frame shows.
 
@@ -24,7 +24,7 @@ docker compose up -d --build    # or: podman compose up -d --build
 
 Open http://localhost:8080. The first build downloads Chromium and takes a few minutes.
 
-Categories, uploaded images and the current frame image live in the `data` folder next to `compose.yaml`.
+Collections, uploaded images and the current frame image live in the `data` folder next to `compose.yaml`.
 To move Peek to another machine, copy the whole folder and run the same command there.
 
 ## See changes without rebuilding
@@ -47,12 +47,12 @@ takes a minute. Add `--build` only when `requirements.txt` changes, and go back 
 | Endpoint | What it returns |
 | --- | --- |
 | `GET /api/sleep` | Seconds to sleep before the next wake, as plain text: until the next refresh set in Settings (every 15 minutes up to weekly), on the round time in the server's time zone |
-| `GET /frame.png` | The current 800x480 image, a paletted PNG in the six pure panel colours. Once per refresh it moves on to the next item of the current category (in the category's item order), and once per "Switch category" interval to the next active category. "Show" on an item puts it on the frame until the next refresh |
+| `GET /frame.png` | The current 800x480 image, a paletted PNG in the six pure panel colours. Once per refresh it moves on to the next item of the current collection (in the collection's item order), and once per "Switch collection" interval to the next active collection. "Show" on an item puts it on the frame until the next refresh |
 
 ## Fields and CSV import
 
-Each category has its own fields, each holding text or an image, edited on its Fields tab.
-Items store one value per field. A CSV file can fill a category: each row becomes an item, columns are matched to
+Each collection has its own fields, each holding text or an image, edited on its Fields tab.
+Items store one value per field. A CSV file can fill a collection: each row becomes an item, columns are matched to
 fields by name or added as new fields, and image columns hold URLs that Peek downloads. Comma, semicolon and tab
 separated files all work.
 
@@ -72,14 +72,14 @@ one under the other, full width and centred, each attached below the one before.
 - **Typefaces** come from Google Fonts (the list is in `server/peek/fonts.py`). Each is downloaded the first time a page
   uses it (only the weights in use) and kept in the data folder, so the frame keeps working offline. The weight
   menu lists only the weights each typeface really has.
-- **Style images** are uploaded per category and drawn the same for every item, such as a frame around a sprite. They
+- **Style images** are uploaded per collection and drawn the same for every item, such as a frame around a sprite. They
   start out covering the whole page behind the fields, and are dragged and resized like fields. Each is drawn either
   crisp (solid colours, for graphics) or as a photo (dithered).
 
 Boxes are kept per orientation: pages are rendered in headless Chromium at 800x480, or at 480x800 when Settings says
 the frame hangs in portrait, and the panel always gets 800x480, turned to match.
 
-The Style tab also has two filters. Black and white draws the category in black and white only, turning shades into
+The Style tab also has two filters. Black and white draws the collection in black and white only, turning shades into
 dither patterns (an even, regular one for crisp images). Crisp images resizes images without smoothing and maps each pixel
 to one panel colour instead of dithering it like a photo: for pixel art, icons, logos and QR codes. Colours are matched
 mostly by hue, because the panel's green and red are dark: a bright sprite green becomes the panel's green, not its yellow.

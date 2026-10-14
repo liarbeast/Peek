@@ -44,7 +44,7 @@ export function SettingsTab({ category, onSaved }: { category: Category; onSaved
         label="How often it comes up"
         value={weight}
         onChange={setWeight}
-        description="Used when categories are picked at random."
+        description="Used when collections are picked at random."
         options={[
           { id: "1", label: "Normal" },
           { id: "2", label: "Twice as often" },
@@ -52,7 +52,7 @@ export function SettingsTab({ category, onSaved }: { category: Category; onSaved
           { id: "5", label: "Five times as often" },
         ]}
       />
-      <Toggle label="Show this category on the frame" isSelected={enabled} onChange={setEnabled} />
+      <Toggle label="Show this collection on the frame" isSelected={enabled} onChange={setEnabled} />
       <div className="flex gap-2">
         <Button isDisabled={!dirty || !name.trim()} onPress={save}>
           Save settings
@@ -61,7 +61,7 @@ export function SettingsTab({ category, onSaved }: { category: Category; onSaved
 
       <div className="mt-6 border-t border-separator pt-6">
         <Button variant="danger-soft" onPress={() => setConfirming(true)}>
-          Delete category
+          Delete collection
         </Button>
       </div>
       <Dialog
@@ -80,7 +80,7 @@ export function SettingsTab({ category, onSaved }: { category: Category; onSaved
           </>
         }
       >
-        <p>This deletes the category and all {category.item_count} of its items, including uploaded images.</p>
+        <p>This deletes the collection and all {category.item_count} of its items, including uploaded images.</p>
       </Dialog>
     </div>
   );

@@ -148,7 +148,7 @@ export function ItemsTab(props: {
       </Dialog>
 
       {category.fields.length === 0 && (
-        <p className="text-muted">This category has no fields yet. Add some on the Fields tab, or import a CSV.</p>
+        <p className="text-muted">This collection has no fields yet. Add some on the Fields tab, or import a CSV.</p>
       )}
       {category.fields.length > 0 && items.length === 0 && (
         <p className="text-muted">
