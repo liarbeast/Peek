@@ -45,7 +45,11 @@ export function PanelImage({ load, deps, alt }: Props) {
       }`}
     >
       {url && <img src={url} alt={alt} className="h-full w-full object-contain" />}
-      {error && <p className="absolute inset-0 flex items-center justify-center p-4 text-center text-sm text-danger">{error}</p>}
+      {error && (
+        <p className="absolute inset-0 flex items-center justify-center bg-background/90 p-4 text-center text-sm text-danger">
+          {error}
+        </p>
+      )}
       {loading && (
         <div className="absolute inset-0 flex items-center justify-center bg-background/40">
           <Spinner />

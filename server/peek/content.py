@@ -1,8 +1,10 @@
-"""JSON API for categories, their fields and items, CSV import and previews."""
+"""JSON API for categories, their fields, items and decoration images, CSV
+import and previews."""
 
 from __future__ import annotations
 
 import json
+import re
 import uuid
 from pathlib import Path
 from typing import Literal
@@ -39,6 +41,7 @@ class CategoryIn(BaseModel):
     # Start from another category's fields and style instead of the defaults.
     copy_from: int | None = None
     custom_css: str = ""
+    custom_html: str = ""
     item_order: str = "in_order"
     weight: int = Field(1, ge=1, le=10)
     enabled: bool = True
@@ -48,6 +51,7 @@ class CategoryPatch(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=80)
     template: str | None = None
     custom_css: str | None = None
+    custom_html: str | None = None
     item_order: str | None = None
     weight: int | None = Field(None, ge=1, le=10)
     enabled: bool | None = None
@@ -61,9 +65,15 @@ class PreviewIn(BaseModel):
 
     template: str | None = None
     custom_css: str | None = None
+    custom_html: str | None = None
     mono: bool | None = None
     pixelate: bool | None = None
     item_id: int | None = None
+
+
+class CategoryImagePatch(BaseModel):
+    name: str | None = None
+    crisp: bool | None = None
 
 
 class Reorder(BaseModel):
@@ -83,6 +93,11 @@ def _check(fields: dict) -> None:
         raise HTTPException(422, f"unknown template: {fields['template']}")
     if fields.get("item_order") not in (None, *db.ITEM_ORDERS):
         raise HTTPException(422, f"unknown item order: {fields['item_order']}")
+    if fields.get("custom_html"):
+        try:
+            layouts.check_html(fields["custom_html"])
+        except layouts.LayoutError as e:
+            raise HTTPException(422, str(e)) from e
 
 
 def _category_or_404(store: db.Store, category_id: int) -> dict:
@@ -147,25 +162,38 @@ def orientation(store: db.Store) -> str:
     return value if value in renderer.ORIENTATIONS else "landscape"
 
 
-def render_page(store: db.Store, template: str, fields: list[dict], values: dict,
-                custom_css: str = "", mono: bool = False, pixelate: bool = False) -> renderer.Render:
-    """Render a layout the way the frame hangs (landscape or portrait)."""
-    orientation_ = orientation(store)
-    size = renderer.canvas_size(orientation_)
-    html = layouts.build(template, fields, values, custom_css, size, pixelate)
-    return renderer.render(html, orientation_, mono)
+def _decorations(store: db.Store, category_id: int) -> tuple[dict[str, str], dict[str, renderer.Resource]]:
+    """A category's decoration images: their URLs by name, and the files
+    behind those URLs for the renderer."""
+    urls, resources = {}, {}
+    for image in store.category_images(category_id):
+        path = store.images / image["file"]
+        if not path.is_file():
+            continue
+        url = layouts.image_url(image["file"])
+        mime = next((m for m, e in IMAGE_TYPES.items() if e == path.suffix), "image/png")
+        urls[image["name"]] = url
+        resources[url] = renderer.Resource(path.read_bytes(), mime, image["crisp"])
+    return urls, resources
 
 
 def render_item(store: db.Store, category: dict, item: dict | None, changes: dict | None = None) -> renderer.Render:
-    """Render an item (or placeholder content) in its category's style.
+    """Render an item (or placeholder content) in its category's style, the
+    way the frame hangs (landscape or portrait).
 
     `changes` overrides saved style settings, to preview unsaved edits.
     """
     style = {**category, **{k: v for k, v in (changes or {}).items() if v is not None}}
     template = style["template"] if style["template"] in layouts.TEMPLATES else layouts.TEMPLATES[0]
     values = item_values(store, category, item) if item else samples.placeholder(category["fields"])
-    return render_page(store, template, category["fields"], values, style["custom_css"],
-                       style["mono"], style["pixelate"])
+    urls, resources = _decorations(store, category["id"])
+    orientation_ = orientation(store)
+    try:
+        html = layouts.build(template, category["fields"], values, style["custom_css"],
+                             renderer.canvas_size(orientation_), style["pixelate"], style["custom_html"], urls)
+    except layouts.LayoutError as e:
+        raise HTTPException(422, str(e)) from e
+    return renderer.render(html, orientation_, style["mono"], resources)
 
 
 def _png(render: renderer.Render, view: View) -> Response:
@@ -221,11 +249,19 @@ def create_category(request: Request, body: CategoryIn) -> dict:
         for key in ("template", "fields", "mono", "pixelate", "item_order"):
             new[key] = source[key]
         new["custom_css"] = body.custom_css or source["custom_css"]
+        new["custom_html"] = body.custom_html or source["custom_html"]
     else:
         _check(new)
         new["fields"] = layouts.TEMPLATE_INFO[body.template]["fields"]
     _check(new)
-    return store.create_category(new)
+    created = store.create_category(new)
+    if body.copy_from is not None:
+        for image in store.category_images(body.copy_from):
+            path = store.images / image["file"]
+            if path.is_file():
+                file = _save_image_bytes(store, path.read_bytes(), path.suffix)
+                store.create_category_image(created["id"], image["name"], file, image["crisp"])
+    return created
 
 
 @router.get("/api/categories/{category_id}")
@@ -274,6 +310,7 @@ def delete_category(request: Request, category_id: int) -> None:
     store = _store(request)
     category = _category_or_404(store, category_id)
     images = [name for item in store.items(category_id) for name in _item_images(category, item)]
+    images += [image["file"] for image in store.category_images(category_id)]
     store.delete_category(category_id)
     for name in images:
         _remove_image(store, name)
@@ -292,6 +329,72 @@ def preview_category(request: Request, category_id: int, body: PreviewIn, view: 
         items = store.items(category_id)
         item = items[0] if items else None
     return _png(render_item(store, category, item, changes), view)
+
+
+# Decoration images: uploaded once per category, used by its HTML and CSS.
+
+_IMAGE_NAME = re.compile(r"^[a-z][a-z0-9_]{0,39}$")
+
+
+def _image_name(text: str) -> str:
+    """A name usable as {{ images.<name> }} and var(--image-<name>)."""
+    return fieldlib.slug(text).replace("-", "_")
+
+
+def _category_image_or_404(store: db.Store, image_id: int) -> dict:
+    image = store.category_image(image_id)
+    if image is None:
+        raise HTTPException(404, "no such image")
+    return image
+
+
+@router.get("/api/categories/{category_id}/images")
+def list_category_images(request: Request, category_id: int) -> list[dict]:
+    store = _store(request)
+    _category_or_404(store, category_id)
+    return store.category_images(category_id)
+
+
+@router.post("/api/categories/{category_id}/images", status_code=201)
+def add_category_image(request: Request, category_id: int, file: UploadFile = File(...),
+                       name: str = Form("")) -> dict:
+    """Upload a decoration image. Its name comes from the file unless given.
+
+    PNG and GIF files usually hold graphics, so they start out crisp; JPEG
+    and WebP files are usually photos, so they start out dithered.
+    """
+    store = _store(request)
+    _category_or_404(store, category_id)
+    taken = {i["name"] for i in store.category_images(category_id)}
+    base = _image_name(name or Path(file.filename or "image").stem)
+    new, n = base, 2
+    while new in taken:
+        new = f"{base[:36]}_{n}"
+        n += 1
+    crisp = file.content_type in ("image/png", "image/gif")
+    return store.create_category_image(category_id, new, _save_image(store, file), crisp)
+
+
+@router.patch("/api/category-images/{image_id}")
+def update_category_image(request: Request, image_id: int, body: CategoryImagePatch) -> dict:
+    store = _store(request)
+    image = _category_image_or_404(store, image_id)
+    changes = body.model_dump(exclude_none=True)
+    if "name" in changes:
+        if not _IMAGE_NAME.match(changes["name"]):
+            raise HTTPException(422, "names use lowercase letters, digits and _, starting with a letter")
+        others = {i["name"] for i in store.category_images(image["category_id"]) if i["id"] != image_id}
+        if changes["name"] in others:
+            raise HTTPException(422, f"there is already an image called {changes['name']}")
+    return store.update_category_image(image_id, changes)
+
+
+@router.delete("/api/category-images/{image_id}", status_code=204)
+def delete_category_image(request: Request, image_id: int) -> None:
+    store = _store(request)
+    image = _category_image_or_404(store, image_id)
+    store.delete_category_image(image_id)
+    _remove_image(store, image["file"])
 
 
 # Items

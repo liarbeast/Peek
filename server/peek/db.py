@@ -87,6 +87,20 @@ MIGRATIONS = [
     ALTER TABLE category ADD COLUMN pixelate INTEGER NOT NULL DEFAULT 0;
     UPDATE category SET pixelate = 1 WHERE custom_css LIKE '%pixelated%';
     """,
+    # A category's own HTML (instead of Stack), and its decoration images:
+    # uploaded once per category, not per item.
+    """
+    ALTER TABLE category ADD COLUMN custom_html TEXT NOT NULL DEFAULT '';
+    CREATE TABLE category_image (
+        id INTEGER PRIMARY KEY,
+        category_id INTEGER NOT NULL REFERENCES category(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        file TEXT NOT NULL,
+        crisp INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (category_id, name)
+    );
+    """,
 ]
 
 # Frame-wide settings and their values until someone changes them.
@@ -180,12 +194,14 @@ class Store:
     def create_category(self, fields: dict) -> dict:
         with self.connect() as conn:
             cur = conn.execute(
-                """INSERT INTO category (name, template, custom_css, item_order, weight, enabled, fields, mono, pixelate)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                """INSERT INTO category (name, template, custom_css, custom_html, item_order, weight, enabled,
+                                         fields, mono, pixelate)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     fields["name"],
                     fields["template"],
                     fields.get("custom_css", ""),
+                    fields.get("custom_html", ""),
                     fields.get("item_order", "in_order"),
                     fields.get("weight", 1),
                     int(fields.get("enabled", True)),
@@ -198,7 +214,7 @@ class Store:
         return self.category(new_id)
 
     def update_category(self, category_id: int, fields: dict) -> dict | None:
-        allowed = ("name", "template", "custom_css", "item_order", "weight", "enabled", "fields", "mono", "pixelate")
+        allowed = ("name", "template", "custom_css", "custom_html", "item_order", "weight", "enabled", "fields", "mono", "pixelate")
         changes = {k: _column(k, v) for k, v in fields.items() if k in allowed}
         if changes:
             sets = ", ".join(f"{k} = ?" for k in changes)
@@ -209,6 +225,41 @@ class Store:
     def delete_category(self, category_id: int) -> None:
         with self.connect() as conn:
             conn.execute("DELETE FROM category WHERE id = ?", (category_id,))
+
+    # Decoration images
+
+    def category_images(self, category_id: int) -> list[dict]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM category_image WHERE category_id = ? ORDER BY name", (category_id,)
+            ).fetchall()
+        return [_category_image(r) for r in rows]
+
+    def category_image(self, image_id: int) -> dict | None:
+        with self.connect() as conn:
+            row = conn.execute("SELECT * FROM category_image WHERE id = ?", (image_id,)).fetchone()
+        return _category_image(row) if row else None
+
+    def create_category_image(self, category_id: int, name: str, file: str, crisp: bool) -> dict:
+        with self.connect() as conn:
+            cur = conn.execute(
+                "INSERT INTO category_image (category_id, name, file, crisp) VALUES (?, ?, ?, ?)",
+                (category_id, name, file, int(crisp)),
+            )
+            new_id = cur.lastrowid
+        return self.category_image(new_id)
+
+    def update_category_image(self, image_id: int, fields: dict) -> dict | None:
+        changes = {k: int(v) if k == "crisp" else v for k, v in fields.items() if k in ("name", "crisp")}
+        if changes:
+            sets = ", ".join(f"{k} = ?" for k in changes)
+            with self.connect() as conn:
+                conn.execute(f"UPDATE category_image SET {sets} WHERE id = ?", (*changes.values(), image_id))
+        return self.category_image(image_id)
+
+    def delete_category_image(self, image_id: int) -> None:
+        with self.connect() as conn:
+            conn.execute("DELETE FROM category_image WHERE id = ?", (image_id,))
 
     # Items
 
@@ -280,6 +331,12 @@ def _category(row: sqlite3.Row) -> dict:
     d["mono"] = bool(d["mono"])
     d["pixelate"] = bool(d["pixelate"])
     d["fields"] = json.loads(d["fields"])
+    return d
+
+
+def _category_image(row: sqlite3.Row) -> dict:
+    d = dict(row)
+    d["crisp"] = bool(d["crisp"])
     return d
 
 

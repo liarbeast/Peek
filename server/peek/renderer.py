@@ -11,6 +11,10 @@ times with every photo painted pure white and then pure black. Pixels that
 change between those two shots are photo pixels that nothing covers. In
 black and white, pixel art is found the same way, so its shades can become
 an even dither pattern instead of collapsing to black or white.
+
+Pages can't reach the network. A category's decoration images are served to
+the page by the renderer itself, and each says whether it is crisp (drawn
+with hard edges, not dithered, like pixel art) or a photo.
 """
 
 from __future__ import annotations
@@ -39,6 +43,35 @@ for (const img of document.querySelectorAll("img:not([data-peek])")) {
 }
 """
 
+# Before the first screenshot: crisp decoration images get hard edges, wherever
+# they are used (an <img> or a CSS background), and are kept out of dithering.
+# Photo backgrounds count as photos, but only on elements with nothing inside
+# them, since painting an element for the photo mask paints its contents too.
+_MARK_DECORATIONS = """
+([crisp, photos]) => {
+  const uses = (el, urls) => {
+    const bg = getComputedStyle(el).backgroundImage;
+    return bg !== "none" && urls.some((u) => bg.includes(u));
+  };
+  for (const el of document.querySelectorAll("body, body *")) {
+    if (el.tagName === "IMG" && crisp.includes(el.src)) {
+      el.style.imageRendering = "pixelated";
+      el.dataset.peek = "pixel";
+    } else if (uses(el, crisp)) {
+      el.style.imageRendering = "pixelated";
+    } else if (uses(el, photos) && !el.children.length && !el.textContent.trim()) {
+      el.dataset.peek = "photo";
+    }
+  }
+}
+"""
+
+# Tailwind writes its stylesheet a moment after the page loads.
+_TAILWIND_READY = """
+() => !document.querySelector('script[nonce]') ||
+  [...document.querySelectorAll("style:not([type])")].some((s) => s.textContent.includes("tailwindcss v4"))
+"""
+
 # A pixel counts as photo when painting the photos white versus black moves
 # it by more than this much (0-255, summed over RGB / 3).
 _MASK_THRESHOLD = 96
@@ -56,6 +89,15 @@ def canvas_size(orientation: str) -> tuple[int, int]:
     if ORIENTATIONS[orientation] % 2:
         return palette.HEIGHT, palette.WIDTH
     return palette.WIDTH, palette.HEIGHT
+
+
+@dataclass
+class Resource:
+    """A file the page may load, such as a decoration image."""
+
+    data: bytes
+    mime: str
+    crisp: bool = False
 
 
 @dataclass
@@ -99,9 +141,11 @@ def _mask(page, selector: str) -> np.ndarray:
 
 
 def screenshot(html: str, size: tuple[int, int] = (palette.WIDTH, palette.HEIGHT),
-               find_pixel_art: bool = False) -> tuple[Image.Image, np.ndarray, np.ndarray]:
+               find_pixel_art: bool = False,
+               resources: dict[str, Resource] | None = None) -> tuple[Image.Image, np.ndarray, np.ndarray]:
     """Return the page as drawn plus boolean masks of visible photo pixels and,
-    if asked for, pixel-art pixels."""
+    if asked for, pixel-art pixels. `resources` are the only URLs it may load."""
+    resources = resources or {}
     width, height = size
     launch = {"args": ["--disable-dev-shm-usage"]}
     if path := os.environ.get("PEEK_CHROMIUM_PATH"):
@@ -113,8 +157,14 @@ def screenshot(html: str, size: tuple[int, int] = (palette.WIDTH, palette.HEIGHT
                 viewport={"width": width, "height": height},
                 device_scale_factor=1,
             )
+            page.route("**/*", lambda route: _serve(route, resources))
             page.set_content(html, wait_until="load")
+            page.wait_for_function(_TAILWIND_READY, timeout=10_000)
             page.evaluate("document.fonts.ready")
+            if resources:
+                crisp = [url for url, r in resources.items() if r.crisp]
+                photos = [url for url, r in resources.items() if not r.crisp]
+                page.evaluate(_MARK_DECORATIONS, [crisp, photos])
             raw = _shot(page)
 
             # Images that CSS draws pixelated are pixel art, not photos.
@@ -126,6 +176,13 @@ def screenshot(html: str, size: tuple[int, int] = (palette.WIDTH, palette.HEIGHT
         finally:
             browser.close()
     return raw, *masks
+
+
+def _serve(route, resources: dict[str, Resource]) -> None:
+    if (resource := resources.get(route.request.url)) is not None:
+        route.fulfill(body=resource.data, content_type=resource.mime)
+    else:
+        route.abort()
 
 
 def reduce(raw: Image.Image, photo_mask: np.ndarray, mono: bool = False,
@@ -141,7 +198,8 @@ def reduce(raw: Image.Image, photo_mask: np.ndarray, mono: bool = False,
     return idx
 
 
-def render(html: str, orientation: str = "landscape", mono: bool = False) -> Render:
+def render(html: str, orientation: str = "landscape", mono: bool = False,
+           resources: dict[str, Resource] | None = None) -> Render:
     """Render a page; ``mono`` draws it in black and white only."""
-    raw, photos, pixel_art = screenshot(html, canvas_size(orientation), find_pixel_art=mono)
+    raw, photos, pixel_art = screenshot(html, canvas_size(orientation), find_pixel_art=mono, resources=resources)
     return Render(raw=raw, indices=reduce(raw, photos, mono, pixel_art), orientation=orientation)

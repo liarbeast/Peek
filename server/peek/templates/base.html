@@ -2,22 +2,47 @@
 <html>
 <head>
 <meta charset="utf-8">
+{# Only Peek's own scripts run, and nothing loads from the network: images
+   arrive as data URIs or from Peek itself while rendering. #}
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-{{ nonce }}'; style-src 'unsafe-inline'; img-src data: {{ image_origin }}; font-src data:">
 <style>
-  /* The six panel colours, for use in templates and custom CSS. */
+  /* In a layer, so Tailwind classes and custom CSS always win over it. */
+  @layer peek {
+    /* The six panel colours, for use in templates and custom CSS. */
+    :root {
+      --black: #000; --white: #fff; --yellow: #ff0;
+      --red: #f00; --blue: #00f; --green: #0f0;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: {{ width }}px; height: {{ height }}px; overflow: hidden;
+      background: var(--white); color: var(--black);
+      font-family: "DejaVu Sans", "Liberation Sans", Arial, sans-serif;
+      -webkit-font-smoothing: none;
+    }
+    .type-text { white-space: pre-line; }
+  }
+  {% if images %}
+  /* The category's decoration images, e.g. background: var(--image-frame). */
   :root {
-    --black: #000; --white: #fff; --yellow: #ff0;
-    --red: #f00; --blue: #00f; --green: #0f0;
+    {% for name, url in images.items() %}--image-{{ name }}: url("{{ url }}");
+    {% endfor %}
   }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body {
-    width: {{ width }}px; height: {{ height }}px; overflow: hidden;
-    background: var(--white); color: var(--black);
-    font-family: "DejaVu Sans", "Liberation Sans", Arial, sans-serif;
-    -webkit-font-smoothing: none;
-  }
-  .type-text { white-space: pre-line; }
+  {% endif %}
   {% block style %}{% endblock %}
 </style>
+{% if tailwind %}
+<style type="text/tailwindcss">
+  /* Only the panel's colours, and the frame's font. */
+  @theme {
+    --color-*: initial;
+    --color-black: #000; --color-white: #fff; --color-yellow: #ff0;
+    --color-red: #f00; --color-blue: #00f; --color-green: #0f0;
+    --font-sans: "DejaVu Sans", "Liberation Sans", Arial, sans-serif;
+  }
+</style>
+<script nonce="{{ nonce }}">{{ tailwind | safe }}</script>
+{% endif %}
 {% if custom_css %}<style>{{ custom_css | safe }}</style>{% endif %}
 </head>
 <body>{% block body %}{% endblock %}</body>

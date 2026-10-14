@@ -38,9 +38,18 @@ export function TextInput(props: {
   autoFocus?: boolean;
   // Keep the label for screen readers only, e.g. inside a table row.
   hideLabel?: boolean;
+  // Called when typing is done: on Enter (single line only) or leaving the field.
+  onCommit?: () => void;
 }) {
   return (
-    <TextField value={props.value} onChange={props.onChange} autoFocus={props.autoFocus} fullWidth>
+    <TextField
+      value={props.value}
+      onChange={props.onChange}
+      autoFocus={props.autoFocus}
+      onBlur={props.onCommit}
+      onKeyDown={(e) => !props.multiline && e.key === "Enter" && props.onCommit?.()}
+      fullWidth
+    >
       <Label className={props.hideLabel ? "sr-only" : undefined}>{props.label}</Label>
       {props.multiline ? (
         <TextArea variant="secondary" placeholder={props.placeholder} rows={2} />

@@ -41,11 +41,22 @@ Items store one value per field. A CSV file can fill a category: each row become
 fields by name or added as new fields, and image columns hold URLs that Peek downloads. Comma, semicolon and tab
 separated files all work.
 
-## Styling with CSS
+## Styling: HTML, CSS and Tailwind
 
-Every item is drawn by one layout, Stack (`server/peek/templates/stack.html`): each field in order, centred, inside
-`.stack`. Every field's element has the classes `field field-<key> type-<type>`, so a category's custom CSS can style,
-move or hide any field; the layout's own rules never outweigh it.
+By default every item is drawn by one layout, Stack (`server/peek/templates/stack.html`): each field in order, centred,
+inside `.stack`. Every field's element has the classes `field field-<key> type-<type>`, so a category's custom CSS can
+style, move or hide any field; the layout's own rules never outweigh it.
+
+A category can bring its own HTML instead. It is a [Jinja](https://jinja.palletsprojects.com/) template: `{{ title }}`
+puts in a field's value (escaped), `<img src="{{ image }}">` an image field, and `{% if subtitle %}…{% endif %}` shows a
+part only when the item has that value. Tailwind classes work in it (Tailwind 4's browser build ships with Peek, so no
+build step or internet is needed), with the panel's six colours as its only colours: `bg-red`, `text-blue` and so on.
+Templates run sandboxed, scripts in them don't run, and a page can't load anything from the network.
+
+Each category can also have decoration images, such as a frame or a background, uploaded once rather than per item.
+Use them as `{{ images.<name> }}` in HTML or `var(--image-<name>)` in CSS. A crisp one is drawn with hard edges and solid
+panel colours, like pixel art; otherwise it is dithered like a photo (a photo used as a CSS background only on an
+element with nothing inside it, since everything inside would be dithered with it).
 
 Pages are rendered in headless Chromium at 800x480, or at 480x800 when Settings says the frame hangs in portrait; the
 panel always gets 800x480, turned to match. CSS can target portrait with `@media (orientation: portrait)` and use the

@@ -34,6 +34,8 @@ export interface Category {
   name: string;
   template: string;
   custom_css: string;
+  // The category's own HTML; empty means the standard Stack layout.
+  custom_html: string;
   item_order: ItemOrder;
   weight: number;
   enabled: boolean;
@@ -42,6 +44,15 @@ export interface Category {
   fields: Field[];
   item_count: number;
   cover: string | null;
+}
+
+// A decoration image: uploaded once per category, used by its HTML and CSS.
+export interface CategoryImage {
+  id: number;
+  category_id: number;
+  name: string;
+  file: string;
+  crisp: boolean;
 }
 
 export interface Item {
@@ -66,6 +77,7 @@ export type ImportTarget = { field: string } | { new: { label: string; type: Fie
 export interface StyleChanges {
   template?: string;
   custom_css?: string;
+  custom_html?: string;
   mono?: boolean;
   pixelate?: boolean;
   item_id?: number;
@@ -128,6 +140,16 @@ export const api = {
 
   previewCategory: (id: number, body: StyleChanges) =>
     request<Blob>(`/api/categories/${id}/preview.png`, json("POST", body)),
+
+  categoryImages: (categoryId: number) => request<CategoryImage[]>(`/api/categories/${categoryId}/images`),
+  addCategoryImage: (categoryId: number, file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return request<CategoryImage>(`/api/categories/${categoryId}/images`, { method: "POST", body: form });
+  },
+  updateCategoryImage: (id: number, body: Partial<Pick<CategoryImage, "name" | "crisp">>) =>
+    request<CategoryImage>(`/api/category-images/${id}`, json("PATCH", body)),
+  deleteCategoryImage: (id: number) => request<void>(`/api/category-images/${id}`, { method: "DELETE" }),
 
   items: (categoryId: number) => request<Item[]>(`/api/categories/${categoryId}/items`),
   // Form fields: "data" (JSON of text values), "image:<key>" files.

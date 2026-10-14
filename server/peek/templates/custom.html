@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block style %}
+  {% if pixelate %}
+  /* Crisp images: item images (data URIs) keep hard edges when resized. */
+  img[src^="data:"] { image-rendering: pixelated; }
+  {% endif %}
+{% endblock %}
+{% block body %}{{ body | safe }}{% endblock %}
