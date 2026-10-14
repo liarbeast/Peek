@@ -91,14 +91,45 @@ export function FieldBoxes(props: {
     return { ...box, y: height === null ? above.y : above.y + height + (box.gap ?? 0) };
   };
 
-  // Saves a box; for an attached field, its new position becomes its new gap.
-  const place = (key: string, box: Box) => {
-    if (box.below) {
-      const above = shown(box.below);
-      const height = contentHeight(box.below);
-      if (above && height !== null) box = { ...box, gap: Math.round(box.y - (above.y + height)) };
+  // Saves boxes; for an attached field, its new position becomes its new gap.
+  const placeAll = (boxes: Record<string, Box>) => {
+    const next = { ...placed };
+    for (let [key, box] of Object.entries(boxes)) {
+      if (box.below) {
+        const above = shown(box.below);
+        const height = contentHeight(box.below);
+        if (above && height !== null) box = { ...box, gap: Math.round(box.y - (above.y + height)) };
+      }
+      next[key] = box;
     }
-    props.onChange({ ...placed, [key]: box });
+    props.onChange(next);
+  };
+  const place = (key: string, box: Box) => placeAll({ [key]: box });
+
+  // Shift-click picks several fields, to move together; the toolbar is for one at a time.
+  const [group, setGroup] = useState<string[]>([]);
+  const chosen = group.length > 1 ? group : props.selected ? [props.selected] : [];
+  const clear = () => {
+    setGroup([]);
+    props.onSelect(null);
+  };
+
+  // Moves the chosen fields by (dx, dy), kept on the canvas as one block.
+  // A field attached to another that moves too just follows it.
+  const shift = (starts: Record<string, Box>, dx: number, dy: number) => {
+    const boxes = Object.values(starts);
+    const left = Math.min(...boxes.map((b) => b.x));
+    const top = Math.min(...boxes.map((b) => b.y));
+    const right = Math.max(...boxes.map((b) => b.x + b.w));
+    const bottom = Math.max(...boxes.map((b) => b.y + b.h));
+    dx = clamp(dx, -left, canvas.width - right);
+    dy = clamp(dy, -top, canvas.height - bottom);
+    const moved: Record<string, Box> = {};
+    for (const [key, box] of Object.entries(starts)) {
+      if (box.below && starts[box.below]) moved[key] = { ...box, x: box.x + dx };
+      else moved[key] = { ...box, x: box.x + dx, y: box.y + dy };
+    }
+    placeAll(moved);
   };
 
   // What `key` can be attached below: anything else that isn't (by way of
@@ -130,14 +161,26 @@ export function FieldBoxes(props: {
     e.stopPropagation();
     // preventDefault keeps the browser from focusing the box, which the arrow keys need.
     (e.currentTarget as HTMLElement).closest<HTMLElement>("[data-box]")?.focus({ preventScroll: true });
-    props.onSelect(key);
+    let members = [key];
+    if (mode === "move" && e.shiftKey) {
+      members = chosen.includes(key) ? chosen.filter((k) => k !== key) : [...chosen, key];
+      setGroup(members.length > 1 ? members : []);
+      props.onSelect(members.at(-1) ?? null);
+      if (!members.includes(key)) return;
+    } else if (mode === "move" && group.length > 1 && group.includes(key)) {
+      members = group;
+    } else {
+      setGroup([]);
+      props.onSelect(key);
+    }
+    const starts = Object.fromEntries(members.flatMap((k) => (shown(k) ? [[k, shown(k)!]] : [])));
     const target = e.currentTarget as HTMLElement;
     target.setPointerCapture(e.pointerId);
     const [x0, y0] = [e.clientX, e.clientY];
     setDragging(true);
 
     // Guide lines: the canvas edges and centre, and the edges and centres of the other fields.
-    const others = props.fields.filter((f) => f.key !== key).flatMap((f) => shown(f.key) ?? []);
+    const others = props.fields.filter((f) => !members.includes(f.key)).flatMap((f) => shown(f.key) ?? []);
     const xs = [0, canvas.width / 2, canvas.width, ...others.flatMap((b) => [b.x, b.x + b.w / 2, b.x + b.w])];
     const ys = [0, canvas.height / 2, canvas.height, ...others.flatMap((b) => [b.y, b.y + b.h / 2, b.y + b.h])];
 
@@ -149,11 +192,7 @@ export function FieldBoxes(props: {
         const sx = snapAxis(start.x + dx, start.w, xs, reach);
         const sy = snapAxis(start.y + dy, start.h, ys, reach);
         setGuides({ x: sx.guide, y: sy.guide });
-        place(key, {
-          ...start,
-          x: clamp(sx.pos, 0, canvas.width - start.w),
-          y: clamp(sy.pos, 0, canvas.height - start.h),
-        });
+        shift(starts, sx.pos - start.x, sy.pos - start.y);
       } else if (mode === "scale") {
         // The corner scales an image, keeping its shape.
         const most = Math.min((canvas.width - start.x) / start.w, (canvas.height - start.y) / start.h);
@@ -181,23 +220,20 @@ export function FieldBoxes(props: {
     target.addEventListener("pointercancel", end);
   };
 
-  // Arrow keys nudge the selected field by a pixel, or ten with Shift; Escape lets go of it.
+  // Arrow keys nudge the selected fields by a pixel, or ten with Shift; Escape lets go of them.
   const nudge = (e: React.KeyboardEvent, key: string) => {
     if (e.key === "Escape") {
       (e.currentTarget as HTMLElement).blur();
-      props.onSelect(null);
+      clear();
       return;
     }
     const delta = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
-    const box = shown(key);
-    if (!delta || !box) return;
+    const members = chosen.includes(key) ? chosen : [key];
+    const starts = Object.fromEntries(members.flatMap((k) => (shown(k) ? [[k, shown(k)!]] : [])));
+    if (!delta || !starts[key]) return;
     e.preventDefault();
     const step = e.shiftKey ? 10 : 1;
-    place(key, {
-      ...box,
-      x: clamp(box.x + delta[0] * step, 0, canvas.width - box.w),
-      y: clamp(box.y + delta[1] * step, 0, canvas.height - box.h),
-    });
+    shift(starts, delta[0] * step, delta[1] * step);
   };
 
   // The selected field's options, under its box (or above it, near the bottom),
@@ -242,11 +278,11 @@ export function FieldBoxes(props: {
 
   const handle = "absolute rounded-sm";
   return (
-    <div ref={ref} className="absolute inset-0 touch-none" onPointerDown={() => props.onSelect(null)}>
+    <div ref={ref} className="absolute inset-0 touch-none" onPointerDown={clear}>
       {order.map(({ field }) => {
         const box = shown(field.key);
         if (!box) return null;
-        const selected = props.selected === field.key;
+        const selected = chosen.includes(field.key);
         return (
           <div
             key={field.key}
@@ -256,7 +292,11 @@ export function FieldBoxes(props: {
             aria-label={`${field.label}: drag to move`}
             onPointerDown={(e) => startDrag(e, field, "move")}
             onKeyDown={(e) => nudge(e, field.key)}
-            onFocus={() => props.onSelect(field.key)}
+            onFocus={() => {
+              if (chosen.includes(field.key)) return;
+              setGroup([]);
+              props.onSelect(field.key);
+            }}
             className={`group absolute cursor-move outline-none ${selected ? "z-10" : ""}`}
             style={{
               left: box.x * scale,
@@ -278,7 +318,7 @@ export function FieldBoxes(props: {
             >
               {field.label}
             </span>
-            {selected && (
+            {selected && group.length < 2 && (
               <>
                 {field.type === "text" ? (
                   <span
@@ -302,7 +342,7 @@ export function FieldBoxes(props: {
           </div>
         );
       })}
-      {props.selected && !dragging && toolbar(props.selected)}
+      {props.selected && group.length < 2 && !dragging && toolbar(props.selected)}
       {guides.x !== null && (
         <div className="pointer-events-none absolute inset-y-0 w-px" style={{ left: guides.x * scale, background: "var(--danger)" }} />
       )}
