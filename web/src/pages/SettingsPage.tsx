@@ -1,6 +1,6 @@
 import { toast } from "@heroui/react";
 import { useState } from "react";
-import { api, type Orientation, type Refresh, type Settings } from "../api";
+import { api, type Orientation, type Refresh, type Settings, type Switch } from "../api";
 import { PanelImage } from "../components/PanelImage";
 import { Choice } from "../components/ui";
 import { Label, Radio, RadioGroup } from "react-aria-components";
@@ -19,6 +19,16 @@ const REFRESHES: { id: Refresh; label: string }[] = [
   { id: "12h", label: "Every 12 hours" },
   { id: "1d", label: "Every day, at midnight" },
   { id: "1w", label: "Every week, on Monday at midnight" },
+];
+
+const SWITCHES: { id: Switch; label: string }[] = [
+  { id: "30m", label: "Every 30 minutes" },
+  { id: "1h", label: "Every hour" },
+  { id: "8h", label: "Every 8 hours" },
+  { id: "1d", label: "Every day, at midnight" },
+  { id: "1w", label: "Every week, on Monday at midnight" },
+  { id: "finished", label: "Once a collection is finished" },
+  { id: "1mo", label: "Every month, on the 1st at midnight" },
 ];
 
 export function SettingsPage({ settings, onChange }: { settings: Settings; onChange: (s: Settings) => void }) {
@@ -104,11 +114,12 @@ export function SettingsPage({ settings, onChange }: { settings: Settings; onCha
               label="Switch collection"
               value={settings.switch}
               onChange={(s) => update({ switch: s })}
-              options={REFRESHES}
+              options={SWITCHES}
             />
             <p className="text-sm text-muted">
-              How often the frame moves on to the next active collection, on its first wake after this time. Set it
-              to the same as Refresh, or shorter, to change collection on every wake.
+              How often the frame moves on to the next active collection, on its first wake after this time.
+              “Finished” moves on once every item of the collection has been shown. Set it to the same as Refresh,
+              or shorter, to change collection on every wake.
             </p>
           </div>
         </div>

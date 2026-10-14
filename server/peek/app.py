@@ -53,7 +53,8 @@ def create_app(data_dir: Path) -> FastAPI:
         now = datetime.now() + schedule.EARLY_WAKE
         settings = store.settings()
         return {"refresh_period": schedule.period_start(settings["refresh"], now).isoformat(),
-                "switch_period": schedule.period_start(settings["switch"], now).isoformat()}
+                "switch_period": "finished" if settings["switch"] == "finished"
+                else schedule.period_start(settings["switch"], now).isoformat()}
 
     def set_current(render: renderer.Render, source: dict | None = None) -> None:
         """Make this what the frame shows until the next refresh."""
@@ -74,10 +75,15 @@ def create_app(data_dir: Path) -> FastAPI:
             return
         shown = store.item(source["item_id"]) if "item_id" in source else None
         switch = source.get("switch_period") != now["switch_period"]
-        item = schedule.next_item(store, shown and shown["category_id"], switch)
+        lap = source.get("lap", 1) if now["switch_period"] == "finished" else None
+        item = schedule.next_item(store, shown and shown["category_id"], switch, lap)
         if item:
             store.mark_shown(item["id"])
-            set_current(content.render_item(store, store.category(item["category_id"]), item), {"item_id": item["id"]})
+            # How many items of this category the frame has shown in a row (a
+            # shown item without a count is the first).
+            lap = source.get("lap", 1) + 1 if shown and shown["category_id"] == item["category_id"] else 1
+            set_current(content.render_item(store, store.category(item["category_id"]), item),
+                        {"item_id": item["id"], "lap": lap})
         elif not current.exists():
             set_current(_welcome_render(content.orientation(store)), {"welcome": True})
 
