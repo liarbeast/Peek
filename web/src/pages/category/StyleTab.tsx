@@ -139,7 +139,7 @@ export function StyleTab(props: {
         <p className="text-sm text-muted">Drag to move, click to style.</p>
       </div>
 
-      <aside className="flex flex-[1_1_220px] flex-col gap-6 sm:max-w-64">
+      <aside className="flex flex-[1_1_260px] flex-col gap-6 sm:max-w-72">
         {items.length > 0 && (
           <Choice
             label="Preview with"
@@ -198,7 +198,7 @@ function Filter(props: { label: string; description: string; isSelected: boolean
   return (
     <div className="flex flex-col gap-0.5">
       <Toggle label={props.label} isSelected={props.isSelected} onChange={props.onChange} />
-      <p className="pl-12 text-sm text-muted">{props.description}</p>
+      <p className="pl-13 text-sm text-muted">{props.description}</p>
     </div>
   );
 }
