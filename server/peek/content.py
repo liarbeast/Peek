@@ -34,7 +34,8 @@ class Box(BaseModel):
     y: int = Field(ge=-800, le=800)
     w: int = Field(ge=8, le=800)
     h: int = Field(ge=8, le=800)
-    # Text size in pixels; long text shrinks below it to fit the box.
+    # Text size in pixels. A text box is as tall as its lines, so `h` only
+    # applies to images.
     size: int | None = Field(default=None, ge=6, le=400)
     align: Literal["left", "center", "right"] | None = None
     valign: Literal["top", "middle", "bottom"] | None = None

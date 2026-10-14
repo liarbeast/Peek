@@ -1,11 +1,13 @@
 import { Button, Dropdown, ToggleButton, ToggleButtonGroup } from "@heroui/react";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { Box, Field } from "../../api";
 
-// The selected field's options, shown next to its box: alignment, front to
-// back order, linking it below another field, and putting it back in the stack.
+// The selected field's options, shown next to its box: alignment, text size,
+// front to back order, linking it below another field, and putting it back
+// in the stack.
 export function FieldToolbar(props: {
   box: Box;
+  isText: boolean;
   isPlaced: boolean;
   linkable: Field[]; // fields it can be linked below without going round in a circle
   onChange: (changes: Partial<Box>) => void;
@@ -31,16 +33,20 @@ export function FieldToolbar(props: {
         ]}
         onChange={(align) => props.onChange({ align: align as Box["align"] })}
       />
-      <Segments
-        label="Vertical alignment"
-        value={box.valign ?? "middle"}
-        options={[
-          ["top", "Align top", <Bar key="t" y={5} />],
-          ["middle", "Align middle", <Bar key="m" y={8} />],
-          ["bottom", "Align bottom", <Bar key="b" y={11} />],
-        ]}
-        onChange={(valign) => props.onChange({ valign: valign as Box["valign"] })}
-      />
+      {props.isText ? (
+        <TextSize size={box.size} onChange={(size) => props.onChange({ size })} />
+      ) : (
+        <Segments
+          label="Vertical alignment"
+          value={box.valign ?? "middle"}
+          options={[
+            ["top", "Align top", <Bar key="t" y={5} />],
+            ["middle", "Align middle", <Bar key="m" y={8} />],
+            ["bottom", "Align bottom", <Bar key="b" y={11} />],
+          ]}
+          onChange={(valign) => props.onChange({ valign: valign as Box["valign"] })}
+        />
+      )}
       <IconButton label="Bring to front" onPress={props.onFront}>
         <Layers front />
       </IconButton>
@@ -81,6 +87,31 @@ export function FieldToolbar(props: {
         </IconButton>
       )}
     </div>
+  );
+}
+
+// Text size in pixels; applied as you type once it is a size the panel can draw.
+function TextSize(props: { size?: number; onChange: (size: number) => void }) {
+  const [text, setText] = useState(props.size ? String(props.size) : "");
+  return (
+    <label className="flex h-8 items-center gap-1 rounded-lg border border-border px-2 text-sm" title="Text size">
+      <span className="sr-only">Text size</span>
+      <input
+        type="number"
+        inputMode="numeric"
+        min={6}
+        max={400}
+        value={text}
+        onChange={(e) => {
+          setText(e.target.value);
+          const n = Number(e.target.value);
+          if (Number.isInteger(n) && n >= 6 && n <= 400) props.onChange(n);
+        }}
+        onBlur={() => setText(props.size ? String(props.size) : "")}
+        className="w-10 bg-transparent text-right outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+      />
+      <span className="text-muted">px</span>
+    </label>
   );
 }
 
