@@ -41,6 +41,7 @@ const SWITCHES: { id: Switch; label: string; description?: string; divider?: boo
 
 export function SettingsPage({ settings, onChange }: { settings: Settings; onChange: (s: Settings) => void }) {
   const [busy, setBusy] = useState(false);
+  const refreshMinutes = REFRESHES.find((r) => r.id === settings.refresh)?.minutes ?? 0;
 
   const update = async (patch: Partial<Settings>) => {
     setBusy(true);
@@ -73,7 +74,7 @@ export function SettingsPage({ settings, onChange }: { settings: Settings; onCha
             orientation="horizontal"
             className="flex flex-col gap-2"
           >
-            <Label className="text-sm font-medium">How the frame hangs</Label>
+            <Label className="text-sm font-medium">Orientation</Label>
             <div className="grid grid-cols-2 gap-3">
               {ORIENTATIONS.map((o) => (
                 <Radio
@@ -103,7 +104,6 @@ export function SettingsPage({ settings, onChange }: { settings: Settings; onCha
                 </Radio>
               ))}
             </div>
-            <p className="text-sm text-muted">Layouts are drawn upright for this, and the image is turned for the panel.</p>
           </RadioGroup>
           <div className="flex flex-col gap-1">
             <Choice
@@ -122,14 +122,15 @@ export function SettingsPage({ settings, onChange }: { settings: Settings; onCha
               label="Switch collection"
               value={settings.switch}
               onChange={(s) => update({ switch: s })}
-              options={SWITCHES.filter(
-                (s) => s.minutes >= (REFRESHES.find((r) => r.id === settings.refresh)?.minutes ?? 0),
-              )}
+              options={SWITCHES.map((s) => ({
+                ...s,
+                disabled: s.minutes < refreshMinutes ? "Shorter than Refresh: the frame doesn't wake that often" : undefined,
+              }))}
             />
             <p className="text-sm text-muted">
               How often the frame moves on to the next active collection, on its first wake after this time.
               “Finished” moves on once every item of the collection has been shown. Choices shorter than Refresh
-              are left out; pick the same as Refresh to change collection on every wake.
+              are greyed out; pick the same as Refresh to change collection on every wake.
             </p>
           </div>
         </div>
