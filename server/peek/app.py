@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
 
@@ -13,7 +14,7 @@ from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Res
 from fastapi.staticfiles import StaticFiles
 from PIL import Image
 
-from . import content, db, layouts, palette, renderer, samples
+from . import content, db, layouts, palette, renderer, samples, schedule
 
 STATIC = Path(__file__).parent / "static"
 # The built web app (see web/); absent when only the API is installed.
@@ -46,17 +47,49 @@ def create_app(data_dir: Path) -> FastAPI:
     current_preview = data_dir / "current-preview.png"
     current_source = data_dir / "current.json"
 
+    def periods() -> dict:
+        """The refresh and category periods the frame is in now (or is about
+        to be in, if it woke a little early); a new one means a new image."""
+        now = datetime.now() + schedule.EARLY_WAKE
+        settings = store.settings()
+        return {"refresh_period": schedule.period_start(settings["refresh"], now).isoformat(),
+                "switch_period": "finished" if settings["switch"] == "finished"
+                else schedule.period_start(settings["switch"], now).isoformat()}
+
     def set_current(render: renderer.Render, source: dict | None = None) -> None:
+        """Make this what the frame shows until the next refresh."""
         current.write_bytes(render.panel_png())
         current_preview.write_bytes(render.preview_png())
-        current_source.write_text(json.dumps(source or {}))
+        current_source.write_text(json.dumps({**periods(), **(source or {})}))
+
+    def read_source() -> dict:
+        try:
+            return json.loads(current_source.read_text())
+        except (OSError, ValueError):
+            return {}
+
+    def advance() -> None:
+        """Move on to the next item once a refresh period has passed."""
+        source, now = read_source(), periods()
+        if current.exists() and source.get("refresh_period") == now["refresh_period"]:
+            return
+        shown = store.item(source["item_id"]) if "item_id" in source else None
+        switch = source.get("switch_period") != now["switch_period"]
+        lap = source.get("lap", 1) if now["switch_period"] == "finished" else None
+        item = schedule.next_item(store, shown and shown["category_id"], switch, lap)
+        if item:
+            store.mark_shown(item["id"])
+            # How many items of this category the frame has shown in a row (a
+            # shown item without a count is the first).
+            lap = source.get("lap", 1) + 1 if shown and shown["category_id"] == item["category_id"] else 1
+            set_current(content.render_item(store, store.category(item["category_id"]), item),
+                        {"item_id": item["id"], "lap": lap})
+        elif not current.exists():
+            set_current(_welcome_render(content.orientation(store)), {"welcome": True})
 
     def refresh_current() -> None:
         """Redraw what the frame shows, e.g. in a new orientation."""
-        try:
-            source = json.loads(current_source.read_text())
-        except (OSError, ValueError):
-            source = {}
+        source = read_source()
         if "item_id" in source and (item := store.item(source["item_id"])):
             category = store.category(item["category_id"])
             set_current(content.render_item(store, category, item), source)
@@ -73,14 +106,13 @@ def create_app(data_dir: Path) -> FastAPI:
     @app.get("/frame.png")
     def frame_png() -> Response:
         """The image the frame downloads on each wake."""
-        if not current.exists():
-            set_current(_welcome_render(content.orientation(store)), {"welcome": True})
+        advance()
         return _image_response(current.read_bytes())
 
     @app.get("/frame/preview.png")
     def frame_preview() -> Response:
         """The current frame image, upright, in the panel's real colours."""
-        frame_png()  # make sure there is one
+        frame_png()  # make sure it's up to date
         if current_preview.exists():
             return _image_response(current_preview.read_bytes())
         idx = np.asarray(Image.open(current), dtype=np.uint8)
@@ -88,11 +120,12 @@ def create_app(data_dir: Path) -> FastAPI:
 
     @app.get("/api/sleep", response_class=PlainTextResponse)
     def sleep_seconds() -> str:
-        """How long the frame should sleep before its next wake, in seconds.
-
-        A fixed value for now; the scheduler (milestone 3) will compute it.
-        """
-        return os.environ.get("PEEK_SLEEP_SECONDS", "3600")
+        """How long the frame should sleep before its next wake, in seconds:
+        until the next refresh set in Settings. PEEK_SLEEP_SECONDS overrides
+        it, for testing a frame."""
+        if fixed := os.environ.get("PEEK_SLEEP_SECONDS"):
+            return fixed
+        return str(schedule.sleep_seconds(store.settings()["refresh"]))
 
     # The web app: static files, with index.html for every other page.
 

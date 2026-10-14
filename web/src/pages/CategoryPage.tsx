@@ -30,7 +30,7 @@ export function CategoryPage({ id, tab, templates }: { id: number; tab: Category
     <div className="flex flex-col gap-6">
       <div>
         <a href="#/" className="text-sm text-muted hover:underline">
-          ← Categories
+          ← Collections
         </a>
         <div className="mt-1 flex flex-wrap items-center gap-3">
           <h1 className="text-2xl font-semibold">{category.name}</h1>
@@ -44,7 +44,7 @@ export function CategoryPage({ id, tab, templates }: { id: number; tab: Category
 
       <Tabs selectedKey={tab} onSelectionChange={(key) => go(`#/categories/${id}/${key}`)}>
         <Tabs.ListContainer>
-          <Tabs.List aria-label="Category sections">
+          <Tabs.List aria-label="Collection sections">
             <Tabs.Tab id="items">
               Items
               <Tabs.Indicator />
