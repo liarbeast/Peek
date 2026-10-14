@@ -60,9 +60,10 @@ separated files all work.
 
 ## Data sources
 
-A collection can fill itself from a web address that returns JSON, set at the bottom of its Settings tab. The address
-may hold `{YYYY}`, `{MM}` and `{DD}` for today's date. "List of entries" is where the entries sit in the response, and
-each field says which value of an entry it takes, both as dotted paths (`selected`, `pages.0.thumbnail.source`). Every
+A collection can fill itself from a web address that returns JSON: "Connect data source" on its Items tab. The address
+may hold `{YYYY}`, `{MM}` and `{DD}` for today's date. "Look at response" fetches it, finds the lists of entries in it,
+and offers every value in an entry (with an example) to pick for each field. They're stored as dotted paths
+(`selected`, `pages.0.thumbnail.source`). While a source is connected, its items can't be edited by hand. Every
 day, on the frame's first wake, the entries replace the collection's items, and image addresses are downloaded. If the
 address can't be read, the old items stay and Peek tries again on the next wake.
 

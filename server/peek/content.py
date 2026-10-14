@@ -731,6 +731,29 @@ def sync_due(store: db.Store, day: date) -> None:
                 log.warning("%s: %s", category["name"], e)
 
 
+class InspectIn(BaseModel):
+    url: str
+    items: str | None = None  # None: pick the longest list
+
+
+@router.post("/api/sources/inspect")
+def inspect_source(body: InspectIn) -> dict:
+    """What an address returns, to set up a source by picking instead of
+    typing: the lists of entries in it, and the values in the first entry of
+    the chosen one ("" is the whole response, as one entry)."""
+    try:
+        data = sources.load(body.url.strip(), date.today())
+    except sources.SourceError as e:
+        raise HTTPException(502, str(e)) from e
+    lists = sources.lists(data)
+    items = body.items if body.items is not None else (lists[0]["path"] if lists else "")
+    found = sources.pick(data, items)
+    entry = found[0] if isinstance(found, list) and found else found
+    # Values at the top of an entry first: they're the likeliest picks.
+    values = sorted(sources.values(entry), key=lambda v: v["path"].count("."))
+    return {"lists": lists, "items": items, "values": values[:300]}
+
+
 @router.post("/api/categories/{category_id}/sync")
 def sync(request: Request, category_id: int) -> dict:
     """Fetch the category's source now."""
