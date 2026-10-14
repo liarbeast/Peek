@@ -109,8 +109,12 @@ export function StyleTab(props: {
   };
 
   return (
-    <div className="mb-8 flex flex-wrap items-center gap-x-8 gap-y-12">
-      <div className="relative min-w-0 flex-[999_1_560px]">
+    <div className="mb-8 flex flex-wrap items-center justify-center gap-x-16 gap-y-12">
+      <div
+        className={`relative min-w-0 ${
+          orientation === "portrait" ? "w-[min(100%,calc(70vh*0.6))] flex-none" : "flex-[999_1_560px]"
+        }`}
+      >
         <PanelImage
           alt="Preview of this style on the panel"
           load={() =>
@@ -136,7 +140,7 @@ export function StyleTab(props: {
             onImageDelete={deleteImage}
           />
         </PanelImage>
-        <p className="absolute top-full mt-2 text-sm text-muted">Drag to move, click to style.</p>
+        <p className="absolute inset-x-0 top-full mt-2 text-center text-sm text-muted">Drag to move, click to style.</p>
       </div>
 
       <aside className="flex flex-[1_1_260px] flex-col gap-6 sm:max-w-72">
