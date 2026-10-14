@@ -40,7 +40,7 @@ const SWITCHES: { id: Switch; label: string; description?: string; divider?: boo
 
 export function SettingsPage({ settings, onChange }: { settings: Settings; onChange: (s: Settings) => void }) {
   const [busy, setBusy] = useState(false);
-  const refreshMinutes = REFRESHES.find((r) => r.id === settings.refresh)?.minutes ?? 0;
+  const refresh = REFRESHES.find((r) => r.id === settings.refresh) ?? REFRESHES[0];
 
   const update = async (patch: Partial<Settings>) => {
     setBusy(true);
@@ -123,7 +123,10 @@ export function SettingsPage({ settings, onChange }: { settings: Settings; onCha
               onChange={(s) => update({ switch: s })}
               options={SWITCHES.map((s) => ({
                 ...s,
-                disabled: s.minutes < refreshMinutes ? "Shorter than Refresh" : undefined,
+                disabled:
+                  s.minutes < refresh.minutes
+                    ? `The frame only wakes ${refresh.label.charAt(0).toLowerCase()}${refresh.label.slice(1)} (see Refresh)`
+                    : undefined,
               }))}
             />
             <p className="text-sm text-muted">
