@@ -1,4 +1,4 @@
-import { Button, Chip, toast } from "@heroui/react";
+import { Button, toast } from "@heroui/react";
 import { Reorder, useDragControls } from "motion/react";
 import { useState } from "react";
 import { api, FIELD_TYPES, type Category, type FieldDraft, type FieldType } from "../../api";
@@ -50,8 +50,7 @@ export function FieldsTab(props: { category: Category; onSaved: (c: Category) =>
   return (
     <div className="flex max-w-3xl flex-col gap-4">
       <p className="text-muted">
-        Every item in this category has these fields. Each one gets its own CSS class, shown next to it, which you can
-        use on the Style tab. Renaming a field keeps its class.
+        Every item in this category has these fields. Place and style them on the Style tab.
       </p>
 
       {rows.length > 0 && (
@@ -143,9 +142,6 @@ function FieldRow(props: { row: Row; onChange: (change: Partial<Row>) => void; o
           options={FIELD_TYPES}
         />
       </div>
-      <Chip size="sm" variant="soft" className="w-36 justify-center">
-        <code className="truncate">{row.key ? `.field-${row.key}` : "new"}</code>
-      </Chip>
       <Button size="sm" variant="danger-soft" onPress={props.onRemove}>
         Remove
       </Button>
