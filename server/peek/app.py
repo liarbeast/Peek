@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Res
 from fastapi.staticfiles import StaticFiles
 from PIL import Image
 
-from . import content, db, layouts, palette, renderer, samples
+from . import content, db, layouts, palette, renderer, samples, schedule
 
 STATIC = Path(__file__).parent / "static"
 # The built web app (see web/); absent when only the API is installed.
@@ -88,11 +88,12 @@ def create_app(data_dir: Path) -> FastAPI:
 
     @app.get("/api/sleep", response_class=PlainTextResponse)
     def sleep_seconds() -> str:
-        """How long the frame should sleep before its next wake, in seconds.
-
-        A fixed value for now; the scheduler (milestone 3) will compute it.
-        """
-        return os.environ.get("PEEK_SLEEP_SECONDS", "3600")
+        """How long the frame should sleep before its next wake, in seconds:
+        until the next refresh set in Settings. PEEK_SLEEP_SECONDS overrides
+        it, for testing a frame."""
+        if fixed := os.environ.get("PEEK_SLEEP_SECONDS"):
+            return fixed
+        return str(schedule.sleep_seconds(store.settings()["refresh"]))
 
     # The web app: static files, with index.html for every other page.
 

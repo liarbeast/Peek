@@ -70,7 +70,7 @@ def test_frame_png_and_sleep(client):
     res = client.get("/frame.png")
     assert res.status_code == 200
     assert panel_colours(res.content) <= set(renderer.palette.PANEL)
-    assert client.get("/api/sleep").text == "3600"
+    assert 60 <= int(client.get("/api/sleep").text) <= 3600 + 60  # until the next hour
 
 
 def test_mono_uses_only_black_and_white():

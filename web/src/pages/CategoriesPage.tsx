@@ -41,8 +41,35 @@ export function CategoriesPage() {
         </Card>
       )}
 
+      {categories && categories.length > 0 && (
+        <CategoryGroup
+          title="Active"
+          empty="No active categories. Turn on “Show this category on the frame” in its Settings tab."
+          categories={categories.filter((c) => c.enabled)}
+        />
+      )}
+      {categories?.some((c) => !c.enabled) && (
+        <CategoryGroup title="Inactive" categories={categories.filter((c) => !c.enabled)} />
+      )}
+
+      <NewCategoryDialog
+        isOpen={creating}
+        onOpenChange={setCreating}
+        categories={categories ?? []}
+        onCreated={(c) => go(`#/categories/${c.id}`)}
+      />
+    </div>
+  );
+}
+
+// A heading and the categories under it, as cards.
+function CategoryGroup(props: { title: string; categories: Category[]; empty?: string }) {
+  return (
+    <section className="flex flex-col gap-3">
+      <h2 className="text-lg font-semibold">{props.title}</h2>
+      {props.categories.length === 0 && props.empty && <p className="text-muted">{props.empty}</p>}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {categories?.map((c) => (
+        {props.categories.map((c) => (
           <Card key={c.id} className="cursor-pointer transition hover:shadow-md" onClick={() => go(`#/categories/${c.id}`)}>
             <div className="aspect-[5/3] overflow-hidden rounded-lg bg-surface-secondary">
               {c.cover ? (
@@ -63,23 +90,11 @@ export function CategoriesPage() {
               <Chip size="sm">
                 {c.item_count} {c.item_count === 1 ? "item" : "items"}
               </Chip>
-              {!c.enabled && (
-                <Chip size="sm" color="warning">
-                  Off
-                </Chip>
-              )}
             </Card.Footer>
           </Card>
         ))}
       </div>
-
-      <NewCategoryDialog
-        isOpen={creating}
-        onOpenChange={setCreating}
-        categories={categories ?? []}
-        onCreated={(c) => go(`#/categories/${c.id}`)}
-      />
-    </div>
+    </section>
   );
 }
 
