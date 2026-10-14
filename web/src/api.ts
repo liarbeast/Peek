@@ -88,6 +88,16 @@ export interface Category {
   fields: Field[];
   item_count: number;
   cover: string | null;
+  source: Source | null;
+  synced: string | null; // the day the source was last read, YYYY-MM-DD
+}
+
+// Where a collection's items come from: a JSON address, read once a day.
+// `items` and each field's entry are dotted paths into the response.
+export interface Source {
+  url: string;
+  items: string;
+  fields: Record<string, string>;
 }
 
 // An image drawn the same for every item of a category, such as a frame.
@@ -182,6 +192,8 @@ export const api = {
     request<Category>("/api/categories", json("POST", body)),
   updateCategory: (id: number, body: Partial<Omit<Category, "fields">> & { fields?: FieldDraft[] }) =>
     request<Category>(`/api/categories/${id}`, json("PATCH", body)),
+  syncCategory: (id: number) =>
+    request<{ created: number; category: Category }>(`/api/categories/${id}/sync`, { method: "POST" }),
   deleteCategory: (id: number) => request<void>(`/api/categories/${id}`, { method: "DELETE" }),
 
   previewCategory: async (id: number, body: StyleChanges): Promise<Preview> => {

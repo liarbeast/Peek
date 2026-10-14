@@ -73,17 +73,21 @@ def create_app(data_dir: Path) -> FastAPI:
         source, now = read_source(), periods()
         if current.exists() and source.get("refresh_period") == now["refresh_period"]:
             return
-        shown = store.item(source["item_id"]) if "item_id" in source else None
+        content.sync_due(store, (datetime.now() + schedule.EARLY_WAKE).date())
+        # The category shown last; its item may be gone if a data source replaced it.
+        shown_category = source.get("category_id")
+        if shown_category is None and "item_id" in source:
+            shown_category = (store.item(source["item_id"]) or {}).get("category_id")
         switch = source.get("switch_period") != now["switch_period"]
         lap = source.get("lap", 1) if now["switch_period"] == "finished" else None
-        item = schedule.next_item(store, shown and shown["category_id"], switch, lap)
+        item = schedule.next_item(store, shown_category, switch, lap)
         if item:
             store.mark_shown(item["id"])
             # How many items of this category the frame has shown in a row (a
             # shown item without a count is the first).
-            lap = source.get("lap", 1) + 1 if shown and shown["category_id"] == item["category_id"] else 1
+            lap = source.get("lap", 1) + 1 if shown_category == item["category_id"] else 1
             set_current(content.render_item(store, store.category(item["category_id"]), item),
-                        {"item_id": item["id"], "lap": lap})
+                        {"item_id": item["id"], "category_id": item["category_id"], "lap": lap})
         elif not current.exists():
             set_current(_welcome_render(content.orientation(store)), {"welcome": True})
 

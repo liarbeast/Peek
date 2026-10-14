@@ -3,6 +3,7 @@ import { useState } from "react";
 import { api, type Category, type ItemOrder } from "../../api";
 import { Choice, Dialog, TextInput, Toggle } from "../../components/ui";
 import { go } from "../../router";
+import { SourceSection } from "./SourceSection";
 
 export const ORDERS: Array<{ id: ItemOrder; label: string; description: string }> = [
   { id: "in_order", label: "In order", description: "Top to bottom, then start again" },
@@ -45,6 +46,8 @@ export function SettingsTab({ category, onSaved }: { category: Category; onSaved
           Save settings
         </Button>
       </div>
+
+      <SourceSection category={category} onSaved={onSaved} />
 
       <div className="mt-6 border-t border-separator pt-6">
         <Button variant="danger-soft" onPress={() => setConfirming(true)}>
