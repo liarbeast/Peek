@@ -27,6 +27,7 @@ def test_entries_follow_the_paths():
         sources.entries({"x": 1}, {"items": "selected"})
     assert sources.url_for(SOURCE["url"], date(2026, 3, 4)) == "https://example.org/onthisday/03/04"
     assert 1 <= int(sources.url_for("{RANDOM:1-3}", date.today())) <= 3
+    assert 5 <= int(sources.url_for("{RANDOM:9-5}", date.today())) <= 9  # either way round
 
 
 def test_every_wake_fetches_and_keeps_known_entries(tmp_path, monkeypatch):

@@ -10,6 +10,14 @@ import {
 } from "../../api";
 import { Choice, Dialog, TextInput } from "../../components/ui";
 
+// What an address may hold (see server/peek/sources.py).
+const PLACEHOLDERS = [
+  ["{YYYY}", "this year, e.g. 2026"],
+  ["{MM}", "this month, 01 to 12"],
+  ["{DD}", "this day of the month, 01 to 31"],
+  ["{RANDOM:min-max}", "a random whole number from min to max"],
+];
+
 // Select can't hold an empty key, so "the whole response" uses this.
 const WHOLE = "-";
 
@@ -145,9 +153,17 @@ export function SourceDialog(props: {
           {looking ? "Looking…" : "Look at response"}
         </Button>
       </div>
-      <p className="-mt-2 text-xs text-muted">
-        {"{YYYY}, {MM} and {DD} are filled in with today's date; {RANDOM:1-1025} with a random number on each fetch."}
-      </p>
+      <div className="-mt-2 text-xs text-muted">
+        <p>Placeholders you can use in the address, filled in on every fetch:</p>
+        <ul className="mt-1 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
+          {PLACEHOLDERS.map(([code, meaning]) => (
+            <li key={code} className="contents">
+              <code className="font-mono text-foreground">{code}</code>
+              <span>{meaning}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
 
       {!inspection && (
         <p className="text-sm text-muted">
