@@ -109,85 +109,87 @@ export function StyleTab(props: {
   };
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-start gap-x-8 gap-y-3">
-        <Filter
-          label="Black and white"
-          description="Shades become dither patterns."
-          isSelected={mono}
-          onChange={setMono}
-        />
-        <Filter
-          label="Crisp images"
-          description="Solid colours, no smoothing: for pixel art, icons and QR codes."
-          isSelected={pixelate}
-          onChange={setPixelate}
-        />
+    <div className="flex flex-wrap items-start gap-8">
+      <div className="flex min-w-0 flex-[999_1_560px] flex-col gap-2">
+        <PanelImage
+          alt="Preview of this style on the panel"
+          load={() =>
+            api.previewCategory(category.id, {
+              mono,
+              pixelate,
+              positions: debouncedPositions,
+              item_id: previewItem ? Number(previewItem) : undefined,
+            })
+          }
+          deps={[mono, pixelate, previewItem, JSON.stringify(debouncedPositions), JSON.stringify(images)]}
+          onBoxes={setMeasured}
+        >
+          <FieldBoxes
+            canvas={canvas}
+            fields={layers}
+            measured={measured}
+            placed={placed}
+            onChange={setPlaced}
+            selected={selected}
+            onSelect={setSelected}
+            onImageChange={changeImage}
+            onImageDelete={deleteImage}
+          />
+        </PanelImage>
+        <p className="text-sm text-muted">Drag to move, click to style.</p>
+      </div>
+
+      <aside className="flex flex-[1_1_220px] flex-col gap-6 sm:max-w-64">
         {items.length > 0 && (
-          <div className="ml-auto w-full sm:w-64">
-            <Choice
-              label="Preview with"
-              value={previewItem}
-              onChange={setPreviewItem}
-              options={items.map((i) => ({ id: String(i.id), label: describeItem(category.fields, i).title }))}
-            />
-          </div>
+          <Choice
+            label="Preview with"
+            value={previewItem}
+            onChange={setPreviewItem}
+            options={items.map((i) => ({ id: String(i.id), label: describeItem(category.fields, i).title }))}
+          />
         )}
-      </div>
-
-      <PanelImage
-        alt="Preview of this style on the panel"
-        load={() =>
-          api.previewCategory(category.id, {
-            mono,
-            pixelate,
-            positions: debouncedPositions,
-            item_id: previewItem ? Number(previewItem) : undefined,
-          })
-        }
-        deps={[mono, pixelate, previewItem, JSON.stringify(debouncedPositions), JSON.stringify(images)]}
-        onBoxes={setMeasured}
-      >
-        <FieldBoxes
-          canvas={canvas}
-          fields={layers}
-          measured={measured}
-          placed={placed}
-          onChange={setPlaced}
-          selected={selected}
-          onSelect={setSelected}
-          onImageChange={changeImage}
-          onImageDelete={deleteImage}
-        />
-      </PanelImage>
-      <p className="text-sm text-muted">Drag to move, click to style.</p>
-
-      <div className="flex flex-wrap gap-2">
-        <Button isDisabled={!dirty || busy} onPress={save}>
-          Save style
-        </Button>
-        <Button variant="tertiary" isDisabled={!dirty} onPress={undo}>
-          Undo changes
-        </Button>
-        <div className="flex-1" />
-        <input
-          ref={upload}
-          type="file"
-          accept="image/png,image/jpeg,image/gif,image/webp"
-          className="hidden"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) addImage(file);
-            e.target.value = "";
-          }}
-        />
-        <Button variant="tertiary" onPress={() => upload.current?.click()}>
-          Add image
-        </Button>
-        <Button variant="tertiary" onPress={() => setPlaced(category.default_positions[orientation] ?? {})}>
-          Reset layout
-        </Button>
-      </div>
+        <div className="flex flex-col gap-4">
+          <Filter
+            label="Black and white"
+            description="Shades become dither patterns."
+            isSelected={mono}
+            onChange={setMono}
+          />
+          <Filter
+            label="Crisp images"
+            description="Solid colours, no smoothing: for pixel art, icons and QR codes."
+            isSelected={pixelate}
+            onChange={setPixelate}
+          />
+        </div>
+        <div className="-ml-4 flex flex-col items-start">
+          <input
+            ref={upload}
+            type="file"
+            accept="image/png,image/jpeg,image/gif,image/webp"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) addImage(file);
+              e.target.value = "";
+            }}
+          />
+          <Button variant="ghost" onPress={() => upload.current?.click()}>
+            Add image
+          </Button>
+          <Button variant="ghost" onPress={() => setPlaced(category.default_positions[orientation] ?? {})}>
+            Reset layout
+          </Button>
+        </div>
+        <div className="flex gap-2">
+          <Button className="flex-1" isDisabled={!dirty || busy} onPress={save}>
+            Save style
+          </Button>
+          <Button variant="tertiary" isDisabled={!dirty} onPress={undo}>
+            Undo
+          </Button>
+        </div>
+      </aside>
     </div>
   );
 }
