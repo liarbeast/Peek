@@ -5,3 +5,8 @@ html,
 body {
   min-height: 100%;
 }
+
+/* Tags (HeroUI chips): 2px more room on each side than HeroUI's 4px. */
+.chip {
+  padding-inline: 6px;
+}
