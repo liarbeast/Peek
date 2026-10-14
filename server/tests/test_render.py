@@ -8,7 +8,12 @@ from PIL import Image
 from peek import layouts, renderer, samples
 from peek.app import create_app
 
-FIELDS = layouts.TEMPLATE_INFO["stack"]["fields"]
+FIELDS = layouts.TEMPLATE_INFO["canvas"]["fields"]
+
+
+def with_css(html: str, css: str) -> str:
+    """A page with extra CSS, to set up a scene the app itself can't make."""
+    return html.replace("</head>", f"<style>{css}</style></head>")
 
 
 @pytest.fixture(scope="module")
@@ -25,12 +30,14 @@ def panel_colours(png: bytes) -> set:
 def photo_page(css: str = "") -> str:
     # A full-screen photo with a caption bar over its bottom.
     css = (
-        ".field-image { position: absolute; inset: 0; width: 100%; height: 100%; max-height: none; object-fit: cover; }"
-        ".field-title { position: absolute; left: 0; right: 0; bottom: 0; height: 60px; background: var(--black); }"
+        ".field-image { left: 0 !important; top: 0 !important; width: 100% !important; height: 100% !important;"
+        " object-fit: cover; }"
+        ".field-title { left: 0 !important; top: auto !important; width: 100% !important; bottom: 0; height: 60px;"
+        " background: var(--black); z-index: 1; }"
         + css
     )
     values = {"image": layouts.data_uri(samples.sunset_photo()), "title": "Evening"}
-    return layouts.build("stack", FIELDS, values, css)
+    return with_css(layouts.build("canvas", FIELDS, values), css)
 
 
 def test_photo_is_dithered_but_caption_is_solid():
@@ -41,7 +48,7 @@ def test_photo_is_dithered_but_caption_is_solid():
 
 
 def test_text_has_no_photo_pixels():
-    _, mask, _, _ = renderer.screenshot(layouts.build("stack", FIELDS, {"title": "Here's looking at you, kid."}))
+    _, mask, _, _ = renderer.screenshot(layouts.build("canvas", FIELDS, {"title": "Here's looking at you, kid."}))
     assert not mask.any()
 
 
@@ -53,9 +60,9 @@ def test_pixelated_images_are_pixel_art():
 
 def test_pixelate_filter_makes_pixel_art():
     values = {"image": layouts.data_uri(samples.sunset_photo()), "title": "Evening"}
-    _, mask, _, _ = renderer.screenshot(layouts.build("stack", FIELDS, values, pixelate=True))
+    _, mask, _, _ = renderer.screenshot(layouts.build("canvas", FIELDS, values, pixelate=True))
     assert not mask.any()
-    _, mask, _, _ = renderer.screenshot(layouts.build("stack", FIELDS, values))
+    _, mask, _, _ = renderer.screenshot(layouts.build("canvas", FIELDS, values))
     assert mask.any()
 
 
@@ -79,8 +86,9 @@ def test_mono_pixel_art_keeps_its_shades():
     # an even pattern of both, not a solid block of one.
     sprite = io.BytesIO()
     Image.new("RGB", (8, 8), (52, 140, 66)).save(sprite, format="PNG")
-    css = ".field-image { width: 200px; height: 200px; max-height: none; }"
-    html = layouts.build("stack", FIELDS, {"image": layouts.data_uri(sprite.getvalue())}, css, pixelate=True)
+    box = {"x": 300, "y": 140, "w": 200, "h": 200}
+    html = layouts.build("canvas", FIELDS, {"image": layouts.data_uri(sprite.getvalue())}, pixelate=True,
+                         positions={"image": box})
     render = renderer.render(html, mono=True)
     block = render.indices[150:330, 310:490]
     assert set(np.unique(render.indices)) <= {0, 1}

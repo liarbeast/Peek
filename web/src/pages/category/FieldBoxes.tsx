@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { Box, Field, Preview } from "../../api";
+import type { Box, CategoryImage, Preview } from "../../api";
 import { FieldToolbar } from "./FieldToolbar";
 
 const GRID = 4;
@@ -10,13 +10,23 @@ const SNAP_DISTANCE = 6;
 const snap = (n: number) => Math.round(n / GRID) * GRID;
 const clamp = (n: number, lo: number, hi: number) => Math.min(Math.max(n, lo), Math.max(lo, hi));
 
-// A field's box: where it was placed, or else where the stack drew it on the
-// last render (with the text size it was drawn at). Text is as tall as its
-// lines, so its height always comes from the last render.
+// Something on the canvas: one of the category's fields, or one of its style
+// images (drawn the same for every item; their keys start with @).
+export interface Layer {
+  key: string;
+  label: string;
+  type: "text" | "image";
+  image?: CategoryImage;
+}
+
+// A layer's box: its saved one, or else where the last render drew it (a
+// style image that was never moved sits behind everything). Text is as tall
+// as its lines, so its height always comes from the last render.
 function boxOf(key: string, placed: Record<string, Box>, measured: Preview["boxes"], text: boolean): Box | null {
   const m = measured[key];
   if (placed[key]) return { size: m?.[4], ...placed[key], ...(text && m ? { h: m[3] } : {}) };
-  return m ? { x: m[0], y: m[1], w: m[2], h: m[3], size: m[4] } : null;
+  if (!m) return null;
+  return { x: m[0], y: m[1], w: m[2], h: m[3], ...(key.startsWith("@") ? { z: -1 } : { size: m[4] }) };
 }
 
 // Moves `start` (a box edge) so that its start, centre or end lands on the
@@ -36,17 +46,18 @@ function snapAxis(start: number, size: number, lines: number[], reach: number) {
 
 type Guides = { x: number | null; y: number | null };
 
-// Boxes over the preview, one per field, to drag into place and resize.
-// Dragging a field gives it a fixed box; until then it sits where the stack
-// put it (as measured on the last render).
+// Boxes over the preview, one per field and style image, to drag into place
+// and resize; clicking one shows its options next to it.
 export function FieldBoxes(props: {
   canvas: { width: number; height: number };
-  fields: Field[];
+  fields: Layer[];
   measured: Preview["boxes"];
   placed: Record<string, Box>;
   onChange: (placed: Record<string, Box>) => void;
   selected: string | null;
   onSelect: (key: string | null) => void;
+  onImageChange: (image: CategoryImage, changes: Partial<CategoryImage>) => void;
+  onImageDelete: (image: CategoryImage) => void;
 }) {
   const { canvas, placed, measured } = props;
   const ref = useRef<HTMLDivElement>(null);
@@ -65,7 +76,7 @@ export function FieldBoxes(props: {
   const contentHeight = (key: string) => measured[key]?.[3] ?? null;
   const isText = (key: string) => props.fields.find((f) => f.key === key)?.type === "text";
 
-  // A field's box as it is drawn now: a field linked below another sits
+  // A field's box as it is drawn now: a field attached below another sits
   // `gap` under where that field's content ends, wherever that field is.
   const shown = (key: string, seen = new Set<string>()): Box | null => {
     const box = boxOf(key, placed, measured, isText(key));
@@ -76,7 +87,7 @@ export function FieldBoxes(props: {
     return above && height !== null ? { ...box, y: above.y + height + (box.gap ?? 0) } : box;
   };
 
-  // Saves a box; for a linked field, its new position becomes its new gap.
+  // Saves a box; for an attached field, its new position becomes its new gap.
   const place = (key: string, box: Box) => {
     if (box.below) {
       const above = shown(box.below);
@@ -86,9 +97,9 @@ export function FieldBoxes(props: {
     props.onChange({ ...placed, [key]: box });
   };
 
-  // The fields `key` can be linked below: any other field that isn't (by way
-  // of others) linked below `key` itself.
-  const linkable = (key: string) =>
+  // What `key` can be attached below: anything else that isn't (by way of
+  // others) attached below `key` itself.
+  const attachable = (key: string) =>
     props.fields.filter((f) => {
       for (let k: string | undefined = f.key, n = 0; k && n <= props.fields.length; k = placed[k]?.below, n++) {
         if (k === key) return false;
@@ -96,23 +107,18 @@ export function FieldBoxes(props: {
       return measured[f.key] !== undefined;
     });
 
-  const link = (key: string, below: string | null) => {
+  const attach = (key: string, below: string | null) => {
     const box = shown(key);
     if (!box) return;
     const { below: _, gap: __, ...rest } = box;
     place(key, below ? { ...rest, below } : rest);
   };
 
-  const unplace = (key: string) => {
-    const { [key]: _, ...rest } = placed;
-    props.onChange(rest);
-  };
-
   const [dragging, setDragging] = useState(false);
 
   type Mode = "move" | "scale" | "width";
 
-  const startDrag = (e: React.PointerEvent, field: Field, mode: Mode) => {
+  const startDrag = (e: React.PointerEvent, field: Layer, mode: Mode) => {
     const key = field.key;
     const start = shown(key);
     if (!start || e.button !== 0) return;
@@ -171,8 +177,13 @@ export function FieldBoxes(props: {
     target.addEventListener("pointercancel", end);
   };
 
-  // Arrow keys nudge the selected field by a pixel, or ten with Shift.
+  // Arrow keys nudge the selected field by a pixel, or ten with Shift; Escape lets go of it.
   const nudge = (e: React.KeyboardEvent, key: string) => {
+    if (e.key === "Escape") {
+      (e.currentTarget as HTMLElement).blur();
+      props.onSelect(null);
+      return;
+    }
     const delta = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
     const box = shown(key);
     if (!delta || !box) return;
@@ -190,7 +201,9 @@ export function FieldBoxes(props: {
   const toolbar = (key: string) => {
     const box = shown(key);
     if (!box) return null;
-    const zs = Object.values(placed).map((b) => b.z ?? 0);
+    const layer = props.fields.find((f) => f.key === key);
+    if (!layer) return null;
+    const zs = props.fields.map((f) => shown(f.key)?.z ?? 0);
     const restyle = (changes: Partial<Box>) => place(key, { ...box, ...changes });
     const right = box.x + box.w / 2 > canvas.width / 2;
     const low = box.y + box.h > canvas.height - 40;
@@ -204,15 +217,15 @@ export function FieldBoxes(props: {
         }}
       >
         <FieldToolbar
+          layer={layer}
           box={box}
-          isText={isText(key)}
-          isPlaced={!!placed[key]}
-          linkable={linkable(key)}
+          attachable={attachable(key)}
           onChange={restyle}
-          onLink={(below) => link(key, below)}
+          onAttach={(below) => attach(key, below)}
           onFront={() => restyle({ z: Math.max(0, ...zs) + 1 })}
           onBack={() => restyle({ z: Math.min(0, ...zs) - 1 })}
-          onUnplace={() => unplace(key)}
+          onImageChange={(changes) => layer.image && props.onImageChange(layer.image, changes)}
+          onImageDelete={() => layer.image && props.onImageDelete(layer.image)}
         />
       </div>
     );
@@ -220,7 +233,7 @@ export function FieldBoxes(props: {
 
   // Front-most last, so it is also on top here.
   const order = props.fields
-    .map((field, i) => ({ field, i, z: placed[field.key]?.z ?? 0 }))
+    .map((field, i) => ({ field, i, z: shown(field.key)?.z ?? 0 }))
     .sort((a, b) => a.z - b.z || a.i - b.i);
 
   const handle = "absolute rounded-sm";
@@ -260,7 +273,6 @@ export function FieldBoxes(props: {
               style={{ background: "var(--accent)", color: "var(--accent-foreground)" }}
             >
               {field.label}
-              {placed[field.key] ? "" : " · in stack"}
             </span>
             {selected && (
               <>

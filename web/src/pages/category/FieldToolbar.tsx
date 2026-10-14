@@ -1,50 +1,103 @@
-import { Button, Dropdown, ToggleButton, ToggleButtonGroup } from "@heroui/react";
-import { useState, type ReactNode } from "react";
-import type { Box, Field } from "../../api";
+import { Button, Dropdown, ToggleButton, ToggleButtonGroup, Toolbar } from "@heroui/react";
+import { useEffect, useState, type ReactNode } from "react";
+import { api, PANEL_COLOURS, type Box, type CategoryImage, type PanelColour } from "../../api";
+import type { Layer } from "./FieldBoxes";
 
-// The selected field's options, shown next to its box: alignment, text size,
-// front to back order, linking it below another field, and putting it back
-// in the stack.
+// The Google Fonts on offer, fetched once, and loaded into the page so the
+// menu can show each one in its own face.
+let fontList: Promise<string[]> | null = null;
+function useFonts() {
+  const [fonts, setFonts] = useState<string[]>([]);
+  useEffect(() => {
+    if (!fontList) {
+      fontList = api.fonts();
+      fontList.then((names) => {
+        const link = document.createElement("link");
+        link.rel = "stylesheet";
+        link.href = `https://fonts.googleapis.com/css2?${names.map((n) => `family=${encodeURIComponent(n)}`).join("&")}&display=swap`;
+        document.head.append(link);
+      });
+    }
+    fontList.then(setFonts).catch(() => setFonts([]));
+  }, []);
+  return fonts;
+}
+
+// The selected field's options, shown next to its box. Text gets alignment,
+// size, weight, colour and typeface; images get alignment both ways; style
+// images also choose between crisp and photo, and can be removed. Everything
+// can go to the front or back and be attached below something else.
 export function FieldToolbar(props: {
+  layer: Layer;
   box: Box;
-  isText: boolean;
-  isPlaced: boolean;
-  linkable: Field[]; // fields it can be linked below without going round in a circle
+  attachable: Layer[]; // what it can be attached below without going round in a circle
   onChange: (changes: Partial<Box>) => void;
-  onLink: (below: string | null) => void;
+  onAttach: (below: string | null) => void;
   onFront: () => void;
   onBack: () => void;
-  onUnplace: () => void;
+  onImageChange: (changes: Partial<CategoryImage>) => void;
+  onImageDelete: () => void;
 }) {
-  const { box } = props;
-  const linked = props.linkable.find((f) => f.key === box.below);
+  const { box, layer } = props;
+  const attached = props.attachable.find((f) => f.key === box.below);
+  const isText = layer.type === "text";
   return (
-    <div
+    <Toolbar
+      aria-label={`${layer.label} options`}
       className="flex items-center gap-1 whitespace-nowrap rounded-xl border border-border bg-overlay p-1 shadow-lg"
       onPointerDown={(e) => e.stopPropagation()}
     >
-      <Segments
-        label="Horizontal alignment"
-        value={box.align ?? "center"}
-        options={[
-          ["left", "Align left", <Lines key="l" lines={[[2, 14], [2, 10], [2, 14]]} />],
-          ["center", "Align centre", <Lines key="c" lines={[[2, 14], [4, 12], [2, 14]]} />],
-          ["right", "Align right", <Lines key="r" lines={[[2, 14], [6, 14], [2, 14]]} />],
-        ]}
-        onChange={(align) => props.onChange({ align: align as Box["align"] })}
-      />
-      {props.isText ? (
-        <TextSize size={box.size} onChange={(size) => props.onChange({ size })} />
-      ) : (
+      {!layer.image && (
         <Segments
-          label="Vertical alignment"
-          value={box.valign ?? "middle"}
+          label="Horizontal alignment"
+          value={box.align ?? "center"}
           options={[
-            ["top", "Align top", <Bar key="t" y={5} />],
-            ["middle", "Align middle", <Bar key="m" y={8} />],
-            ["bottom", "Align bottom", <Bar key="b" y={11} />],
+            ["left", "Align left", <Lines key="l" lines={[[2, 14], [2, 10], [2, 14]]} />],
+            ["center", "Align centre", <Lines key="c" lines={[[2, 14], [4, 12], [2, 14]]} />],
+            ["right", "Align right", <Lines key="r" lines={[[2, 14], [6, 14], [2, 14]]} />],
           ]}
-          onChange={(valign) => props.onChange({ valign: valign as Box["valign"] })}
+          onChange={(align) => props.onChange({ align: align as Box["align"] })}
+        />
+      )}
+      {isText ? (
+        <>
+          <TextSize size={box.size} onChange={(size) => props.onChange({ size })} />
+          <ToggleButton
+            size="sm"
+            isIconOnly
+            aria-label="Bold"
+            isSelected={!!box.bold}
+            onChange={(bold) => props.onChange({ bold })}
+          >
+            <span title="Bold" className="font-bold">B</span>
+          </ToggleButton>
+          <ColourMenu value={box.color ?? "black"} onChange={(color) => props.onChange({ color })} />
+          <FontMenu value={box.font} onChange={(font) => props.onChange({ font })} />
+        </>
+      ) : (
+        !layer.image && (
+          <Segments
+            label="Vertical alignment"
+            value={box.valign ?? "middle"}
+            options={[
+              ["top", "Align top", <Bar key="t" y={5} />],
+              ["middle", "Align middle", <Bar key="m" y={8} />],
+              ["bottom", "Align bottom", <Bar key="b" y={11} />],
+            ]}
+            onChange={(valign) => props.onChange({ valign: valign as Box["valign"] })}
+          />
+        )
+      )}
+      {layer.image && (
+        <Segments
+          label="How to draw it"
+          value={layer.image.crisp ? "crisp" : "photo"}
+          options={[
+            ["crisp", "Crisp: solid colours, for graphics and pixel art", <span key="c" className="px-1 text-xs">Crisp</span>],
+            ["photo", "Photo: dithered, for photos", <span key="p" className="px-1 text-xs">Photo</span>],
+          ]}
+          onChange={(how) => props.onImageChange({ crisp: how === "crisp" })}
+          isIconOnly={false}
         />
       )}
       <IconButton label="Bring to front" onPress={props.onFront}>
@@ -55,24 +108,24 @@ export function FieldToolbar(props: {
       </IconButton>
       <Dropdown>
         <Dropdown.Trigger
-          aria-label="Link below another field"
+          aria-label="Attach below another field"
           className="flex h-8 items-center gap-1 rounded-lg px-2 text-sm hover:bg-default"
         >
-          <LinkIcon />
-          {linked ? `Below ${linked.label}` : "Link"}
+          <AttachIcon />
+          {attached ? `Below ${attached.label}` : "Attach"}
         </Dropdown.Trigger>
         <Dropdown.Popover>
           <Dropdown.Menu
-            aria-label="Link below"
+            aria-label="Attach below"
             selectionMode="single"
             selectedKeys={[box.below ?? ""]}
-            onAction={(key) => props.onLink(key === "" ? null : String(key))}
+            onAction={(key) => props.onAttach(key === "" ? null : String(key))}
           >
-            <Dropdown.Item id="" textValue="Not linked">
-              Not linked
+            <Dropdown.Item id="" textValue="Not attached">
+              Not attached
               <Dropdown.ItemIndicator />
             </Dropdown.Item>
-            {props.linkable.map((f) => (
+            {props.attachable.map((f) => (
               <Dropdown.Item key={f.key} id={f.key} textValue={`Below ${f.label}`}>
                 Below {f.label}
                 <Dropdown.ItemIndicator />
@@ -81,12 +134,75 @@ export function FieldToolbar(props: {
           </Dropdown.Menu>
         </Dropdown.Popover>
       </Dropdown>
-      {props.isPlaced && (
-        <IconButton label="Back in the stack" onPress={props.onUnplace}>
-          <Unplace />
+      {layer.image && (
+        <IconButton label="Remove this image" onPress={props.onImageDelete}>
+          <TrashIcon />
         </IconButton>
       )}
-    </div>
+    </Toolbar>
+  );
+}
+
+function ColourMenu(props: { value: PanelColour; onChange: (colour: PanelColour) => void }) {
+  return (
+    <Dropdown>
+      <Dropdown.Trigger aria-label="Text colour" className="flex h-8 items-center rounded-lg px-2 hover:bg-default">
+        <span title="Text colour" className="flex flex-col items-center text-sm leading-none">
+          A
+          <span className="mt-0.5 h-1 w-4 rounded-sm border border-border" style={{ background: PANEL_COLOURS[props.value] }} />
+        </span>
+      </Dropdown.Trigger>
+      <Dropdown.Popover>
+        <Dropdown.Menu
+          aria-label="Text colour"
+          selectionMode="single"
+          selectedKeys={[props.value]}
+          onAction={(key) => props.onChange(key as PanelColour)}
+        >
+          {(Object.keys(PANEL_COLOURS) as PanelColour[]).map((c) => (
+            <Dropdown.Item key={c} id={c} textValue={c}>
+              <span className="flex items-center gap-2 capitalize">
+                <span className="h-4 w-4 rounded-full border border-border" style={{ background: PANEL_COLOURS[c] }} />
+                {c}
+              </span>
+              <Dropdown.ItemIndicator />
+            </Dropdown.Item>
+          ))}
+        </Dropdown.Menu>
+      </Dropdown.Popover>
+    </Dropdown>
+  );
+}
+
+function FontMenu(props: { value?: string; onChange: (font: string | undefined) => void }) {
+  const fonts = useFonts();
+  return (
+    <Dropdown>
+      <Dropdown.Trigger
+        aria-label="Typeface"
+        className="flex h-8 max-w-36 items-center rounded-lg px-2 text-sm hover:bg-default"
+      >
+        <span title="Typeface" className="truncate" style={{ fontFamily: props.value ? `'${props.value}'` : undefined }}>
+          {props.value ?? "Default"}
+        </span>
+      </Dropdown.Trigger>
+      <Dropdown.Popover>
+        <Dropdown.Menu
+          aria-label="Typeface"
+          className="max-h-80 overflow-auto"
+          selectionMode="single"
+          selectedKeys={[props.value ?? ""]}
+          onAction={(key) => props.onChange(key === "" ? undefined : String(key))}
+        >
+          {["", ...fonts].map((f) => (
+            <Dropdown.Item key={f} id={f} textValue={f || "Default"}>
+              <span style={{ fontFamily: f ? `'${f}'` : undefined }}>{f || "Default"}</span>
+              <Dropdown.ItemIndicator />
+            </Dropdown.Item>
+          ))}
+        </Dropdown.Menu>
+      </Dropdown.Popover>
+    </Dropdown>
   );
 }
 
@@ -108,7 +224,7 @@ function TextSize(props: { size?: number; onChange: (size: number) => void }) {
           if (Number.isInteger(n) && n >= 6 && n <= 400) props.onChange(n);
         }}
         onBlur={() => setText(props.size ? String(props.size) : "")}
-        className="w-10 bg-transparent text-right outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+        className="w-8 bg-transparent text-right outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
       />
       <span className="text-muted">px</span>
     </label>
@@ -128,6 +244,7 @@ function Segments(props: {
   value: string;
   options: [string, string, ReactNode][];
   onChange: (value: string) => void;
+  isIconOnly?: boolean;
 }) {
   return (
     <ToggleButtonGroup
@@ -142,7 +259,7 @@ function Segments(props: {
       }}
     >
       {props.options.map(([id, label, icon]) => (
-        <ToggleButton key={id} id={id} isIconOnly aria-label={label}>
+        <ToggleButton key={id} id={id} isIconOnly={props.isIconOnly ?? true} aria-label={label}>
           <span title={label}>{icon}</span>
         </ToggleButton>
       ))}
@@ -189,7 +306,7 @@ function Layers(props: { front?: boolean }) {
   );
 }
 
-function LinkIcon() {
+function AttachIcon() {
   return (
     <svg {...svg}>
       <path d="M6.5 9.5l3-3M7 4.5l1-1a2.5 2.5 0 013.5 3.5l-1 1M9 11.5l-1 1A2.5 2.5 0 014.5 9l1-1" />
@@ -197,14 +314,10 @@ function LinkIcon() {
   );
 }
 
-// An arrow back into a column of lines: the stack.
-function Unplace() {
+function TrashIcon() {
   return (
     <svg {...svg}>
-      <line x1="9" x2="14" y1="4" y2="4" />
-      <line x1="9" x2="14" y1="8" y2="8" />
-      <line x1="9" x2="14" y1="12" y2="12" />
-      <path d="M2 8h4M4.5 6L6.5 8l-2 2" />
+      <path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.7 8.5h5.6l.7-8.5" strokeLinejoin="round" />
     </svg>
   );
 }

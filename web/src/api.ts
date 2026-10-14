@@ -26,10 +26,20 @@ export interface Template {
   label: string;
   description: string;
   fields: Field[];
-  classes: string[];
 }
 
-// Where a dragged field sits, in pixels of the upright page.
+// The six colours the panel can show.
+export const PANEL_COLOURS = {
+  black: "#000000",
+  white: "#ffffff",
+  yellow: "#ffff00",
+  red: "#ff0000",
+  blue: "#0000ff",
+  green: "#00ff00",
+} as const;
+export type PanelColour = keyof typeof PANEL_COLOURS;
+
+// Where a field or style image sits, in pixels of the upright page, and how it looks.
 export interface Box {
   x: number;
   y: number;
@@ -39,12 +49,15 @@ export interface Box {
   align?: "left" | "center" | "right";
   valign?: "top" | "middle" | "bottom";
   z?: number; // higher is drawn in front
-  // Linked below another field: drawn `gap` pixels under where that field's content ends.
+  bold?: boolean;
+  color?: PanelColour;
+  font?: string; // one of api.fonts(); none is the built-in face
+  // Attached below another field: drawn `gap` pixels under where that field ends.
   below?: string;
   gap?: number;
 }
 
-// Per orientation, the fields that were dragged to a place.
+// Per orientation, every field's box (and the style images that were moved).
 export type Positions = Partial<Record<Orientation, Record<string, Box>>>;
 
 // A render, and where each field was drawn on it: [x, y, width, height, font size].
@@ -57,16 +70,25 @@ export interface Category {
   id: number;
   name: string;
   template: string;
-  custom_css: string;
   item_order: ItemOrder;
   weight: number;
   enabled: boolean;
   mono: boolean;
   pixelate: boolean;
   positions: Positions;
+  default_positions: Positions; // where fields go before anyone moves them
   fields: Field[];
   item_count: number;
   cover: string | null;
+}
+
+// An image drawn the same for every item of a category, such as a frame.
+export interface CategoryImage {
+  id: number;
+  key: string; // its key in positions
+  name: string;
+  file: string;
+  crisp: boolean; // drawn in solid colours like pixel art, instead of dithered like a photo
 }
 
 export interface Item {
@@ -90,7 +112,6 @@ export type ImportTarget = { field: string } | { new: { label: string; type: Fie
 
 export interface StyleChanges {
   template?: string;
-  custom_css?: string;
   mono?: boolean;
   pixelate?: boolean;
   positions?: Positions;
@@ -160,6 +181,17 @@ export const api = {
     if (!res.ok) throw await failure(res);
     return { image: await res.blob(), boxes: JSON.parse(res.headers.get("X-Peek-Boxes") ?? "{}") };
   },
+
+  fonts: () => request<string[]>("/api/fonts"),
+  categoryImages: (categoryId: number) => request<CategoryImage[]>(`/api/categories/${categoryId}/images`),
+  addCategoryImage: (categoryId: number, file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return request<CategoryImage>(`/api/categories/${categoryId}/images`, { method: "POST", body: form });
+  },
+  updateCategoryImage: (id: number, body: { crisp: boolean }) =>
+    request<CategoryImage>(`/api/category-images/${id}`, json("PATCH", body)),
+  deleteCategoryImage: (id: number) => request<void>(`/api/category-images/${id}`, { method: "DELETE" }),
 
   items: (categoryId: number) => request<Item[]>(`/api/categories/${categoryId}/items`),
   // Form fields: "data" (JSON of text values), "image:<key>" files.
