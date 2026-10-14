@@ -721,10 +721,12 @@ def sync_source(store: db.Store, category: dict, day: date) -> int:
 
 
 def sync_due(store: db.Store, day: date) -> None:
-    """Fetch every active source not yet read on `day`. One that fails keeps
-    its items and is tried again on the next wake."""
+    """Fetch every active source not yet read on `day`, or set to be read on
+    every wake. One that fails keeps its items and is tried again on the next
+    wake."""
     for category in store.categories():
-        if category["enabled"] and category["source"] and category["synced"] != day.isoformat():
+        source = category["source"]
+        if category["enabled"] and source and (source.get("every_wake") or category["synced"] != day.isoformat()):
             try:
                 sync_source(store, category, day)
             except sources.SourceError as e:
@@ -778,6 +780,7 @@ class ConnectIn(BaseModel):
     url: str = Field(min_length=1)
     items: str = ""
     columns: list[ColumnIn]
+    every_wake: bool = False  # fetch on every wake instead of once a day
 
 
 @router.put("/api/categories/{category_id}/source")
@@ -804,7 +807,7 @@ def connect_source(request: Request, category_id: int, body: ConnectIn) -> dict:
     paths = {c.field: c.path for c in body.columns if c.field}
     paths |= {f["key"]: c.path for f, c in zip(fields[len(kept):], new)}
     _drop_changed_values(store, category, fields)
-    source = {"url": body.url.strip(), "items": body.items.strip(), "fields": paths}
+    source = {"url": body.url.strip(), "items": body.items.strip(), "fields": paths, "every_wake": body.every_wake}
     category = store.update_category(category_id, {"fields": fields, "source": source})
     try:
         created = sync_source(store, category, date.today())

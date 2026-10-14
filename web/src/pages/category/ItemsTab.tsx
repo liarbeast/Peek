@@ -111,7 +111,8 @@ export function ItemsTab(props: {
           <div className="min-w-0 flex-1">
             <p className="font-medium">Filled from a data source</p>
             <p className="truncate text-sm text-muted">
-              {category.synced ? `Fetched on ${category.synced}, ` : ""}read again every day from {category.source!.url}
+              {category.synced ? `Fetched on ${category.synced}, ` : ""}read again {category.source!.every_wake ? "on every wake" : "every day"} from{" "}
+              {category.source!.url}
             </p>
           </div>
           <Button size="sm" variant="tertiary" onPress={() => setConnecting(true)}>

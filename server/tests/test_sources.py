@@ -26,6 +26,7 @@ def test_entries_follow_the_paths():
     with pytest.raises(sources.SourceError):
         sources.entries({"x": 1}, {"items": "selected"})
     assert sources.url_for(SOURCE["url"], date(2026, 3, 4)) == "https://example.org/onthisday/03/04"
+    assert 1 <= int(sources.url_for("{RANDOM:1-3}", date.today())) <= 3
 
 
 def test_sync_replaces_items_once_a_day(tmp_path, monkeypatch):
