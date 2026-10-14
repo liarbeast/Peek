@@ -27,6 +27,21 @@ Open http://localhost:8080. The first build downloads Chromium and takes a few m
 Categories, uploaded images and the current frame image live in the `data` folder next to `compose.yaml`.
 To move Peek to another machine, copy the whole folder and run the same command there.
 
+## See changes without rebuilding
+
+`compose.dev.yaml` runs Peek straight from this folder instead of from a built image. The server restarts by itself
+when its code changes, and the web app updates in the open page, so after pulling new code there is nothing to rebuild:
+
+```sh
+docker compose down                         # stop the normal Peek first (it uses the same port)
+docker compose -f compose.dev.yaml up -d    # or: podman compose -f compose.dev.yaml up -d
+git pull                                    # whenever there are changes; they show up within seconds
+```
+
+Open http://localhost:5173 (the frame keeps using port 8080). The first start installs the web app's packages, which
+takes a minute. Add `--build` only when `requirements.txt` changes, and go back with
+`docker compose -f compose.dev.yaml down && docker compose up -d --build`.
+
 ## Endpoints the frame uses
 
 | Endpoint | What it returns |
