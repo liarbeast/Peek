@@ -1,6 +1,6 @@
 import { Button, Spinner, Toast } from "@heroui/react";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { api, type Settings, type Template } from "./api";
 import { PanelImage } from "./components/PanelImage";
 import { Dialog } from "./components/ui";
@@ -9,7 +9,6 @@ import { CategoryPage } from "./pages/CategoryPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { go, useRoute } from "./router";
 import { SettingsContext } from "./settings";
-import { depth, getTransition, TRANSITIONS } from "./transitions";
 
 // Follow the system's light or dark setting.
 function useSystemTheme() {
@@ -29,21 +28,6 @@ export function App() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [showFrame, setShowFrame] = useState(false);
   const [frameVersion, setFrameVersion] = useState(0);
-  const [transition, setTransition] = useState(getTransition);
-
-  // Which way the last page change went, for transitions that care: 1 deeper, -1 back.
-  const last = useRef(route);
-  const direction = useRef(1);
-  if (last.current !== route) {
-    direction.current = depth(route) < depth(last.current) ? -1 : 1;
-    last.current = route;
-  }
-
-  useEffect(() => {
-    const changed = (e: Event) => setTransition((e as CustomEvent<string>).detail);
-    window.addEventListener("peek:transition", changed);
-    return () => window.removeEventListener("peek:transition", changed);
-  }, []);
 
   useEffect(() => {
     api.templates().then(setTemplates);
@@ -73,21 +57,18 @@ export function App() {
           </div>
         </header>
 
-        <main className="mx-auto max-w-5xl overflow-x-clip px-4 py-6">
-          {/* Page transitions (see transitions.ts): the old page leaves, then
-              the new one comes in. A collection's tabs change inside its page,
-              so they don't count as a new page. Off for people who asked their
-              system for less motion. */}
+        <main className="mx-auto max-w-5xl px-4 py-6">
+          {/* Page transitions: the old page fades out, then the new one fades
+              in while rising a little. A collection's tabs change inside its
+              page, so they don't count as a new page. Off for people who asked
+              their system for less motion. */}
           <MotionConfig reducedMotion="user">
-            <AnimatePresence mode="wait" initial={false} custom={direction.current}>
+            <AnimatePresence mode="wait" initial={false}>
               <motion.div
                 key={route.page === "category" ? `category-${route.id}` : route.page}
-                custom={direction.current}
-                variants={TRANSITIONS.find((t) => t.id === transition)?.variants}
-                initial="enter"
-                animate="shown"
-                exit="exit"
-                transition={{ duration: 0.2, ease: [0.2, 0.8, 0.2, 1], opacity: { duration: 0.15 } }}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0, transition: { duration: 0.2, ease: [0.2, 0.8, 0.2, 1] } }}
+                exit={{ opacity: 0, transition: { duration: 0.1, ease: "easeIn" } }}
               >
                 {!templates || !settings ? (
                   <Spinner />
