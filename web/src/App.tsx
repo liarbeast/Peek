@@ -73,7 +73,7 @@ export function App() {
           </div>
         </header>
 
-        <main className="mx-auto max-w-5xl px-4 py-6">
+        <main className="mx-auto max-w-5xl overflow-x-clip px-4 py-6">
           {/* Page transitions (see transitions.ts): the old page leaves, then
               the new one comes in. A collection's tabs change inside its page,
               so they don't count as a new page. Off for people who asked their
