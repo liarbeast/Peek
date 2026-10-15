@@ -42,15 +42,22 @@ export function CategoriesPage() {
         </Card>
       )}
 
+      {categories?.some((c) => c.current) && (
+        <CategoryGroup title="Currently active" categories={categories.filter((c) => c.current)} />
+      )}
       {categories && categories.length > 0 && (
         <CategoryGroup
-          title="Active"
-          empty="No active collections. Turn on “Show this collection on the frame” in its Settings tab."
-          categories={categories.filter((c) => c.enabled)}
+          title="Enabled"
+          empty={
+            categories.some((c) => c.enabled)
+              ? undefined
+              : "No enabled collections. Turn on “Show this collection on the frame” in its Settings tab."
+          }
+          categories={categories.filter((c) => c.enabled && !c.current)}
         />
       )}
-      {categories?.some((c) => !c.enabled) && (
-        <CategoryGroup title="Inactive" categories={categories.filter((c) => !c.enabled)} />
+      {categories?.some((c) => !c.enabled && !c.current) && (
+        <CategoryGroup title="Disabled" categories={categories.filter((c) => !c.enabled && !c.current)} />
       )}
 
       <NewCategoryDialog

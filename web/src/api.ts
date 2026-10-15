@@ -95,6 +95,7 @@ export interface Category {
   item_count: number;
   cover: string | null;
   source: Source | null;
+  current?: boolean; // the collection the frame shows now (in the list of collections only)
   synced: string | null; // the day the source was last read, YYYY-MM-DD
 }
 
