@@ -5,6 +5,7 @@ export type ItemOrder = "in_order" | "random" | "shuffle";
 export type Orientation = "landscape" | "portrait";
 
 export type Refresh = "15m" | "30m" | "1h" | "3h" | "6h" | "12h" | "1d" | "1w";
+export type CollectionOrder = "in_order" | "shuffle";
 export type Switch = "30m" | "1h" | "8h" | "1d" | "1w" | "finished" | "1mo";
 
 export interface Settings {
@@ -12,6 +13,7 @@ export interface Settings {
   // How often the frame wakes for a new image.
   refresh: Refresh;
   switch: Switch; // how often the frame moves on to the next category
+  collection_order: CollectionOrder; // which one it moves on to
 }
 
 export const isPortrait = (o: Orientation) => o === "portrait";
@@ -247,6 +249,9 @@ export const api = {
   updateItem: (id: number, form: FormData) => request<Item>(`/api/items/${id}`, { method: "PATCH", body: form }),
   deleteItem: (id: number) => request<void>(`/api/items/${id}`, { method: "DELETE" }),
   deleteAllItems: (categoryId: number) => request<void>(`/api/categories/${categoryId}/items`, { method: "DELETE" }),
+  // The order the frame goes through collections in (and the home screen lists them).
+  reorderCategories: (categoryIds: number[]) =>
+    request<void>("/api/categories/reorder", json("POST", { category_ids: categoryIds })),
   reorderItems: (categoryId: number, itemIds: number[]) =>
     request<void>(`/api/categories/${categoryId}/items/order`, json("PUT", { item_ids: itemIds })),
 

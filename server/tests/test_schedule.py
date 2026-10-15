@@ -131,3 +131,41 @@ def test_the_current_collection_says_when_it_switches(client):
     client.patch("/api/settings", json={"switch": "finished"})
     current = next(c for c in client.get("/api/categories").json() if c["current"])
     assert current["next_switch"] == {"items_left": 2}  # one of three shown
+
+
+def _rotation(tmp_path, client, names, wakes):
+    """Make one-item collections and the categories the frame shows on each of `wakes` switching wakes."""
+    ids = {}
+    for name in names:
+        cat = client.post("/api/categories", json={"name": name}).json()
+        client.post(f"/api/categories/{cat['id']}/items", data={"data": json.dumps({"title": name})})
+        ids[cat["id"]] = name
+
+    def wakes_():
+        source = tmp_path / "current.json"
+        for _ in range(wakes):
+            if source.exists():
+                data = json.loads(source.read_text())
+                source.write_text(json.dumps({**data, "refresh_period": "earlier", "switch_period": "earlier"}))
+            client.get("/frame.png")
+            yield ids[json.loads(source.read_text())["category_id"]]
+    return ids, wakes_
+
+
+def test_collections_go_in_the_order_set(tmp_path, client):
+    ids, wakes = _rotation(tmp_path, client, ["Birds", "Fish", "Trees"], 4)
+    by_name = {v: k for k, v in ids.items()}
+    assert client.post("/api/categories/reorder", json={"category_ids": [by_name["Trees"], by_name["Birds"]]}).status_code == 204
+    assert [c["name"] for c in client.get("/api/categories").json()] == ["Trees", "Birds", "Fish"]
+    assert list(wakes()) == ["Trees", "Birds", "Fish", "Trees"]
+
+
+def test_shuffle_gives_every_collection_a_turn_each_round(tmp_path, client):
+    client.patch("/api/settings", json={"collection_order": "shuffle"})
+    names = ["A", "B", "C", "D", "E"]
+    _, wakes = _rotation(tmp_path, client, names, 15)
+    shown = list(wakes())
+    for start in (0, 5, 10):
+        assert sorted(shown[start:start + 5]) == names  # each round: all five, once
+    assert all(a != b for a, b in zip(shown, shown[1:]))  # never the same twice in a row
+    assert client.patch("/api/settings", json={"collection_order": "random"}).status_code == 422

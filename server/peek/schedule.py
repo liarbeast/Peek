@@ -102,9 +102,13 @@ def sleep_seconds(refresh: str, now: datetime | None = None) -> int:
 
 
 def next_item(store: db.Store, current_category: int | None, switch: bool, lap: int | None = None,
-              fetch: Callable[[dict], None] | None = None) -> dict | None:
+              fetch: Callable[[dict], None] | None = None, order: str = "in_order",
+              shown_this_round: list[int] | tuple = ()) -> dict | None:
     """The item to show next: from the current category, or from the next
     active one when `switch` is set (or the current one is off or empty).
+    The next one is the one after it in the categories' order, or with
+    `order` "shuffle", a random one that hasn't had its turn this round
+    (`shown_this_round`); once all have, a new round starts.
     With `lap`, the number of its items shown in a row, it also switches once
     that reaches how many items the category has. `fetch` brings a category
     filled from a data source up to date before its next item is picked.
@@ -116,7 +120,13 @@ def next_item(store: db.Store, current_category: int | None, switch: bool, lap: 
     ids = [c["id"] for c, _ in pool]
     if lap is not None and current_category in ids:
         switch = switch or lap >= len(pool[ids.index(current_category)][1])
-    index = (ids.index(current_category) + switch) % len(pool) if current_category in ids else 0
+    if current_category in ids and not switch:
+        index = ids.index(current_category)
+    elif order == "shuffle":
+        others = [i for i in ids if i != current_category] or ids
+        index = ids.index(random.choice([i for i in others if i not in shown_this_round] or others))
+    else:
+        index = (ids.index(current_category) + 1) % len(pool) if current_category in ids else 0
     category, items = pool[index]
     if fetch and category["source"]:
         fetch(category)

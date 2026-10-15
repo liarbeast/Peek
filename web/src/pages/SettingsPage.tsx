@@ -3,6 +3,7 @@ import { useState } from "react";
 import { api, type Orientation, type Refresh, type Settings, type Switch } from "../api";
 import { PanelImage } from "../components/PanelImage";
 import { Choice } from "../components/ui";
+import { CollectionOrder } from "./CollectionOrder";
 import { Label, Radio, RadioGroup } from "react-aria-components";
 
 const ORIENTATIONS: { id: Orientation; label: string; size: string; shape: string }[] = [
@@ -135,6 +136,7 @@ export function SettingsPage({ settings, onChange }: { settings: Settings; onCha
               are greyed out; pick the same as Refresh to change collection on every wake.
             </p>
           </div>
+          <CollectionOrder value={settings.collection_order} onChange={(collection_order) => update({ collection_order })} />
         </div>
         <div className="flex flex-col gap-2">
           <span className="text-sm font-medium">On the frame now</span>
