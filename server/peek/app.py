@@ -98,15 +98,22 @@ def create_app(data_dir: Path) -> FastAPI:
         switch = source.get("switch_period") != now["switch_period"]
         lap = source.get("lap", 1) if now["switch_period"] == "finished" else None
         day = (datetime.now() + schedule.EARLY_WAKE).date()
+        shown_this_round = source.get("round", [])
         item = schedule.next_item(store, shown_category, switch, lap,
-                                  fetch=lambda category: content.fetch_quietly(store, category, day))
+                                  fetch=lambda category: content.fetch_quietly(store, category, day),
+                                  order=store.settings()["collection_order"], shown_this_round=shown_this_round)
         if item:
             store.mark_shown(item["id"])
+            category_id = item["category_id"]
             # How many items of this category the frame has shown in a row (a
             # shown item without a count is the first).
-            lap = source.get("lap", 1) + 1 if shown_category == item["category_id"] else 1
-            set_current(content.render_item(store, store.category(item["category_id"]), item),
-                        {"item_id": item["id"], "category_id": item["category_id"], "lap": lap})
+            lap = source.get("lap", 1) + 1 if shown_category == category_id else 1
+            # The categories that had a turn this round, for shuffling; one
+            # coming round again starts a new round.
+            if category_id != shown_category:
+                shown_this_round = [*shown_this_round, category_id] if category_id not in shown_this_round else [category_id]
+            set_current(content.render_item(store, store.category(category_id), item),
+                        {"item_id": item["id"], "category_id": category_id, "lap": lap, "round": shown_this_round})
         elif not current.exists():
             set_current(_welcome_render(content.orientation(store)), {"welcome": True})
 

@@ -127,6 +127,11 @@ class SettingsPatch(BaseModel):
     orientation: str | None = None
     refresh: str | None = None
     switch: str | None = None
+    collection_order: Literal["in_order", "shuffle"] | None = None
+
+
+class CategoryOrder(BaseModel):
+    category_ids: list[int]
 
 
 def _store(request: Request) -> db.Store:
@@ -315,6 +320,12 @@ def create_category(request: Request, body: CategoryIn) -> dict:
             positions = {o: {keys.get(k, k): box for k, box in boxes.items()} for o, boxes in new["positions"].items()}
             created = store.update_category(created["id"], {"positions": positions})
     return created
+
+
+@router.post("/api/categories/reorder", status_code=204)
+def reorder_categories(request: Request, body: CategoryOrder) -> None:
+    """The order the frame goes through categories in ("In order")."""
+    _store(request).reorder_categories(body.category_ids)
 
 
 @router.get("/api/categories/{category_id}")
