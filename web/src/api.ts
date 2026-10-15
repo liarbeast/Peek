@@ -10,9 +10,9 @@ export type Switch = "30m" | "1h" | "8h" | "1d" | "1w" | "finished" | "1mo";
 
 export interface Settings {
   orientation: Orientation;
-  // How often the frame wakes for a new image.
+  // How often the frame wakes for a new image, unless the collection on it has its own refresh.
   refresh: Refresh;
-  switch: Switch; // how often the frame moves on to the next category
+  switch: Switch; // how often the frame moves on to the next collection
   collection_order: CollectionOrder; // which one it moves on to
 }
 
@@ -97,6 +97,8 @@ export interface Category {
   item_count: number;
   cover: string | null;
   source: Source | null;
+  // How often it shows its next item while it's on the frame; null for the frame's refresh from Settings.
+  refresh: Refresh | null;
   current?: boolean; // the collection the frame shows now (in the list of collections only)
   // On the current one: when the frame moves on (or how many items it shows
   // first), and to the next collection in order or a shuffled one.

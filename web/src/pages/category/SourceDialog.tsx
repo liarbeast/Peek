@@ -128,7 +128,7 @@ export function SourceDialog(props: {
       }
     >
       <p className="text-sm text-muted">
-        A web address that returns JSON. On every wake that shows this collection (see Refresh in Settings), Peek reads
+        A web address that returns JSON. On every wake that shows this collection (see Refresh on its Settings tab), Peek reads
         it again: new entries are added and gone ones removed, so the items can't be edited by hand.
         {!category.source &&
           props.itemCount > 0 &&

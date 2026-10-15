@@ -107,6 +107,9 @@ class CategoryPatch(BaseModel):
     positions: Positions | None = None
     fields: list[FieldIn] | None = None
     source: SourceIn | None = None
+    # How often it shows its next item while it's on the frame; null for the
+    # frame's refresh from Settings.
+    refresh: str | None = None
 
 
 class PreviewIn(BaseModel):
@@ -143,6 +146,8 @@ def _check(fields: dict) -> None:
         raise HTTPException(422, f"unknown template: {fields['template']}")
     if fields.get("item_order") not in (None, *db.ITEM_ORDERS):
         raise HTTPException(422, f"unknown item order: {fields['item_order']}")
+    if fields.get("refresh") not in (None, *schedule.REFRESH_INTERVALS):
+        raise HTTPException(422, f"unknown refresh interval: {fields['refresh']}")
 
 
 def _category_or_404(store: db.Store, category_id: int) -> dict:
@@ -349,6 +354,8 @@ def update_category(request: Request, category_id: int, body: CategoryPatch) -> 
         changes["source"] = body.source.model_dump() if body.source.url.strip() else None
         if changes["source"] is None:
             changes["synced"] = None
+    if "refresh" in body.model_fields_set:
+        changes["refresh"] = body.refresh  # null goes back to the frame's refresh
     return store.update_category(category_id, changes)
 
 

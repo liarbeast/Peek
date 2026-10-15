@@ -134,12 +134,17 @@ MIGRATIONS = [
            OR (other.name COLLATE NOCASE = category.name COLLATE NOCASE AND other.id < category.id)
     );
     """,
+    # A category's own refresh, while it's on the frame; none means the
+    # frame's refresh from Settings.
+    """
+    ALTER TABLE category ADD COLUMN refresh TEXT;
+    """,
 ]
 
 # Frame-wide settings and their values until someone changes them.
 SETTING_DEFAULTS = {
     "orientation": "landscape",
-    "refresh": "1h",  # see schedule.REFRESH_INTERVALS
+    "refresh": "1h",  # see schedule.REFRESH_INTERVALS; categories can have their own
     "switch": "1d",  # see schedule.SWITCH_INTERVALS
     "collection_order": "in_order",  # or "shuffle": see schedule.next_item
 }
@@ -250,7 +255,7 @@ class Store:
 
     def update_category(self, category_id: int, fields: dict) -> dict | None:
         allowed = ("name", "template", "item_order", "weight", "enabled", "fields", "mono", "pixelate", "positions",
-                   "source", "synced")
+                   "source", "synced", "refresh")
         changes = {k: _column(k, v) for k, v in fields.items() if k in allowed}
         if changes:
             sets = ", ".join(f"{k} = ?" for k in changes)

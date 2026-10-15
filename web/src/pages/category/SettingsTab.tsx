@@ -1,8 +1,15 @@
 import { Button, toast } from "@heroui/react";
 import { useState } from "react";
-import { api, type Category, type ItemOrder } from "../../api";
+import { api, type Category, type ItemOrder, type Refresh } from "../../api";
 import { Choice, Dialog, TextInput, Toggle } from "../../components/ui";
 import { go } from "../../router";
+import { useSettings } from "../../settings";
+import { REFRESHES, refreshLabel } from "../../timing";
+
+const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
+
+// Select can't hold an empty key, so the frame's own refresh uses this.
+const DEFAULT = "default";
 
 export const ORDERS: Array<{ id: ItemOrder; label: string; description: string }> = [
   { id: "in_order", label: "In order", description: "Top to bottom, then start again" },
@@ -14,14 +21,19 @@ export function SettingsTab({ category, onSaved }: { category: Category; onSaved
   const [name, setName] = useState(category.name);
   const [order, setOrder] = useState<ItemOrder>(category.item_order);
   const [enabled, setEnabled] = useState(category.enabled);
+  const [refresh, setRefresh] = useState<Refresh | null>(category.refresh);
   const [confirming, setConfirming] = useState(false);
+  const frame = useSettings();
   const dirty =
-    name !== category.name || order !== category.item_order || enabled !== category.enabled;
+    name !== category.name ||
+    order !== category.item_order ||
+    enabled !== category.enabled ||
+    refresh !== category.refresh;
 
   const save = async () => {
     try {
       onSaved(
-        await api.updateCategory(category.id, { name: name.trim(), item_order: order, enabled }),
+        await api.updateCategory(category.id, { name: name.trim(), item_order: order, enabled, refresh }),
       );
       toast.success("Settings saved");
     } catch (e) {
@@ -39,6 +51,20 @@ export function SettingsTab({ category, onSaved }: { category: Category; onSaved
     <div className="flex max-w-lg flex-col gap-5">
       <TextInput label="Name" value={name} onChange={setName} />
       <Choice label="Order of items" value={order} onChange={setOrder} options={ORDERS} />
+      <Choice
+        label="Refresh"
+        value={refresh ?? DEFAULT}
+        onChange={(r) => setRefresh(r === DEFAULT ? null : (r as Refresh))}
+        options={[
+          {
+            id: DEFAULT,
+            label: `Default (${lowerFirst(refreshLabel(frame.refresh).label)})`,
+            description: "The frame's refresh, from Settings",
+          },
+          ...REFRESHES.map((r, i) => ({ ...r, divider: i === 0 })),
+        ]}
+        description="How often the frame wakes for the next item while this collection is on it."
+      />
       <Toggle label="Show this collection on the frame" isSelected={enabled} onChange={setEnabled} />
       <div className="flex gap-2">
         <Button isDisabled={!dirty || !name.trim()} onPress={save}>

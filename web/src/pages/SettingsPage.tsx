@@ -1,6 +1,7 @@
 import { toast } from "@heroui/react";
 import { useState } from "react";
-import { api, type Orientation, type Refresh, type Settings, type Switch } from "../api";
+import { api, type Orientation, type Settings } from "../api";
+import { REFRESHES, switchOptions } from "../timing";
 import { PanelImage } from "../components/PanelImage";
 import { Choice } from "../components/ui";
 import { CollectionOrder } from "./CollectionOrder";
@@ -11,37 +12,8 @@ const ORIENTATIONS: { id: Orientation; label: string; size: string; shape: strin
   { id: "portrait", label: "Portrait", size: "480 × 800", shape: "h-15 w-9" },
 ];
 
-// Each with its length in minutes, so Switch collection can leave out choices
-// shorter than Refresh (the server does the same).
-const REFRESHES: { id: Refresh; label: string; minutes: number }[] = [
-  { id: "15m", label: "Every 15 minutes", minutes: 15 },
-  { id: "30m", label: "Every 30 minutes", minutes: 30 },
-  { id: "1h", label: "Every hour", minutes: 60 },
-  { id: "3h", label: "Every 3 hours", minutes: 180 },
-  { id: "6h", label: "Every 6 hours", minutes: 360 },
-  { id: "12h", label: "Every 12 hours", minutes: 720 },
-  { id: "1d", label: "Every day, at midnight", minutes: 1440 },
-  { id: "1w", label: "Every week, on Monday at midnight", minutes: 10080 },
-];
-
-const SWITCHES: { id: Switch; label: string; description?: string; divider?: boolean; minutes: number }[] = [
-  { id: "30m", label: "Every 30 minutes", minutes: 30 },
-  { id: "1h", label: "Every hour", minutes: 60 },
-  { id: "8h", label: "Every 8 hours", minutes: 480 },
-  { id: "1d", label: "Every day, at midnight", minutes: 1440 },
-  { id: "1w", label: "Every week, on Monday at midnight", minutes: 10080 },
-  { id: "1mo", label: "Every month, on the 1st at midnight", minutes: Infinity },
-  {
-    id: "finished",
-    label: "Once a collection is finished",
-    divider: true,
-    minutes: Infinity,
-  },
-];
-
 export function SettingsPage({ settings, onChange }: { settings: Settings; onChange: (s: Settings) => void }) {
   const [busy, setBusy] = useState(false);
-  const refresh = REFRESHES.find((r) => r.id === settings.refresh) ?? REFRESHES[0];
 
   const update = async (patch: Partial<Settings>) => {
     setBusy(true);
@@ -113,7 +85,8 @@ export function SettingsPage({ settings, onChange }: { settings: Settings; onCha
               options={REFRESHES}
             />
             <p className="text-sm text-muted">
-              How often the frame wakes for the next image, on the round time. More often uses more battery.
+              How often the frame wakes for the next image, on the round time. More often uses more battery. A
+              collection can have its own, on its Settings tab.
             </p>
           </div>
           <div className="flex flex-col gap-1">
@@ -121,13 +94,7 @@ export function SettingsPage({ settings, onChange }: { settings: Settings; onCha
               label="Switch collection"
               value={settings.switch}
               onChange={(s) => update({ switch: s })}
-              options={SWITCHES.map((s) => ({
-                ...s,
-                disabled:
-                  s.minutes < refresh.minutes
-                    ? `Refresh is ${refresh.label.charAt(0).toLowerCase()}${refresh.label.slice(1)}`
-                    : undefined,
-              }))}
+              options={switchOptions(settings.refresh)}
             />
             <p className="text-sm text-muted">
               How often the frame moves on to the next active collection, on its first wake after this time.
