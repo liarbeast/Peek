@@ -45,7 +45,7 @@ export function CategoriesPage() {
       {categories?.some((c) => c.current) && (
         <CategoryGroup
           title="Currently active"
-          subtitle={switchText(categories.find((c) => c.current)?.next_switch)}
+          subtitle={switchText(categories.find((c) => c.current))}
           categories={categories.filter((c) => c.current)}
         />
       )}
@@ -73,17 +73,24 @@ export function CategoriesPage() {
   );
 }
 
-// When the frame moves on from the collection it shows, in words.
-function switchText(next: Category["next_switch"]): string | undefined {
+// When and to what the frame moves on from the collection it shows, in words:
+// "Switching to Birds in 7 hours", "Switching to a random collection after 3 more items".
+function switchText(current: Category | undefined): string | undefined {
+  const next = current?.next_switch;
   if (!next) return undefined;
+  const to = next.shuffle
+    ? "Switching to a random collection"
+    : next.next && next.next !== current.name
+      ? `Switching to ${next.next}`
+      : "Starting this collection again"; // the only one in rotation
   if ("items_left" in next) {
     const n = next.items_left;
-    return n === 0 ? "Switching collection on the next wake" : `Switching collection after ${n} more ${n === 1 ? "item" : "items"}`;
+    return n === 0 ? `${to} on the next wake` : `${to} after ${n} more ${n === 1 ? "item" : "items"}`;
   }
   const minutes = Math.max(1, Math.round((new Date(next.at).getTime() - Date.now()) / 60000));
   const [amount, unit]: [number, Intl.RelativeTimeFormatUnit] =
     minutes < 60 ? [minutes, "minute"] : minutes < 48 * 60 ? [Math.round(minutes / 60), "hour"] : [Math.round(minutes / 1440), "day"];
-  return `Switching collection ${new Intl.RelativeTimeFormat("en").format(amount, unit)}`;
+  return `${to} ${new Intl.RelativeTimeFormat("en").format(amount, unit)}`;
 }
 
 // A heading and the categories under it, as cards.

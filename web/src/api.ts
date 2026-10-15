@@ -98,8 +98,9 @@ export interface Category {
   cover: string | null;
   source: Source | null;
   current?: boolean; // the collection the frame shows now (in the list of collections only)
-  // On the current one: when the frame moves on, or how many items it shows first.
-  next_switch?: { at: string } | { items_left: number };
+  // On the current one: when the frame moves on (or how many items it shows
+  // first), and to the next collection in order or a shuffled one.
+  next_switch?: ({ at: string } | { items_left: number }) & { next?: string | null; shuffle?: boolean };
   synced: string | null; // the day the source was last read, YYYY-MM-DD
 }
 

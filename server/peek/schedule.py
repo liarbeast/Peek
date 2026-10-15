@@ -101,6 +101,17 @@ def sleep_seconds(refresh: str, now: datetime | None = None) -> int:
     return round((next_wake(refresh, now) - now).total_seconds())
 
 
+def next_in_order(store: db.Store, current_category: int | None) -> dict | None:
+    """The category the frame moves on to after `current_category` with
+    "In order": the next one in rotation that has something to show."""
+    pool = [c for c in store.categories() if c["enabled"]
+            if c["source"] or any(i["enabled"] for i in store.items(c["id"]))]
+    ids = [c["id"] for c in pool]
+    if not pool:
+        return None
+    return pool[(ids.index(current_category) + 1) % len(pool) if current_category in ids else 0]
+
+
 def next_item(store: db.Store, current_category: int | None, switch: bool, lap: int | None = None,
               fetch: Callable[[dict], None] | None = None, order: str = "in_order",
               shown_this_round: list[int] | tuple = ()) -> dict | None:
