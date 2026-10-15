@@ -47,13 +47,6 @@ SWITCH_INTERVALS: dict[str, timedelta | None] = {
 
 
 
-def switch_choices(refresh: str) -> list[str]:
-    """The switch intervals no shorter than the refresh: a shorter one would
-    pass between two wakes anyway."""
-    step = REFRESH_INTERVALS.get(refresh, REFRESH_INTERVALS[DEFAULT_REFRESH])
-    return [k for k, length in SWITCH_INTERVALS.items() if length is None or length >= step]
-
-
 # Never ask the frame to sleep for less than this, so a wake that lands just
 # before a boundary doesn't come straight back.
 MIN_SLEEP = 60

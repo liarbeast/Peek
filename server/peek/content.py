@@ -107,8 +107,7 @@ class CategoryPatch(BaseModel):
     positions: Positions | None = None
     fields: list[FieldIn] | None = None
     source: SourceIn | None = None
-    # How often it shows its next item while it's on the frame; null for the
-    # frame's refresh from Settings.
+    # How often it shows its next item while it's on the frame.
     refresh: str | None = None
 
 
@@ -128,7 +127,6 @@ class Reorder(BaseModel):
 
 class SettingsPatch(BaseModel):
     orientation: str | None = None
-    refresh: str | None = None
     switch: str | None = None
     collection_order: Literal["in_order", "shuffle"] | None = None
 
@@ -262,15 +260,10 @@ def update_settings(request: Request, body: SettingsPatch) -> dict:
     fields = body.model_dump(exclude_none=True)
     if fields.get("orientation") not in (None, *renderer.ORIENTATIONS):
         raise HTTPException(422, f"unknown orientation: {fields['orientation']}")
-    if fields.get("refresh") not in (None, *schedule.REFRESH_INTERVALS):
-        raise HTTPException(422, f"unknown refresh interval: {fields['refresh']}")
     if fields.get("switch") not in (None, *schedule.SWITCH_INTERVALS):
         raise HTTPException(422, f"unknown switch interval: {fields['switch']}")
     before = _store(request).settings()
     settings = _store(request).update_settings(fields)
-    if settings["switch"] not in (choices := schedule.switch_choices(settings["refresh"])):
-        # Never switch collections more often than the frame wakes.
-        settings = _store(request).update_settings({"switch": choices[0]})
     if settings["orientation"] != before["orientation"]:
         # Turn what the frame shows now, so it doesn't wait for the next change.
         request.app.state.refresh_current()
@@ -354,8 +347,6 @@ def update_category(request: Request, category_id: int, body: CategoryPatch) -> 
         changes["source"] = body.source.model_dump() if body.source.url.strip() else None
         if changes["source"] is None:
             changes["synced"] = None
-    if "refresh" in body.model_fields_set:
-        changes["refresh"] = body.refresh  # null goes back to the frame's refresh
     return store.update_category(category_id, changes)
 
 

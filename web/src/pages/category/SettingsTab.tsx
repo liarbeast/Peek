@@ -3,8 +3,7 @@ import { useState } from "react";
 import { api, type Category, type ItemOrder, type Refresh } from "../../api";
 import { Choice, Dialog, TextInput, Toggle } from "../../components/ui";
 import { go } from "../../router";
-import { useSettings } from "../../settings";
-import { DEFAULT_REFRESH, refreshOptions } from "../../timing";
+import { refreshOptions } from "../../timing";
 
 export const ORDERS: Array<{ id: ItemOrder; label: string; description: string }> = [
   { id: "in_order", label: "In order", description: "Top to bottom, then start again" },
@@ -16,9 +15,8 @@ export function SettingsTab({ category, onSaved }: { category: Category; onSaved
   const [name, setName] = useState(category.name);
   const [order, setOrder] = useState<ItemOrder>(category.item_order);
   const [enabled, setEnabled] = useState(category.enabled);
-  const [refresh, setRefresh] = useState<Refresh | null>(category.refresh);
+  const [refresh, setRefresh] = useState<Refresh>(category.refresh);
   const [confirming, setConfirming] = useState(false);
-  const frame = useSettings();
   const dirty =
     name !== category.name ||
     order !== category.item_order ||
@@ -48,10 +46,10 @@ export function SettingsTab({ category, onSaved }: { category: Category; onSaved
       <Choice label="Order of items" value={order} onChange={setOrder} options={ORDERS} />
       <Choice
         label="Refresh"
-        value={refresh ?? DEFAULT_REFRESH}
-        onChange={(r) => setRefresh(r === DEFAULT_REFRESH ? null : (r as Refresh))}
-        options={refreshOptions(frame.refresh)}
-        description="How often the frame wakes for the next item while this collection is on it."
+        value={refresh}
+        onChange={setRefresh}
+        options={refreshOptions()}
+        description="How often the frame wakes for the next item while this collection is on it. More often uses more battery."
       />
       <Toggle label="Show this collection on the frame" isSelected={enabled} onChange={setEnabled} />
       <div className="flex gap-2">

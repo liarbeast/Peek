@@ -48,11 +48,10 @@ def create_app(data_dir: Path) -> FastAPI:
     current_source = data_dir / "current.json"
 
     def timing(category_id: int | None) -> tuple[str, str]:
-        """The refresh while a category is on the frame (its own, or the
-        frame's from Settings) and the frame's switch."""
-        settings = store.settings()
+        """The refresh while a category is on the frame (the default with
+        none, such as the welcome page) and the frame's switch."""
         category = store.category(category_id) if category_id is not None else None
-        return (category and category["refresh"]) or settings["refresh"], settings["switch"]
+        return (category and category["refresh"]) or schedule.DEFAULT_REFRESH, store.settings()["switch"]
 
     def periods(category_id: int | None) -> dict:
         """The refresh and switch periods the frame is in now (or is about to

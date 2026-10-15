@@ -139,12 +139,18 @@ MIGRATIONS = [
     """
     ALTER TABLE category ADD COLUMN refresh TEXT;
     """,
+    # Every category has its own refresh: those that used the frame's take it
+    # over, and the frame no longer has one.
+    """
+    UPDATE category SET refresh = COALESCE((SELECT value FROM setting WHERE key = 'refresh'), '1h')
+    WHERE refresh IS NULL;
+    DELETE FROM setting WHERE key = 'refresh';
+    """,
 ]
 
 # Frame-wide settings and their values until someone changes them.
 SETTING_DEFAULTS = {
     "orientation": "landscape",
-    "refresh": "1h",  # see schedule.REFRESH_INTERVALS; categories can have their own
     "switch": "1d",  # see schedule.SWITCH_INTERVALS
     "collection_order": "in_order",  # or "shuffle": see schedule.next_item
 }
@@ -236,8 +242,8 @@ class Store:
         with self.connect() as conn:
             cur = conn.execute(
                 """INSERT INTO category (name, template, item_order, weight, enabled, fields, mono, pixelate, positions,
-                                        position)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(position), 0) + 1 FROM category))""",
+                                        refresh, position)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(position), 0) + 1 FROM category))""",
                 (
                     fields["name"],
                     fields["template"],
@@ -248,6 +254,7 @@ class Store:
                     int(fields.get("mono", False)),
                     int(fields.get("pixelate", False)),
                     json.dumps(fields.get("positions", {})),
+                    fields.get("refresh", "1h"),
                 ),
             )
             new_id = cur.lastrowid
