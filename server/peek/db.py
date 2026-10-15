@@ -16,7 +16,7 @@ from typing import Iterator
 
 from . import layouts
 
-ITEM_ORDERS = ("in_order", "random", "shuffle")
+ITEM_ORDERS = ("in_order", "shuffle")
 
 # Each entry upgrades the schema by one version; never edit a shipped entry.
 MIGRATIONS = [
@@ -145,6 +145,10 @@ MIGRATIONS = [
     UPDATE category SET refresh = COALESCE((SELECT value FROM setting WHERE key = 'refresh'), '1h')
     WHERE refresh IS NULL;
     DELETE FROM setting WHERE key = 'refresh';
+    """,
+    # Items in random order made way for shuffle: random, but each once a round.
+    """
+    UPDATE category SET item_order = 'shuffle' WHERE item_order = 'random';
     """,
 ]
 

@@ -7,8 +7,7 @@ import { refreshOptions } from "../../timing";
 
 export const ORDERS: Array<{ id: ItemOrder; label: string; description: string }> = [
   { id: "in_order", label: "In order", description: "Top to bottom, then start again" },
-  { id: "random", label: "Random", description: "Any item each time, repeats possible" },
-  { id: "shuffle", label: "Shuffle", description: "Random, but every item once before repeating" },
+  { id: "shuffle", label: "Shuffle", description: "Every item once in a shuffled order, then again" },
 ];
 
 export function SettingsTab({ category, onSaved }: { category: Category; onSaved: (c: Category) => void }) {

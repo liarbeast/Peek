@@ -75,12 +75,12 @@ export function CategoriesPage() {
 }
 
 // When and to what the frame moves on from the collection it shows, in words:
-// "Switching to Birds in 7 hours", "Switching to a random collection after 3 more items".
+// "Switching to Birds in 7 hours", "Switching to the next collection (shuffled) after 3 more items".
 function switchText(current: Category | undefined): string | undefined {
   const next = current?.next_switch;
   if (!next) return undefined;
   const to = next.shuffle
-    ? "Switching to a random collection"
+    ? "Switching to the next collection (shuffled)"
     : next.next && next.next !== current.name
       ? `Switching to ${next.next}`
       : "Starting this collection again"; // the only one in rotation

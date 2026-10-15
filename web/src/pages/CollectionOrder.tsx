@@ -9,7 +9,7 @@ import { ORDERS as ITEM_ORDERS } from "./category/SettingsTab";
 
 const ORDERS: { id: Order; label: string; description: string }[] = [
   { id: "in_order", label: "In order", description: "Top to bottom as listed below, then from the top again" },
-  { id: "shuffle", label: "Shuffle", description: "A random order, every collection once before any comes back" },
+  { id: "shuffle", label: "Shuffle", description: "A shuffled order, every collection once before any comes back" },
 ];
 
 // Which collection the frame moves on to: in the order set here, or shuffled.
