@@ -282,9 +282,11 @@ def field_types() -> list[str]:
 
 @router.get("/api/categories")
 def list_categories(request: Request) -> list[dict]:
-    """Every category, with `current` set on the one the frame shows now."""
+    """Every category, with `current` set on the one the frame shows now, and
+    on that one `next_switch`: when the frame moves on from it."""
     current = request.app.state.current_category()
-    return [{**c, "current": c["id"] == current} for c in _store(request).categories()]
+    return [{**c, "current": True, "next_switch": request.app.state.next_switch()} if c["id"] == current
+            else {**c, "current": False} for c in _store(request).categories()]
 
 
 @router.post("/api/categories", status_code=201)

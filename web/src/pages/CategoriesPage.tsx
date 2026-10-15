@@ -43,7 +43,11 @@ export function CategoriesPage() {
       )}
 
       {categories?.some((c) => c.current) && (
-        <CategoryGroup title="Currently active" categories={categories.filter((c) => c.current)} />
+        <CategoryGroup
+          title="Currently active"
+          subtitle={switchText(categories.find((c) => c.current)?.next_switch)}
+          categories={categories.filter((c) => c.current)}
+        />
       )}
       {categories && categories.length > 0 && (
         <CategoryGroup
@@ -69,11 +73,27 @@ export function CategoriesPage() {
   );
 }
 
+// When the frame moves on from the collection it shows, in words.
+function switchText(next: Category["next_switch"]): string | undefined {
+  if (!next) return undefined;
+  if ("items_left" in next) {
+    const n = next.items_left;
+    return n === 0 ? "Switching collection on the next wake" : `Switching collection after ${n} more ${n === 1 ? "item" : "items"}`;
+  }
+  const minutes = Math.max(1, Math.round((new Date(next.at).getTime() - Date.now()) / 60000));
+  const [amount, unit]: [number, Intl.RelativeTimeFormatUnit] =
+    minutes < 60 ? [minutes, "minute"] : minutes < 48 * 60 ? [Math.round(minutes / 60), "hour"] : [Math.round(minutes / 1440), "day"];
+  return `Switching collection ${new Intl.RelativeTimeFormat("en").format(amount, unit)}`;
+}
+
 // A heading and the categories under it, as cards.
-function CategoryGroup(props: { title: string; categories: Category[]; empty?: string }) {
+function CategoryGroup(props: { title: string; subtitle?: string; categories: Category[]; empty?: string }) {
   return (
     <section className="flex flex-col gap-3">
-      <h2 className="text-lg font-semibold">{props.title}</h2>
+      <div>
+        <h2 className="text-lg font-semibold">{props.title}</h2>
+        {props.subtitle && <p className="text-sm text-muted">{props.subtitle}</p>}
+      </div>
       {props.categories.length === 0 && props.empty && <p className="text-muted">{props.empty}</p>}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {props.categories.map((c) => (

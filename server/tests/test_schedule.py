@@ -110,3 +110,24 @@ def test_the_list_marks_the_collection_on_the_frame(client):
     assert not any(c["current"] for c in client.get("/api/categories").json())
     client.post(f"/api/items/{item['id']}/show")
     assert {c["id"]: c["current"] for c in client.get("/api/categories").json()} == {cat["id"]: True, other["id"]: False}
+
+
+def test_next_switch_is_the_first_wake_after_the_switch_time():
+    now = datetime(2026, 10, 14, 21, 23, 40)  # a Wednesday
+    assert schedule.next_switch("1d", "1h", now) == datetime(2026, 10, 15, 0, 0)
+    assert schedule.next_switch("8h", "6h", now) == datetime(2026, 10, 15, 0, 0)  # 00:00 is both
+    assert schedule.next_switch("8h", "3h", datetime(2026, 10, 14, 9, 0)) == datetime(2026, 10, 14, 18, 0)  # 16:00 -> wake at 18:00
+    assert schedule.next_switch("1w", "1d", now) == datetime(2026, 10, 19, 0, 0)
+    assert schedule.next_switch("1mo", "1h", now) == datetime(2026, 11, 1, 0, 0)
+
+
+def test_the_current_collection_says_when_it_switches(client):
+    cat = client.post("/api/categories", json={"name": "Birds"}).json()
+    items = [client.post(f"/api/categories/{cat['id']}/items", data={"data": json.dumps({"title": t})}).json()
+             for t in ("Robin", "Wren", "Owl")]
+    client.post(f"/api/items/{items[0]['id']}/show")
+    current = next(c for c in client.get("/api/categories").json() if c["current"])
+    assert "at" in current["next_switch"]  # the default: every day
+    client.patch("/api/settings", json={"switch": "finished"})
+    current = next(c for c in client.get("/api/categories").json() if c["current"])
+    assert current["next_switch"] == {"items_left": 2}  # one of three shown

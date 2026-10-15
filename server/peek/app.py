@@ -75,6 +75,17 @@ def create_app(data_dir: Path) -> FastAPI:
             return source["category_id"]
         return (store.item(source["item_id"]) or {}).get("category_id") if "item_id" in source else None
 
+    def next_switch() -> dict:
+        """When the frame moves on from the category it shows: {"at": time},
+        or with "Once a collection is finished", {"items_left": n}."""
+        settings = store.settings()
+        if settings["switch"] == "finished":
+            category = current_category()
+            count = sum(1 for i in store.items(category) if i["enabled"]) if category else 0
+            return {"items_left": max(count - read_source().get("lap", 1), 0)}
+        at = schedule.next_switch(settings["switch"], settings["refresh"], datetime.now())
+        return {"at": at.astimezone().isoformat()}
+
     def advance() -> None:
         """Move on to the next item once a refresh period has passed."""
         source, now = read_source(), periods()
@@ -112,6 +123,7 @@ def create_app(data_dir: Path) -> FastAPI:
     app.state.set_current = set_current
     app.state.refresh_current = refresh_current
     app.state.current_category = current_category
+    app.state.next_switch = next_switch
     app.include_router(content.router)
 
     # The frame's endpoints
