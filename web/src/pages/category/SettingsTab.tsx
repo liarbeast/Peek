@@ -4,12 +4,7 @@ import { api, type Category, type ItemOrder, type Refresh } from "../../api";
 import { Choice, Dialog, TextInput, Toggle } from "../../components/ui";
 import { go } from "../../router";
 import { useSettings } from "../../settings";
-import { REFRESHES, refreshLabel } from "../../timing";
-
-const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
-
-// Select can't hold an empty key, so the frame's own refresh uses this.
-const DEFAULT = "default";
+import { DEFAULT_REFRESH, refreshOptions } from "../../timing";
 
 export const ORDERS: Array<{ id: ItemOrder; label: string; description: string }> = [
   { id: "in_order", label: "In order", description: "Top to bottom, then start again" },
@@ -53,16 +48,9 @@ export function SettingsTab({ category, onSaved }: { category: Category; onSaved
       <Choice label="Order of items" value={order} onChange={setOrder} options={ORDERS} />
       <Choice
         label="Refresh"
-        value={refresh ?? DEFAULT}
-        onChange={(r) => setRefresh(r === DEFAULT ? null : (r as Refresh))}
-        options={[
-          {
-            id: DEFAULT,
-            label: `Default (${lowerFirst(refreshLabel(frame.refresh).label)})`,
-            description: "The frame's refresh, from Settings",
-          },
-          ...REFRESHES.map((r, i) => ({ ...r, divider: i === 0 })),
-        ]}
+        value={refresh ?? DEFAULT_REFRESH}
+        onChange={(r) => setRefresh(r === DEFAULT_REFRESH ? null : (r as Refresh))}
+        options={refreshOptions(frame.refresh)}
         description="How often the frame wakes for the next item while this collection is on it."
       />
       <Toggle label="Show this collection on the frame" isSelected={enabled} onChange={setEnabled} />
