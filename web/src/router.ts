@@ -27,7 +27,8 @@ export function useRoute(): Route {
     // (see index.css); without it, the page just changes.
     const onChange = () => {
       const update = () => flushSync(() => setRoute(parse(window.location.hash)));
-      if (document.startViewTransition) document.startViewTransition(update);
+      // A transition cut short by the next page change is skipped; that's fine.
+      if (document.startViewTransition) document.startViewTransition(update).ready.catch(() => {});
       else update();
     };
     window.addEventListener("hashchange", onChange);
