@@ -40,3 +40,21 @@ export const switchOptions = (refresh: Refresh) => {
     disabled: s.minutes < r.minutes ? `Refresh is ${r.label.charAt(0).toLowerCase()}${r.label.slice(1)}` : undefined,
   }));
 };
+
+const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
+
+// Select can't hold an empty key, so a collection on the frame's own refresh uses this.
+export const DEFAULT_REFRESH = "default";
+
+// A collection's refresh choices: the frame's (from Settings), then its own.
+// `compact` uses the short labels, for a dropdown inside a list.
+export const refreshOptions = (frameRefresh: Refresh, compact = false) => [
+  compact
+    ? { id: DEFAULT_REFRESH, label: `Default (${lowerFirst(refreshLabel(frameRefresh).short.replace(/^Every (hour)?/, (_, h) => (h ? "1 hour" : "")))})` }
+    : {
+        id: DEFAULT_REFRESH,
+        label: `Default (${lowerFirst(refreshLabel(frameRefresh).label)})`,
+        description: "The frame's refresh, from Settings",
+      },
+  ...REFRESHES.map((r, i) => ({ id: r.id as string, label: compact ? r.short : r.label, divider: i === 0 })),
+];
