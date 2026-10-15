@@ -48,7 +48,7 @@ takes a minute. Add `--build` only when `requirements.txt` changes, and go back 
 
 | Endpoint | What it returns |
 | --- | --- |
-| `GET /api/sleep` | Seconds to sleep before the next wake, as plain text: until the next refresh (every 15 minutes up to weekly: the one in Settings, or the collection on the frame's own, set on its Settings tab), on the round time in the server's time zone |
+| `GET /api/sleep` | Seconds to sleep before the next wake, as plain text: until the next refresh of the collection on the frame (every 15 minutes up to weekly, set per collection on its Settings tab or in the list in Settings), on the round time in the server's time zone |
 | `GET /frame.png` | The current 800x480 image, a paletted PNG in the six pure panel colours. Once per refresh it moves on to the next item of the current collection (in the collection's item order), and once per "Switch collection" interval (in Settings) to the next one in rotation ("Collection order": in order or shuffled). "Show" on an item puts it on the frame until the next refresh |
 
 ## Fields and CSV import
@@ -63,7 +63,7 @@ separated files all work.
 A collection can fill itself from a web address that returns JSON: "Connect data source" on its Items tab. The address
 may hold placeholders, filled in on every fetch: `{YYYY}`, `{MM}` and `{DD}` for today's date, and
 `{RANDOM:min-max}` for a random whole number in that range (for an API that has no "random" address of its own). A source is read again on every wake
-that shows its collection, so its Refresh (the collection's own, or the one in Settings) decides how fresh it is. Entries it already had keep their item,
+that shows its collection, so its collection's Refresh decides how fresh it is. Entries it already had keep their item,
 with their place in the rotation and their downloaded images; new ones are added and gone ones removed. "Look at response" fetches it, finds the lists of entries in it,
 and lists every value in an entry with an example, like the columns of a CSV. Each value you use becomes a new field
 (or fills an existing one); fields you don't use are removed, since they'd stay empty. Values are stored as dotted

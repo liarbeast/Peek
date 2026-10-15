@@ -30,11 +30,11 @@ def test_a_wake_just_before_a_boundary_skips_it():
     assert schedule.sleep_seconds("1h", now) == 3630
 
 
-def test_refresh_setting(client):
-    assert client.get("/api/settings").json()["refresh"] == "1h"
-    assert client.patch("/api/settings", json={"refresh": "1d"}).json()["refresh"] == "1d"
-    assert 60 <= int(client.get("/api/sleep").text) <= 86400 + 60
-    assert client.patch("/api/settings", json={"refresh": "2m"}).status_code == 422
+def test_switch_setting(client):
+    assert client.get("/api/settings").json()["switch"] == "1d"
+    assert client.patch("/api/settings", json={"switch": "1w"}).json()["switch"] == "1w"
+    assert client.patch("/api/settings", json={"switch": "2m"}).status_code == 422
+    assert "refresh" not in client.get("/api/settings").json()  # each collection has its own
 
 
 def test_each_refresh_shows_the_next_item_and_switches_category(tmp_path, client):
@@ -65,17 +65,6 @@ def test_each_refresh_shows_the_next_item_and_switches_category(tmp_path, client
     assert wake(switch=True) == b2  # Birds again, where it left off
     client.patch(f"/api/categories/{fish['id']}", json={"enabled": False})
     assert wake(switch=True) == b1  # Fish is off, so Birds stays
-
-
-def test_switch_setting(client):
-    assert client.get("/api/settings").json()["switch"] == "1d"
-    assert client.patch("/api/settings", json={"switch": "1w"}).json()["switch"] == "1w"
-    assert client.patch("/api/settings", json={"switch": "2m"}).status_code == 422
-    # A longer refresh moves the switch up to the shortest choice that isn't shorter.
-    assert client.patch("/api/settings", json={"switch": "30m", "refresh": "1h"}).json()["switch"] == "1h"
-    assert client.patch("/api/settings", json={"refresh": "3h"}).json()["switch"] == "8h"
-    assert client.patch("/api/settings", json={"refresh": "1w"}).json()["switch"] == "1w"
-    assert client.patch("/api/settings", json={"switch": "1mo"}).json()["switch"] == "1mo"
 
 
 def test_switch_periods():
@@ -179,15 +168,12 @@ def test_shuffle_gives_every_collection_a_turn_each_round(tmp_path, client):
     assert client.patch("/api/settings", json={"collection_order": "random"}).status_code == 422
 
 
-def test_a_collection_can_have_its_own_refresh(client):
+def test_each_collection_has_its_own_refresh(client):
     cat = client.post("/api/categories", json={"name": "Birds"}).json()
-    assert cat["refresh"] is None  # the frame's refresh from Settings
+    assert cat["refresh"] == "1h"
     item = client.post(f"/api/categories/{cat['id']}/items", data={"data": json.dumps({"title": "Robin"})}).json()
     client.post(f"/api/items/{item['id']}/show")
-    client.patch("/api/settings", json={"refresh": "15m"})
-    assert int(client.get("/api/sleep").text) <= 15 * 60 + 60  # the default
-    assert client.patch(f"/api/categories/{cat['id']}", json={"refresh": "1w"}).json()["refresh"] == "1w"
-    assert int(client.get("/api/sleep").text) > 15 * 60 + 60  # its own, while it's on the frame
-    assert client.patch(f"/api/categories/{cat['id']}", json={"refresh": None}).json()["refresh"] is None
-    assert int(client.get("/api/sleep").text) <= 15 * 60 + 60  # back to the default
+    assert int(client.get("/api/sleep").text) <= 3600 + 60  # the frame sleeps by the collection it shows
+    assert client.patch(f"/api/categories/{cat['id']}", json={"refresh": "15m"}).json()["refresh"] == "15m"
+    assert int(client.get("/api/sleep").text) <= 15 * 60 + 60
     assert client.patch(f"/api/categories/{cat['id']}", json={"refresh": "2m"}).status_code == 422

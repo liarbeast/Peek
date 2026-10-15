@@ -1,7 +1,7 @@
 import { toast } from "@heroui/react";
 import { useState } from "react";
 import { api, type Orientation, type Settings } from "../api";
-import { REFRESHES, switchOptions } from "../timing";
+import { SWITCHES } from "../timing";
 import { PanelImage } from "../components/PanelImage";
 import { Choice } from "../components/ui";
 import { CollectionOrder } from "./CollectionOrder";
@@ -79,34 +79,22 @@ export function SettingsPage({ settings, onChange }: { settings: Settings; onCha
           </RadioGroup>
           <div className="flex flex-col gap-1">
             <Choice
-              label="Refresh"
-              value={settings.refresh}
-              onChange={(refresh) => update({ refresh })}
-              options={REFRESHES}
-            />
-            <p className="text-sm text-muted">
-              How often the frame wakes for the next image, on the round time. More often uses more battery. A
-              collection can have its own, on its Settings tab.
-            </p>
-          </div>
-          <div className="flex flex-col gap-1">
-            <Choice
               label="Switch collection"
               value={settings.switch}
               onChange={(s) => update({ switch: s })}
-              options={switchOptions(settings.refresh)}
+              options={SWITCHES}
             />
             <p className="text-sm text-muted">
               How often the frame moves on to the next active collection, on its first wake after this time.
             </p>
           </div>
-          <CollectionOrder value={settings.collection_order} onChange={(collection_order) => update({ collection_order })} />
         </div>
         <div className="flex flex-col gap-2">
           <span className="text-sm font-medium">On the frame now</span>
           <PanelImage alt="The frame's current image" load={api.framePreview} deps={[settings.orientation]} />
         </div>
       </div>
+      <CollectionOrder value={settings.collection_order} onChange={(collection_order) => update({ collection_order })} />
     </div>
   );
 }

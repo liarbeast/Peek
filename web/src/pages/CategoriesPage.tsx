@@ -4,7 +4,6 @@ import { api, imageUrl, type Category } from "../api";
 import { Dialog, TextInput } from "../components/ui";
 import { go } from "../router";
 import { ORDERS } from "./category/SettingsTab";
-import { useSettings } from "../settings";
 import { refreshLabel } from "../timing";
 
 export function CategoriesPage() {
@@ -97,7 +96,6 @@ function switchText(current: Category | undefined): string | undefined {
 
 // A heading and the categories under it, as cards.
 function CategoryGroup(props: { title: string; subtitle?: string; categories: Category[]; empty?: string }) {
-  const frame = useSettings();
   return (
     <section className="flex flex-col gap-3">
       <div>
@@ -127,7 +125,7 @@ function CategoryGroup(props: { title: string; subtitle?: string; categories: Ca
                   {c.item_count} {c.item_count === 1 ? "item" : "items"}
                 </Chip>
                 <Chip size="sm">{ORDERS.find((o) => o.id === c.item_order)?.label}</Chip>
-                <Chip size="sm">{refreshLabel(c.refresh ?? frame.refresh).short}</Chip>
+                <Chip size="sm">{refreshLabel(c.refresh).short}</Chip>
                 {c.source && (
                   <Chip size="sm">
                     {/* A pulsing green dot: this collection is fed live. */}
