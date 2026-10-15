@@ -101,3 +101,12 @@ def test_switch_once_a_collection_is_finished(tmp_path, client):
         return ids[json.loads(source.read_text())["item_id"]]
 
     assert [wake() for _ in range(7)] == ["Birds"] * 2 + ["Fish"] * 3 + ["Birds"] * 2
+
+
+def test_the_list_marks_the_collection_on_the_frame(client):
+    cat = client.post("/api/categories", json={"name": "Birds"}).json()
+    other = client.post("/api/categories", json={"name": "Fish"}).json()
+    item = client.post(f"/api/categories/{cat['id']}/items", data={"data": json.dumps({"title": "Robin"})}).json()
+    assert not any(c["current"] for c in client.get("/api/categories").json())
+    client.post(f"/api/items/{item['id']}/show")
+    assert {c["id"]: c["current"] for c in client.get("/api/categories").json()} == {cat["id"]: True, other["id"]: False}

@@ -68,6 +68,13 @@ def create_app(data_dir: Path) -> FastAPI:
         except (OSError, ValueError):
             return {}
 
+    def current_category() -> int | None:
+        """The category the frame shows now, if it shows an item."""
+        source = read_source()
+        if "category_id" in source:
+            return source["category_id"]
+        return (store.item(source["item_id"]) or {}).get("category_id") if "item_id" in source else None
+
     def advance() -> None:
         """Move on to the next item once a refresh period has passed."""
         source, now = read_source(), periods()
@@ -104,6 +111,7 @@ def create_app(data_dir: Path) -> FastAPI:
     app.state.store = store
     app.state.set_current = set_current
     app.state.refresh_current = refresh_current
+    app.state.current_category = current_category
     app.include_router(content.router)
 
     # The frame's endpoints
