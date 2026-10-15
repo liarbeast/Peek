@@ -4,6 +4,7 @@ import { api, type Orientation, type Refresh, type Settings, type Switch } from 
 import { PanelImage } from "../components/PanelImage";
 import { Choice } from "../components/ui";
 import { Label, Radio, RadioGroup } from "react-aria-components";
+import { getTransition, setTransition, TRANSITIONS } from "../transitions";
 
 const ORIENTATIONS: { id: Orientation; label: string; size: string; shape: string }[] = [
   { id: "landscape", label: "Landscape", size: "800 × 480", shape: "h-9 w-15" },
@@ -40,6 +41,7 @@ const SWITCHES: { id: Switch; label: string; description?: string; divider?: boo
 
 export function SettingsPage({ settings, onChange }: { settings: Settings; onChange: (s: Settings) => void }) {
   const [busy, setBusy] = useState(false);
+  const [transition, pickTransition] = useState(getTransition);
   const refresh = REFRESHES.find((r) => r.id === settings.refresh) ?? REFRESHES[0];
 
   const update = async (patch: Partial<Settings>) => {
@@ -134,6 +136,19 @@ export function SettingsPage({ settings, onChange }: { settings: Settings; onCha
               “Finished” moves on once every item of the collection has been shown. Choices shorter than Refresh
               are greyed out; pick the same as Refresh to change collection on every wake.
             </p>
+          </div>
+          {/* Temporary: to try the page transitions out, then keep one. Kept in this browser only. */}
+          <div className="flex flex-col gap-1 rounded-xl border border-dashed border-border p-3">
+            <Choice
+              label="Page transition (to try out)"
+              value={transition}
+              onChange={(t) => {
+                pickTransition(t);
+                setTransition(t);
+              }}
+              options={TRANSITIONS.map((t) => ({ id: t.id, label: t.label }))}
+            />
+            <p className="text-sm text-muted">Click around the app to see it. This picker goes once you've chosen.</p>
           </div>
         </div>
         <div className="flex flex-col gap-2">
