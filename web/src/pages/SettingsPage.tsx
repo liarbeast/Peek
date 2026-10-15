@@ -113,8 +113,7 @@ export function SettingsPage({ settings, onChange }: { settings: Settings; onCha
               options={REFRESHES}
             />
             <p className="text-sm text-muted">
-              How often the frame wakes for a new image: the next item of the current collection. Wakes fall on the
-              round time, so it stays on schedule. More often uses more battery.
+              How often the frame wakes for the next image, on the round time. More often uses more battery.
             </p>
           </div>
           <div className="flex flex-col gap-1">
@@ -132,8 +131,6 @@ export function SettingsPage({ settings, onChange }: { settings: Settings; onCha
             />
             <p className="text-sm text-muted">
               How often the frame moves on to the next active collection, on its first wake after this time.
-              “Finished” moves on once every item of the collection has been shown. Choices shorter than Refresh
-              are greyed out; pick the same as Refresh to change collection on every wake.
             </p>
           </div>
           <CollectionOrder value={settings.collection_order} onChange={(collection_order) => update({ collection_order })} />
