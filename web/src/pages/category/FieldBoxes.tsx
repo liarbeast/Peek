@@ -83,29 +83,39 @@ export function FieldBoxes(props: {
   const contentHeight = (key: string) => measured[key]?.[3] ?? null;
   const isText = (key: string) => props.fields.find((f) => f.key === key)?.type === "text";
 
-  // A field's box as it is drawn now: a field attached below another sits
-  // `gap` under where that field's content ends, wherever that field is.
-  // Attached fields can point at fields this overlay doesn't list (hidden
-  // ones), which still have a saved box.
+  // A field's box as it is drawn now: a field attached to another sits `gap`
+  // under where that field's content ends, or `gap` over where it starts if
+  // it is attached above it, wherever that field is. Attached fields can point
+  // at fields this overlay doesn't list (hidden ones), which still have a
+  // saved box.
   const shown = (key: string, seen = new Set<string>()): Box | null => {
     const box = boxOf(key, placed, measured, isText(key));
     if (!box?.below || seen.has(key)) return box;
     seen.add(key);
-    const above = shown(box.below, seen);
-    if (!above) return box;
+    const target = shown(box.below, seen);
+    if (!target) return box;
     const height = contentHeight(box.below);
+    const gap = box.gap ?? 0;
     // An empty or hidden field isn't drawn and passes its place on.
-    return { ...box, y: height === null ? above.y : above.y + height + (box.gap ?? 0) };
+    if (box.side === "above") return { ...box, y: target.y - box.h - (height === null ? 0 : gap) };
+    return { ...box, y: height === null ? target.y : target.y + height + gap };
   };
 
-  // Saves boxes; for an attached field, its new position becomes its new gap.
+  // Saves boxes. For an attached field, its new position becomes its new gap,
+  // and the side it's on: above the field it's attached to if its middle is
+  // higher than that field's middle, so it keeps its distance from that edge.
   const placeAll = (boxes: Record<string, Box>) => {
     const next = { ...placed };
     for (let [key, box] of Object.entries(boxes)) {
       if (box.below) {
-        const above = shown(box.below);
+        const target = shown(box.below);
         const height = contentHeight(box.below);
-        if (above && height !== null) box = { ...box, gap: Math.round(box.y - (above.y + height)) };
+        if (target && height !== null) {
+          const above = box.y + box.h / 2 < target.y + height / 2;
+          box = above
+            ? { ...box, side: "above", gap: Math.round(target.y - (box.y + box.h)) }
+            : { ...box, side: "below", gap: Math.round(box.y - (target.y + height)) };
+        }
       }
       next[key] = box;
     }
@@ -152,7 +162,7 @@ export function FieldBoxes(props: {
   const attach = (key: string, below: string | null) => {
     const box = shown(key);
     if (!box) return;
-    const { below: _, gap: __, ...rest } = box;
+    const { below: _, gap: __, side: ___, ...rest } = box;
     place(key, below ? { ...rest, below } : rest);
   };
 

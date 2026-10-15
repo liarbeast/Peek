@@ -414,6 +414,22 @@ def test_text_grows_from_the_edge_that_stays_put(client):
         assert found["subtext"][1] == found["title"][1] + found["title"][3] + 12
 
 
+def test_attached_above_follows_the_top_edge(client):
+    cat = make_category(client)
+    url = f"/api/categories/{cat['id']}/preview.png"
+    found = []
+    for subtext in ("A short line", "A much longer line of text that wraps onto several lines in a narrow box " * 2):
+        item = add_item(client, cat["id"], {"title": "1066", "subtext": subtext})
+        positions = {"landscape": {
+            "subtext": {"x": 20, "y": 300, "w": 300, "h": 40, "grow": "up"},
+            "title": {"x": 20, "y": 0, "w": 300, "h": 40, "below": "subtext", "side": "above", "gap": 10},
+        }}
+        found.append(boxes(client.post(url, json={"positions": positions, "item_id": item["id"]})))
+    for f in found:
+        assert abs(f["title"][1] + f["title"][3] + 10 - f["subtext"][1]) <= 1  # 10px over its real top edge
+    assert found[1]["title"][1] < found[0]["title"][1]  # the longer text pushed it up
+
+
 def test_attached_to_an_empty_field_takes_its_place(client):
     cat = make_category(client)
     item = add_item(client, cat["id"], {"title": "Robin", "subtext": "Garden bird"})  # no image

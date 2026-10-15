@@ -51,10 +51,13 @@ class Box(BaseModel):
     # `h` are the box as last placed, so those edges stay put.
     grow: Literal["down", "up", "middle"] | None = None
     z: int | None = Field(default=None, ge=-100, le=100)  # higher is drawn in front
-    # Linked below another field: drawn `gap` pixels under where that field's
-    # content ends, so a title that wraps to two lines pushes it down.
+    # Attached to another field (named `below` for history): drawn `gap` pixels
+    # under where that field's content ends, so a title that wraps to two
+    # lines pushes it down; or, on side "above", `gap` pixels over where its
+    # content starts, so text that grows up pushes it up.
     below: str | None = Field(default=None, max_length=64)
     gap: int | None = Field(default=None, ge=-800, le=800)
+    side: Literal["below", "above"] | None = None
 
     @field_validator("font")
     @classmethod

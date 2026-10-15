@@ -7,7 +7,7 @@
    (keys starting with @) are drawn the same way; crisp ones as pixel art. #}
 {% macro field(e) -%}
   {%- set b = e.box -%}
-  {%- set link = (' data-below="%s" data-gap="%d"' % (b.below | e, b.gap or 0)) if b.below else "" -%}
+  {%- set link = (' data-below="%s" data-gap="%d" data-side="%s"' % (b.below | e, b.gap or 0, b.side or "below")) if b.below else "" -%}
   {#- Where the text's anchor edge is, and how far up from it the text starts. -#}
   {%- set grow = b.grow if e.type != "image" and b.grow in ("up", "middle") else "down" -%}
   {%- set top = b.y + (b.h if grow == "up" else (b.h // 2 if grow == "middle" else 0)) -%}
