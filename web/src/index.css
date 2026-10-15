@@ -27,3 +27,17 @@ body {
 .live-ping {
   animation: live-ping 4s cubic-bezier(0, 0, 0.2, 1) infinite;
 }
+
+/* Page transitions: only the page below the header fades from one to the
+   next, quickly; none for people who asked their system for less motion. */
+::view-transition-old(page),
+::view-transition-new(page) {
+  animation-duration: 180ms;
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
