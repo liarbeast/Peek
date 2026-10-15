@@ -51,11 +51,11 @@ export function CategoriesPage() {
       )}
       {categories && categories.length > 0 && (
         <CategoryGroup
-          title="Enabled"
+          title="In rotation"
           empty={
             categories.some((c) => c.enabled)
               ? undefined
-              : "No enabled collections. Turn on “Show this collection on the frame” in its Settings tab."
+              : "No collections in rotation. Turn on “Show this collection on the frame” in its Settings tab."
           }
           categories={categories.filter((c) => c.enabled && !c.current)}
         />
