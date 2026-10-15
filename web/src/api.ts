@@ -64,9 +64,11 @@ export interface Box {
   weight?: number; // 100 (thin) to 900 (black); 400 is regular
   color?: PanelColour;
   font?: string; // one of api.fonts(); none is the built-in face (400 and 700)
-  // Attached below another field: drawn `gap` pixels under where that field ends.
+  // Attached to another field (named `below` for history): drawn `gap` pixels
+  // under where that field ends, or, on side "above", `gap` pixels over where it starts.
   below?: string;
   gap?: number;
+  side?: "below" | "above";
 }
 
 // Per orientation, every field's box (and the style images that were moved).
