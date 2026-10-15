@@ -1,4 +1,5 @@
 import { Button, Spinner, Toast } from "@heroui/react";
+import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { api, type Settings, type Template } from "./api";
 import { PanelImage } from "./components/PanelImage";
@@ -56,16 +57,31 @@ export function App() {
           </div>
         </header>
 
-        <main className="mx-auto max-w-5xl px-4 py-6 [view-transition-name:page]">
-          {!templates || !settings ? (
-            <Spinner />
-          ) : route.page === "settings" ? (
-            <SettingsPage settings={settings} onChange={setSettings} />
-          ) : route.page === "category" ? (
-            <CategoryPage key={route.id} id={route.id} tab={route.tab} templates={templates} />
-          ) : (
-            <CategoriesPage />
-          )}
+        <main className="mx-auto max-w-5xl px-4 py-6">
+          {/* Page transitions: the old page fades out, then the new one fades
+              in while rising a little. A collection's tabs change inside its
+              page, so they don't count as a new page. Off for people who asked
+              their system for less motion. */}
+          <MotionConfig reducedMotion="user">
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div
+                key={route.page === "category" ? `category-${route.id}` : route.page}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0, transition: { duration: 0.2, ease: [0.2, 0.8, 0.2, 1] } }}
+                exit={{ opacity: 0, transition: { duration: 0.1, ease: "easeIn" } }}
+              >
+                {!templates || !settings ? (
+                  <Spinner />
+                ) : route.page === "settings" ? (
+                  <SettingsPage settings={settings} onChange={setSettings} />
+                ) : route.page === "category" ? (
+                  <CategoryPage id={route.id} tab={route.tab} templates={templates} />
+                ) : (
+                  <CategoriesPage />
+                )}
+              </motion.div>
+            </AnimatePresence>
+          </MotionConfig>
         </main>
 
         <Dialog isOpen={showFrame} onOpenChange={setShowFrame} title="On the frame now" size="lg">
