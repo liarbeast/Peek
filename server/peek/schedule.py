@@ -111,7 +111,7 @@ def next_item(store: db.Store, current_category: int | None, switch: bool, lap: 
     """The item to show next: from the current category, or from the next
     active one when `switch` is set (or the current one is off or empty).
     The next one is the one after it in the categories' order, or with
-    `order` "shuffle", a random one that hasn't had its turn this round
+    `order` "shuffle", one picked at random from those that haven't had their turn this round
     (`shown_this_round`); once all have, a new round starts.
     With `lap`, the number of its items shown in a row, it also switches once
     that reaches how many items the category has. `fetch` brings a category
@@ -137,9 +137,7 @@ def next_item(store: db.Store, current_category: int | None, switch: bool, lap: 
         items = enabled(category)
     if not items:
         return None
-    if category["item_order"] == "random":
-        return random.choice(items)
-    if category["item_order"] == "shuffle":  # each item once, in a random order, then again
+    if category["item_order"] == "shuffle":  # each item once, in a shuffled order, then again
         fewest = min(i["times_shown"] for i in items)
         return random.choice([i for i in items if i["times_shown"] == fewest])
     last = max(items, key=lambda i: i["last_shown"] or "")

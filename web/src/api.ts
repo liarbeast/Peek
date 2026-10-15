@@ -1,6 +1,6 @@
 // Typed calls to the Peek server.
 
-export type ItemOrder = "in_order" | "random" | "shuffle";
+export type ItemOrder = "in_order" | "shuffle";
 
 export type Orientation = "landscape" | "portrait";
 
