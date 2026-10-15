@@ -82,7 +82,9 @@ one under the other, full width and centred, each attached below the one before.
 
 - **Moving:** drag a box. It snaps to the canvas centre and edges and to other fields (hold Alt to stop snapping), and
   the arrow keys nudge it. Shift-click picks several fields, which then drag and nudge together.
-- **Size:** a text box has one handle, for its width: the text wraps inside it and the box is as tall as its lines. Its
+- **Size:** a text box has one handle, for its width: the text wraps inside it and the box is as tall as its lines.
+  "Grow" in its toolbar picks which edge stays put when the text takes more or fewer lines: the top (down, the
+  default), the bottom (up) or the centre (middle). Fields attached below still follow its real bottom edge. Its
   text size is set in pixels. Images scale from their corner and keep their shape.
 - **Style:** click a field for its toolbar: alignment, text size, colour (the panel's six), typeface, weight, front and
   back, and "Attach to". A field attached to another keeps its distance from where that one ends, so when a title wraps to two

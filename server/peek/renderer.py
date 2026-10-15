@@ -49,8 +49,10 @@ _FIELD_BOXES = """
 """
 
 # Fields attached below another move to `gap` pixels under that field, which
-# for text ends where its last line does. An empty field takes no room: what
-# is attached to it moves up to where it would have been.
+# for text ends where its last line does (measured, so text that grows up or
+# from the middle counts too). An empty field takes no room: what is attached
+# to it moves up to where it would have been. An attached field hangs from its
+# top, whichever way it would grow on its own.
 _ATTACH_FIELDS = """
 const done = new Set();
 const find = (key) => document.querySelector(`[data-field="${CSS.escape(key)}"]`);
@@ -72,7 +74,10 @@ const place = (el, seen) => {
   if (!el.dataset.below || done.has(el) || seen.has(el)) return;
   seen.add(el);
   const top = next(el.dataset.below, Number(el.dataset.gap), seen);
-  if (top !== null) el.style.top = `${Math.round(top)}px`;
+  if (top !== null) {
+    el.style.top = `${Math.round(top)}px`;
+    el.style.transform = "none";
+  }
   done.add(el);
 };
 for (const el of document.querySelectorAll("[data-field][data-below]")) place(el, new Set());

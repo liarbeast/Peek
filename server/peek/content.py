@@ -46,6 +46,10 @@ class Box(BaseModel):
     font: str | None = None  # a family from fonts.FONTS; none is the built-in face
     align: Literal["left", "center", "right"] | None = None
     valign: Literal["top", "middle", "bottom"] | None = None
+    # Which way text grows as it takes more lines: from its top edge down (the
+    # default), from its bottom edge up, or both ways from its centre. `y` and
+    # `h` are the box as last placed, so those edges stay put.
+    grow: Literal["down", "up", "middle"] | None = None
     z: int | None = Field(default=None, ge=-100, le=100)  # higher is drawn in front
     # Linked below another field: drawn `gap` pixels under where that field's
     # content ends, so a title that wraps to two lines pushes it down.

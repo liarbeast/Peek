@@ -388,6 +388,32 @@ def test_attached_field_follows_the_text_above(client):
     assert client.post(url, json={"positions": loop}).status_code == 200
 
 
+def test_text_grows_from_the_edge_that_stays_put(client):
+    cat = make_category(client)
+    url = f"/api/categories/{cat['id']}/preview.png"
+    short = add_item(client, cat["id"], {"title": "Robin", "subtext": "Garden bird"})
+    long = add_item(client, cat["id"], {"title": "Robin, the European garden bird of " * 2, "subtext": "Garden bird"})
+
+    def drawn(grow):
+        positions = {"landscape": {
+            "title": {"x": 20, "y": 200, "w": 300, "h": 40, "size": 30, "grow": grow},
+            "subtext": {"x": 20, "y": 0, "w": 300, "h": 40, "below": "title", "gap": 12, "grow": "up"},
+        }}
+        return [boxes(client.post(url, json={"positions": positions, "item_id": i["id"]})) for i in (short, long)]
+
+    one, two = drawn("down")
+    assert one["title"][1] == two["title"][1] == 200  # the top stays put
+    one, two = drawn("up")
+    assert one["title"][1] + one["title"][3] == two["title"][1] + two["title"][3] == 240  # the bottom stays put
+    assert two["title"][1] < one["title"][1]  # more lines went up
+    one, two = drawn("middle")
+    assert abs(one["title"][1] + one["title"][3] / 2 - 220) <= 1  # the centre stays put
+    assert abs(two["title"][1] + two["title"][3] / 2 - 220) <= 1
+    for found in drawn("up") + drawn("middle"):
+        # Attached below: 12px under the title's real bottom edge, hanging from its own top.
+        assert found["subtext"][1] == found["title"][1] + found["title"][3] + 12
+
+
 def test_attached_to_an_empty_field_takes_its_place(client):
     cat = make_category(client)
     item = add_item(client, cat["id"], {"title": "Robin", "subtext": "Garden bird"})  # no image

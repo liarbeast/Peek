@@ -1,13 +1,19 @@
 {# A field's element, at its box: position, front-to-back order and
    alignment; an image also gets its height, while text gets its size,
-   weight, colour and typeface and is as tall as its lines. An empty field leaves a hidden marker,
+   weight, colour and typeface and is as tall as its lines. Text that grows
+   up or from the middle hangs from its box's bottom edge or centre instead
+   of its top. An empty field leaves a hidden marker,
    so fields attached below it can still find their place. Style images
    (keys starting with @) are drawn the same way; crisp ones as pixel art. #}
 {% macro field(e) -%}
   {%- set b = e.box -%}
   {%- set link = (' data-below="%s" data-gap="%d"' % (b.below | e, b.gap or 0)) if b.below else "" -%}
+  {#- Where the text's anchor edge is, and how far up from it the text starts. -#}
+  {%- set grow = b.grow if e.type != "image" and b.grow in ("up", "middle") else "down" -%}
+  {%- set top = b.y + (b.h if grow == "up" else (b.h // 2 if grow == "middle" else 0)) -%}
   {%- if e.value -%}
-    {%- set style = "left:%dpx;top:%dpx;width:%dpx" % (b.x, b.y, b.w) -%}
+    {%- set style = "left:%dpx;top:%dpx;width:%dpx" % (b.x, top, b.w) -%}
+    {%- if grow != "down" %}{% set style = style ~ ";transform:translateY(-%d%%)" % (100 if grow == "up" else 50) %}{% endif -%}
     {%- if e.type == "image" -%}
       {%- set valign = {"top": "top", "middle": "center", "bottom": "bottom"}[b.valign or "middle"] -%}
       {%- set style = style ~ ";height:%dpx;object-position:%s %s" % (b.h, b.align or "center", valign) -%}
@@ -27,6 +33,6 @@
       <div class="{{ classes }}" data-field="{{ e.key }}" style="{{ style }}"{{ link | safe }}>{{ e.value }}</div>
     {%- endif -%}
   {%- else -%}
-    <template data-empty="{{ e.key }}" data-top="{{ b.y }}"{{ link | safe }}></template>
+    <template data-empty="{{ e.key }}" data-top="{{ top }}"{{ link | safe }}></template>
   {%- endif -%}
 {%- endmacro %}
