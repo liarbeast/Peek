@@ -96,6 +96,19 @@ export function FieldToolbar(props: {
           {weights.length > 1 && (
             <WeightMenu weights={weights} value={box.weight ?? 400} onChange={(weight) => props.onChange({ weight })} />
           )}
+          {/* Attached text hangs from the field above, so it can only grow down. */}
+          {!box.below && (
+            <Segments
+              label="Grow"
+              value={box.grow ?? "down"}
+              options={[
+                ["down", "Grow down: the top edge stays put", <Grow key="d" edge={3} arrows={[1]} />],
+                ["up", "Grow up: the bottom edge stays put", <Grow key="u" edge={13} arrows={[-1]} />],
+                ["middle", "Grow both ways: the centre stays put", <Grow key="m" edge={8} arrows={[-1, 1]} />],
+              ]}
+              onChange={(grow) => props.onChange({ grow: grow as Box["grow"] })}
+            />
+          )}
         </>
       ) : (
         !layer.image && (
@@ -339,6 +352,21 @@ function Bar(props: { y: number }) {
     <svg {...svg}>
       <rect x="2" y="2" width="12" height="12" rx="1.5" strokeOpacity="0.4" />
       <line x1="5" x2="11" y1={props.y} y2={props.y} strokeWidth="2.5" />
+    </svg>
+  );
+}
+
+// A line that stays put, with arrows pointing the way the text grows from it.
+function Grow(props: { edge: number; arrows: (1 | -1)[] }) {
+  return (
+    <svg {...svg}>
+      <line x1="2" x2="14" y1={props.edge} y2={props.edge} strokeWidth="2" />
+      {props.arrows.map((dir) => {
+        const tip = props.edge + dir * (props.arrows.length > 1 ? 5 : 9);
+        return (
+          <path key={dir} d={`M8 ${props.edge + dir * 2.5}V${tip}M5.5 ${tip - dir * 2.5}L8 ${tip}l2.5 ${-dir * 2.5}`} strokeLinejoin="round" />
+        );
+      })}
     </svg>
   );
 }

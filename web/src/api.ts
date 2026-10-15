@@ -56,6 +56,10 @@ export interface Box {
   size?: number; // text size in pixels; text is as tall as its lines, so `h` is for images
   align?: "left" | "center" | "right";
   valign?: "top" | "middle" | "bottom";
+  // Which way text grows with more lines: down from its top edge (the default),
+  // up from its bottom edge, or both ways from its centre. y and h are the box
+  // as last placed, so that edge stays put.
+  grow?: "down" | "up" | "middle";
   z?: number; // higher is drawn in front
   weight?: number; // 100 (thin) to 900 (black); 400 is regular
   color?: PanelColour;

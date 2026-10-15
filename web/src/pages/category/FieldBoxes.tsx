@@ -21,10 +21,17 @@ export interface Layer {
 
 // A layer's box: its saved one, or else where the last render drew it (a
 // style image that was never moved sits behind everything). Text is as tall
-// as its lines, so its height always comes from the last render.
+// as its lines, so its height always comes from the last render; text that
+// grows up or from the middle moves its top to keep its bottom or centre.
 function boxOf(key: string, placed: Record<string, Box>, measured: Preview["boxes"], text: boolean): Box | null {
   const m = measured[key];
-  if (placed[key]) return { size: m?.[4], ...placed[key], ...(text && m ? { h: m[3] } : {}) };
+  if (placed[key] && text && m) {
+    const box = { size: m[4], ...placed[key] };
+    const extra = box.h - m[3]; // how much shorter the text came out than the box as placed
+    const y = box.y + (box.grow === "up" ? extra : box.grow === "middle" ? Math.round(extra / 2) : 0);
+    return { ...box, y, h: m[3] };
+  }
+  if (placed[key]) return { size: m?.[4], ...placed[key] };
   if (!m) return null;
   return { x: m[0], y: m[1], w: m[2], h: m[3], ...(key.startsWith("@") ? { z: -1 } : { size: m[4] }) };
 }
