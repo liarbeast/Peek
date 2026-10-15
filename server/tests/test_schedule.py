@@ -177,3 +177,17 @@ def test_shuffle_gives_every_collection_a_turn_each_round(tmp_path, client):
         assert sorted(shown[start:start + 5]) == names  # each round: all five, once
     assert all(a != b for a, b in zip(shown, shown[1:]))  # never the same twice in a row
     assert client.patch("/api/settings", json={"collection_order": "random"}).status_code == 422
+
+
+def test_a_collection_can_have_its_own_refresh(client):
+    cat = client.post("/api/categories", json={"name": "Birds"}).json()
+    assert cat["refresh"] is None  # the frame's refresh from Settings
+    item = client.post(f"/api/categories/{cat['id']}/items", data={"data": json.dumps({"title": "Robin"})}).json()
+    client.post(f"/api/items/{item['id']}/show")
+    client.patch("/api/settings", json={"refresh": "15m"})
+    assert int(client.get("/api/sleep").text) <= 15 * 60 + 60  # the default
+    assert client.patch(f"/api/categories/{cat['id']}", json={"refresh": "1w"}).json()["refresh"] == "1w"
+    assert int(client.get("/api/sleep").text) > 15 * 60 + 60  # its own, while it's on the frame
+    assert client.patch(f"/api/categories/{cat['id']}", json={"refresh": None}).json()["refresh"] is None
+    assert int(client.get("/api/sleep").text) <= 15 * 60 + 60  # back to the default
+    assert client.patch(f"/api/categories/{cat['id']}", json={"refresh": "2m"}).status_code == 422
