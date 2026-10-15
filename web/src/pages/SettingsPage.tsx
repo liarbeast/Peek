@@ -37,7 +37,8 @@ export function SettingsPage({ settings, onChange }: { settings: Settings; onCha
         <h1 className="mt-1 text-2xl font-semibold">Settings</h1>
         <p className="text-muted">These apply to the whole frame.</p>
       </div>
-      <div className="grid gap-6 md:grid-cols-2">
+      {/* The left column is the wider one, for the collections table. */}
+      <div className="grid gap-6 md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
         <div className="flex flex-col gap-4">
           <RadioGroup
             value={settings.orientation}
@@ -88,13 +89,13 @@ export function SettingsPage({ settings, onChange }: { settings: Settings; onCha
               How often the frame moves on to the next active collection, on its first wake after this time.
             </p>
           </div>
+          <CollectionOrder value={settings.collection_order} onChange={(collection_order) => update({ collection_order })} />
         </div>
         <div className="flex flex-col gap-2">
           <span className="text-sm font-medium">On the frame now</span>
           <PanelImage alt="The frame's current image" load={api.framePreview} deps={[settings.orientation]} />
         </div>
       </div>
-      <CollectionOrder value={settings.collection_order} onChange={(collection_order) => update({ collection_order })} />
     </div>
   );
 }

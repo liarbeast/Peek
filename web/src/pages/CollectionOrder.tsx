@@ -53,10 +53,8 @@ export function CollectionOrder(props: { value: Order; onChange: (order: Order) 
   };
 
   return (
-    <div className="flex max-w-3xl flex-col gap-2">
-      <div className="max-w-md">
-        <Choice label="Collection order" value={props.value} onChange={props.onChange} options={ORDERS} />
-      </div>
+    <div className="flex flex-col gap-2">
+      <Choice label="Collection order" value={props.value} onChange={props.onChange} options={ORDERS} />
       {order && order.length > 0 && (
         <div className="flex items-center gap-2 px-2 text-xs font-medium text-muted" aria-hidden="true">
           {props.value === "in_order" && order.length > 1 && <span className="w-[3.25rem] flex-none" />}
