@@ -130,7 +130,15 @@ def test_the_current_collection_says_when_it_switches(client):
     assert "at" in current["next_switch"]  # the default: every day
     client.patch("/api/settings", json={"switch": "finished"})
     current = next(c for c in client.get("/api/categories").json() if c["current"])
-    assert current["next_switch"] == {"items_left": 2}  # one of three shown
+    assert current["next_switch"] == {"items_left": 2, "next": "Birds"}  # one of three shown; Birds is the only one
+    client.post("/api/categories", json={"name": "Fish"})  # no items yet: not in rotation
+    trees = client.post("/api/categories", json={"name": "Trees"}).json()
+    client.post(f"/api/categories/{trees['id']}/items", data={"data": json.dumps({"title": "Oak"})})
+    current = next(c for c in client.get("/api/categories").json() if c["current"])
+    assert current["next_switch"]["next"] == "Trees"
+    client.patch("/api/settings", json={"collection_order": "shuffle"})
+    current = next(c for c in client.get("/api/categories").json() if c["current"])
+    assert current["next_switch"] == {"items_left": 2, "shuffle": True}
 
 
 def _rotation(tmp_path, client, names, wakes):

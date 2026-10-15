@@ -77,14 +77,19 @@ def create_app(data_dir: Path) -> FastAPI:
 
     def next_switch() -> dict:
         """When the frame moves on from the category it shows: {"at": time},
-        or with "Once a collection is finished", {"items_left": n}."""
+        or with "Once a collection is finished", {"items_left": n}; and to
+        what: {"next": name} in order, or {"shuffle": True}."""
         settings = store.settings()
+        category = current_category()
+        if settings["collection_order"] == "shuffle":
+            to = {"shuffle": True}
+        else:
+            to = {"next": (schedule.next_in_order(store, category) or {}).get("name")}
         if settings["switch"] == "finished":
-            category = current_category()
             count = sum(1 for i in store.items(category) if i["enabled"]) if category else 0
-            return {"items_left": max(count - read_source().get("lap", 1), 0)}
+            return {"items_left": max(count - read_source().get("lap", 1), 0), **to}
         at = schedule.next_switch(settings["switch"], settings["refresh"], datetime.now())
-        return {"at": at.astimezone().isoformat()}
+        return {"at": at.astimezone().isoformat(), **to}
 
     def advance() -> None:
         """Move on to the next item once a refresh period has passed."""
