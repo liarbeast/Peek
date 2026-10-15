@@ -96,6 +96,8 @@ export interface Category {
   cover: string | null;
   source: Source | null;
   current?: boolean; // the collection the frame shows now (in the list of collections only)
+  // On the current one: when the frame moves on, or how many items it shows first.
+  next_switch?: { at: string } | { items_left: number };
   synced: string | null; // the day the source was last read, YYYY-MM-DD
 }
 

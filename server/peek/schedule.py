@@ -75,6 +75,18 @@ def period_start(interval: str, now: datetime) -> datetime:
     return start + step * ((now - start) // step)
 
 
+def next_switch(switch: str, refresh: str, now: datetime) -> datetime:
+    """When the frame next moves on to another category: the first wake on or
+    after the end of the current switch period ("finished" isn't a time)."""
+    start = period_start(switch, now)
+    if switch == "1mo":
+        end = (start + timedelta(days=32)).replace(day=1)
+    else:
+        end = start + (SWITCH_INTERVALS.get(switch) or REFRESH_INTERVALS[DEFAULT_REFRESH])
+    wake = period_start(refresh, end)
+    return wake if wake == end else wake + REFRESH_INTERVALS.get(refresh, REFRESH_INTERVALS[DEFAULT_REFRESH])
+
+
 def next_wake(refresh: str, now: datetime) -> datetime:
     """The first round time after `now` for this interval."""
     step = REFRESH_INTERVALS.get(refresh, REFRESH_INTERVALS[DEFAULT_REFRESH])
