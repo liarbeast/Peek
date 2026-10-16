@@ -7,13 +7,15 @@ local time, so they don't drift with however long a wake takes.
 Each wake shows the next item of the current category, in the category's item
 order. When the "switch collection" interval has passed too (or, if so set,
 once every item of the category has had its turn), it moves on to the next
-active category first.
+active category first. A category filled from a data source is fetched on
+every wake it's shown.
 """
 
 from __future__ import annotations
 
 import random
 from datetime import datetime, timedelta
+from typing import Callable
 
 from . import db
 
@@ -87,14 +89,16 @@ def sleep_seconds(refresh: str, now: datetime | None = None) -> int:
     return round((next_wake(refresh, now) - now).total_seconds())
 
 
-def next_item(store: db.Store, current_category: int | None, switch: bool, lap: int | None = None) -> dict | None:
+def next_item(store: db.Store, current_category: int | None, switch: bool, lap: int | None = None,
+              fetch: Callable[[dict], None] | None = None) -> dict | None:
     """The item to show next: from the current category, or from the next
     active one when `switch` is set (or the current one is off or empty).
     With `lap`, the number of its items shown in a row, it also switches once
-    that reaches how many items the category has.
+    that reaches how many items the category has. `fetch` brings a category
+    filled from a data source up to date before its next item is picked.
     None when no active category has an item to show."""
-    pool = [(c, items) for c in store.categories() if c["enabled"]
-            if (items := [i for i in store.items(c["id"]) if i["enabled"]])]
+    enabled = lambda c: [i for i in store.items(c["id"]) if i["enabled"]]  # noqa: E731
+    pool = [(c, items) for c in store.categories() if c["enabled"] if (items := enabled(c)) or c["source"]]
     if not pool:
         return None
     ids = [c["id"] for c, _ in pool]
@@ -102,6 +106,11 @@ def next_item(store: db.Store, current_category: int | None, switch: bool, lap: 
         switch = switch or lap >= len(pool[ids.index(current_category)][1])
     index = (ids.index(current_category) + switch) % len(pool) if current_category in ids else 0
     category, items = pool[index]
+    if fetch and category["source"]:
+        fetch(category)
+        items = enabled(category)
+    if not items:
+        return None
     if category["item_order"] == "random":
         return random.choice(items)
     if category["item_order"] == "shuffle":  # each item once, in a random order, then again

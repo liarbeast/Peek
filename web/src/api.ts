@@ -88,6 +88,26 @@ export interface Category {
   fields: Field[];
   item_count: number;
   cover: string | null;
+  source: Source | null;
+  synced: string | null; // the day the source was last read, YYYY-MM-DD
+}
+
+// One value of a source's entries, going to an existing field or a new one.
+export type SourceColumn = { path: string; field: string } | { path: string; new: { label: string; type: FieldType } };
+
+export interface SourceInspection {
+  lists: { path: string; count: number }[];
+  items: string; // the list looked into
+  // label and type are suggestions for when a value becomes a new field.
+  values: { path: string; example: string; label: string; type: FieldType }[];
+}
+
+// Where a collection's items come from: a JSON address, read once a day.
+// `items` and each field's entry are dotted paths into the response.
+export interface Source {
+  url: string;
+  items: string;
+  fields: Record<string, string>;
 }
 
 // An image drawn the same for every item of a category, such as a frame.
@@ -182,6 +202,12 @@ export const api = {
     request<Category>("/api/categories", json("POST", body)),
   updateCategory: (id: number, body: Partial<Omit<Category, "fields">> & { fields?: FieldDraft[] }) =>
     request<Category>(`/api/categories/${id}`, json("PATCH", body)),
+  // What an address returns: its lists of entries, and the values in one entry.
+  inspectSource: (url: string, items?: string) =>
+    request<SourceInspection>("/api/sources/inspect", json("POST", { url, items })),
+  // Connect a source and fetch it; the collection's fields become the ones the columns go to.
+  connectSource: (id: number, body: { url: string; items: string; columns: SourceColumn[] }) =>
+    request<{ created: number; category: Category }>(`/api/categories/${id}/source`, json("PUT", body)),
   deleteCategory: (id: number) => request<void>(`/api/categories/${id}`, { method: "DELETE" }),
 
   previewCategory: async (id: number, body: StyleChanges): Promise<Preview> => {
