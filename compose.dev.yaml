@@ -19,6 +19,8 @@ services:
     environment:
       # File events don't always cross into a container on a Mac; polling always works.
       WATCHFILES_FORCE_POLLING: "true"
+      # Your time zone: wakes "at midnight" and "today" for data sources follow it.
+      TZ: Europe/Amsterdam
 
   web:
     image: docker.io/library/node:22-slim

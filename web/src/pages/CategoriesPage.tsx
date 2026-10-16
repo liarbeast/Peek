@@ -90,6 +90,16 @@ function CategoryGroup(props: { title: string; categories: Category[]; empty?: s
                   {c.item_count} {c.item_count === 1 ? "item" : "items"}
                 </Chip>
                 <Chip size="sm">{ORDERS.find((o) => o.id === c.item_order)?.label}</Chip>
+                {c.source && (
+                  <Chip size="sm">
+                    {/* A pulsing green dot: this collection is fed live. */}
+                    <span className="relative mr-1 flex size-2">
+                      <span className="absolute inline-flex size-full live-ping rounded-full bg-success opacity-75" />
+                      <span className="relative inline-flex size-2 rounded-full bg-success" />
+                    </span>
+                    Data source
+                  </Chip>
+                )}
               </div>
             </Card.Header>
           </Card>

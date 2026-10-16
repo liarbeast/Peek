@@ -23,6 +23,8 @@ docker compose up -d --build    # or: podman compose up -d --build
 ```
 
 Open http://localhost:8080. The first build downloads Chromium and takes a few minutes.
+Peek keeps time in the zone set as `TZ` in `compose.yaml` (`Europe/Amsterdam`); change it to yours, so "at midnight"
+and "today" mean your midnight.
 
 Collections, uploaded images and the current frame image live in the `data` folder next to `compose.yaml`.
 To move Peek to another machine, copy the whole folder and run the same command there.
@@ -55,6 +57,22 @@ Each collection has its own fields, each holding text or an image, edited on its
 Items store one value per field. A CSV file can fill a collection: each row becomes an item, columns are matched to
 fields by name or added as new fields, and image columns hold URLs that Peek downloads. Comma, semicolon and tab
 separated files all work.
+
+## Data sources
+
+A collection can fill itself from a web address that returns JSON: "Connect data source" on its Items tab. The address
+may hold placeholders, filled in on every fetch: `{YYYY}`, `{MM}` and `{DD}` for today's date, and
+`{RANDOM:min-max}` for a random whole number in that range (for an API that has no "random" address of its own). A source is read again on every wake
+that shows its collection, so Refresh in Settings decides how fresh it is. Entries it already had keep their item,
+with their place in the rotation and their downloaded images; new ones are added and gone ones removed. "Look at response" fetches it, finds the lists of entries in it,
+and lists every value in an entry with an example, like the columns of a CSV. Each value you use becomes a new field
+(or fills an existing one); fields you don't use are removed, since they'd stay empty. Values are stored as dotted
+paths (`selected`, `pages.0.thumbnail.source`). While a source is connected, its items can't be edited by hand. Image
+addresses are downloaded. If the address can't be read, the old items stay.
+
+For example, Wikipedia's "On this day":
+`https://en.wikipedia.org/api/rest_v1/feed/onthisday/selected/{MM}/{DD}`, list `selected`, with `year`, `text` and
+`pages.0.thumbnail.source`.
 
 ## Styling
 

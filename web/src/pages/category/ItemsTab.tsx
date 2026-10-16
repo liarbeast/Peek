@@ -6,6 +6,8 @@ import { PanelImage } from "../../components/PanelImage";
 import { Dialog, Toggle } from "../../components/ui";
 import { ImportDialog } from "./ImportDialog";
 import { ItemDialog } from "./ItemDialog";
+import { SourceDialog } from "./SourceDialog";
+
 
 export function ItemsTab(props: {
   category: Category;
@@ -21,6 +23,20 @@ export function ItemsTab(props: {
   const imageInput = useRef<HTMLInputElement>(null);
   const csvInput = useRef<HTMLInputElement>(null);
   const hasImageField = category.fields.some((f) => f.type === "image");
+  // Items come from a data source, or are added by hand; while a source is
+  // connected they can't be changed here.
+  const fromSource = !!category.source;
+  const [connecting, setConnecting] = useState(false);
+
+  // Back to items by hand: the fetched items stay, and become editable.
+  const disconnect = async () => {
+    try {
+      props.onCategoryChange(await api.updateCategory(category.id, { source: { url: "" } } as Partial<Category>));
+      toast.success("Disconnected. The fetched items stay, and you can edit them now.");
+    } catch (e) {
+      toast.danger((e as Error).message);
+    }
+  };
 
   // The list as shown, which runs ahead of the server while dragging.
   const [order, setOrder] = useState(items);
@@ -90,44 +106,78 @@ export function ItemsTab(props: {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap gap-2">
-        <Button onPress={() => setEditing("new")} isDisabled={category.fields.length === 0}>
-          Add item
-        </Button>
-        {hasImageField && (
-          <>
-            <Button variant="tertiary" isDisabled={uploading} onPress={() => imageInput.current?.click()}>
-              {uploading ? "Uploading…" : "Upload several images"}
-            </Button>
-            <input
-              ref={imageInput}
-              type="file"
-              accept="image/png,image/jpeg,image/gif,image/webp"
-              multiple
-              hidden
-              onChange={(e) => uploadMany(e.target.files)}
-            />
-          </>
-        )}
-        <Button variant="tertiary" onPress={() => csvInput.current?.click()}>
-          Import CSV
-        </Button>
-        <input
-          ref={csvInput}
-          type="file"
-          accept=".csv,text/csv"
-          hidden
-          onChange={(e) => {
-            setCsvFile(e.target.files?.[0] ?? null);
-            e.target.value = "";
-          }}
-        />
-        {items.length > 0 && (
-          <Button variant="danger-soft" className="ml-auto" onPress={() => setConfirmingDeleteAll(true)}>
-            Delete all
+      {fromSource && (
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-surface p-3">
+          <div className="min-w-0 flex-1">
+            <p className="font-medium">Filled from a data source</p>
+            <p className="truncate text-sm text-muted">
+              {category.synced ? `Fetched on ${category.synced}, ` : ""}read again on every wake that shows this collection,
+              from {category.source!.url}
+            </p>
+          </div>
+          <Button size="sm" variant="tertiary" onPress={() => setConnecting(true)}>
+            Edit
           </Button>
-        )}
-      </div>
+          <Button size="sm" variant="danger-soft" onPress={disconnect}>
+            Disconnect
+          </Button>
+        </div>
+      )}
+      <SourceDialog
+        key={JSON.stringify(category.source)}
+        category={category}
+        itemCount={items.length}
+        isOpen={connecting}
+        onOpenChange={setConnecting}
+        onSaved={(c) => {
+          props.onCategoryChange(c);
+          onChange();
+        }}
+      />
+
+      {!fromSource && (
+        <div className="flex flex-wrap gap-2">
+          <Button onPress={() => setEditing("new")} isDisabled={category.fields.length === 0}>
+            Add item
+          </Button>
+          {hasImageField && (
+            <>
+              <Button variant="tertiary" isDisabled={uploading} onPress={() => imageInput.current?.click()}>
+                {uploading ? "Uploading…" : "Upload several images"}
+              </Button>
+              <input
+                ref={imageInput}
+                type="file"
+                accept="image/png,image/jpeg,image/gif,image/webp"
+                multiple
+                hidden
+                onChange={(e) => uploadMany(e.target.files)}
+              />
+            </>
+          )}
+          <Button variant="tertiary" onPress={() => csvInput.current?.click()}>
+            Import CSV
+          </Button>
+          <Button variant="tertiary" onPress={() => setConnecting(true)}>
+            Connect data source
+          </Button>
+          <input
+            ref={csvInput}
+            type="file"
+            accept=".csv,text/csv"
+            hidden
+            onChange={(e) => {
+              setCsvFile(e.target.files?.[0] ?? null);
+              e.target.value = "";
+            }}
+          />
+          {items.length > 0 && (
+            <Button variant="danger-soft" className="ml-auto" onPress={() => setConfirmingDeleteAll(true)}>
+              Delete all
+            </Button>
+          )}
+        </div>
+      )}
       <Dialog
         isOpen={confirmingDeleteAll}
         onOpenChange={setConfirmingDeleteAll}
@@ -150,9 +200,10 @@ export function ItemsTab(props: {
       {category.fields.length === 0 && (
         <p className="text-muted">This collection has no fields yet. Add some on the Fields tab, or import a CSV.</p>
       )}
-      {category.fields.length > 0 && items.length === 0 && (
+      {!fromSource && category.fields.length > 0 && items.length === 0 && (
         <p className="text-muted">
-          No items yet. Add one{hasImageField ? ", upload a batch of images" : ""}, or import a CSV.
+          No items yet. Add one{hasImageField ? ", upload a batch of images" : ""}, import a CSV, or connect a data
+          source.
         </p>
       )}
 
@@ -170,6 +221,7 @@ export function ItemsTab(props: {
               category={category}
               item={item}
               number={index + 1}
+              readOnly={!!category.source}
               isFirst={index === 0}
               isLast={index === order.length - 1}
               onDragEnd={() => saveOrder(orderRef.current)}
@@ -184,7 +236,7 @@ export function ItemsTab(props: {
       )}
 
       <ItemDialog
-        key={editing === "new" ? "new" : editing?.id ?? "none"}
+        key={editing === "new" ? "new" : (editing?.id ?? "none")}
         category={category}
         item={editing === "new" ? null : editing}
         isOpen={editing !== null}
@@ -210,6 +262,8 @@ function ItemRow(props: {
   category: Category;
   item: Item;
   number: number;
+  // Filled from a data source: only previewing is left.
+  readOnly: boolean;
   isFirst: boolean;
   isLast: boolean;
   onDragEnd: () => void;
@@ -230,11 +284,15 @@ function ItemRow(props: {
       dragListener={false}
       dragControls={drag}
       onDragEnd={props.onDragEnd}
-      whileDrag={{ scale: 1.01, boxShadow: "0 8px 24px rgba(0,0,0,0.15)", zIndex: 1 }}
+      whileDrag={{
+        scale: 1.01,
+        boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+        zIndex: 1,
+      }}
       className="relative flex flex-wrap items-center gap-3 border-b border-separator bg-surface p-3 last:border-b-0"
     >
       <div className="flex flex-none items-center gap-1">
-        <DragHandle onPointerDown={(e) => drag.start(e)} />
+        {!props.readOnly && <DragHandle onPointerDown={(e) => drag.start(e)} />}
         <span className="w-7 text-right font-mono text-sm tabular-nums text-muted">{props.number}</span>
       </div>
       <div className={`flex min-w-0 flex-1 items-center gap-3 ${item.enabled ? "" : "opacity-50"}`}>
@@ -257,22 +315,44 @@ function ItemRow(props: {
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-1">
-        <Toggle label="Show" isSelected={item.enabled} onChange={props.onToggle} />
-        <Button size="sm" variant="ghost" isIconOnly aria-label="Move up" isDisabled={props.isFirst} onPress={() => props.onMove(-1)}>
-          ↑
-        </Button>
-        <Button size="sm" variant="ghost" isIconOnly aria-label="Move down" isDisabled={props.isLast} onPress={() => props.onMove(1)}>
-          ↓
-        </Button>
+        {!props.readOnly && (
+          <>
+            <Toggle label="Show" isSelected={item.enabled} onChange={props.onToggle} />
+            <Button
+              size="sm"
+              variant="ghost"
+              isIconOnly
+              aria-label="Move up"
+              isDisabled={props.isFirst}
+              onPress={() => props.onMove(-1)}
+            >
+              ↑
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              isIconOnly
+              aria-label="Move down"
+              isDisabled={props.isLast}
+              onPress={() => props.onMove(1)}
+            >
+              ↓
+            </Button>
+          </>
+        )}
         <Button size="sm" variant="tertiary" onPress={props.onPreview}>
           Preview
         </Button>
-        <Button size="sm" variant="tertiary" onPress={props.onEdit}>
-          Edit
-        </Button>
-        <Button size="sm" variant="danger-soft" onPress={props.onDelete}>
-          Delete
-        </Button>
+        {!props.readOnly && (
+          <>
+            <Button size="sm" variant="tertiary" onPress={props.onEdit}>
+              Edit
+            </Button>
+            <Button size="sm" variant="danger-soft" onPress={props.onDelete}>
+              Delete
+            </Button>
+          </>
+        )}
       </div>
     </Reorder.Item>
   );
@@ -293,7 +373,15 @@ export function DragHandle({ onPointerDown }: { onPointerDown: (e: React.Pointer
   );
 }
 
-function ItemPreviewDialog({ category, item, onClose }: { category: Category; item: Item | null; onClose: () => void }) {
+function ItemPreviewDialog({
+  category,
+  item,
+  onClose,
+}: {
+  category: Category;
+  item: Item | null;
+  onClose: () => void;
+}) {
   const [busy, setBusy] = useState(false);
   const show = async () => {
     if (!item) return;
