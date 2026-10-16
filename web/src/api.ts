@@ -1,17 +1,17 @@
 // Typed calls to the Peek server.
 
-export type ItemOrder = "in_order" | "random" | "shuffle";
+export type ItemOrder = "in_order" | "shuffle";
 
 export type Orientation = "landscape" | "portrait";
 
 export type Refresh = "15m" | "30m" | "1h" | "3h" | "6h" | "12h" | "1d" | "1w";
+export type CollectionOrder = "in_order" | "shuffle";
 export type Switch = "30m" | "1h" | "8h" | "1d" | "1w" | "finished" | "1mo";
 
 export interface Settings {
   orientation: Orientation;
-  // How often the frame wakes for a new image.
-  refresh: Refresh;
-  switch: Switch; // how often the frame moves on to the next category
+  switch: Switch; // how often the frame moves on to the next collection
+  collection_order: CollectionOrder; // which one it moves on to
 }
 
 export const isPortrait = (o: Orientation) => o === "portrait";
@@ -56,13 +56,19 @@ export interface Box {
   size?: number; // text size in pixels; text is as tall as its lines, so `h` is for images
   align?: "left" | "center" | "right";
   valign?: "top" | "middle" | "bottom";
+  // Which way text grows with more lines: down from its top edge (the default),
+  // up from its bottom edge, or both ways from its centre. y and h are the box
+  // as last placed, so that edge stays put.
+  grow?: "down" | "up" | "middle";
   z?: number; // higher is drawn in front
   weight?: number; // 100 (thin) to 900 (black); 400 is regular
   color?: PanelColour;
   font?: string; // one of api.fonts(); none is the built-in face (400 and 700)
-  // Attached below another field: drawn `gap` pixels under where that field ends.
+  // Attached to another field (named `below` for history): drawn `gap` pixels
+  // under where that field ends, or, on side "above", `gap` pixels over where it starts.
   below?: string;
   gap?: number;
+  side?: "below" | "above";
 }
 
 // Per orientation, every field's box (and the style images that were moved).
@@ -89,6 +95,11 @@ export interface Category {
   item_count: number;
   cover: string | null;
   source: Source | null;
+  refresh: Refresh; // how often it shows its next item while it's on the frame
+  current?: boolean; // the collection the frame shows now (in the list of collections only)
+  // On the current one: when the frame moves on (or how many items it shows
+  // first), and to the next collection in order or a shuffled one.
+  next_switch?: ({ at: string } | { items_left: number }) & { next?: string | null; shuffle?: boolean };
   synced: string | null; // the day the source was last read, YYYY-MM-DD
 }
 
@@ -238,6 +249,9 @@ export const api = {
   updateItem: (id: number, form: FormData) => request<Item>(`/api/items/${id}`, { method: "PATCH", body: form }),
   deleteItem: (id: number) => request<void>(`/api/items/${id}`, { method: "DELETE" }),
   deleteAllItems: (categoryId: number) => request<void>(`/api/categories/${categoryId}/items`, { method: "DELETE" }),
+  // The order the frame goes through collections in (and the home screen lists them).
+  reorderCategories: (categoryIds: number[]) =>
+    request<void>("/api/categories/reorder", json("POST", { category_ids: categoryIds })),
   reorderItems: (categoryId: number, itemIds: number[]) =>
     request<void>(`/api/categories/${categoryId}/items/order`, json("PUT", { item_ids: itemIds })),
 

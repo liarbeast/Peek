@@ -47,13 +47,6 @@ SWITCH_INTERVALS: dict[str, timedelta | None] = {
 
 
 
-def switch_choices(refresh: str) -> list[str]:
-    """The switch intervals no shorter than the refresh: a shorter one would
-    pass between two wakes anyway."""
-    step = REFRESH_INTERVALS.get(refresh, REFRESH_INTERVALS[DEFAULT_REFRESH])
-    return [k for k, length in SWITCH_INTERVALS.items() if length is None or length >= step]
-
-
 # Never ask the frame to sleep for less than this, so a wake that lands just
 # before a boundary doesn't come straight back.
 MIN_SLEEP = 60
@@ -75,6 +68,18 @@ def period_start(interval: str, now: datetime) -> datetime:
     return start + step * ((now - start) // step)
 
 
+def next_switch(switch: str, refresh: str, now: datetime) -> datetime:
+    """When the frame next moves on to another category: the first wake on or
+    after the end of the current switch period ("finished" isn't a time)."""
+    start = period_start(switch, now)
+    if switch == "1mo":
+        end = (start + timedelta(days=32)).replace(day=1)
+    else:
+        end = start + (SWITCH_INTERVALS.get(switch) or REFRESH_INTERVALS[DEFAULT_REFRESH])
+    wake = period_start(refresh, end)
+    return wake if wake == end else wake + REFRESH_INTERVALS.get(refresh, REFRESH_INTERVALS[DEFAULT_REFRESH])
+
+
 def next_wake(refresh: str, now: datetime) -> datetime:
     """The first round time after `now` for this interval."""
     step = REFRESH_INTERVALS.get(refresh, REFRESH_INTERVALS[DEFAULT_REFRESH])
@@ -89,10 +94,25 @@ def sleep_seconds(refresh: str, now: datetime | None = None) -> int:
     return round((next_wake(refresh, now) - now).total_seconds())
 
 
+def next_in_order(store: db.Store, current_category: int | None) -> dict | None:
+    """The category the frame moves on to after `current_category` with
+    "In order": the next one in rotation that has something to show."""
+    pool = [c for c in store.categories() if c["enabled"]
+            if c["source"] or any(i["enabled"] for i in store.items(c["id"]))]
+    ids = [c["id"] for c in pool]
+    if not pool:
+        return None
+    return pool[(ids.index(current_category) + 1) % len(pool) if current_category in ids else 0]
+
+
 def next_item(store: db.Store, current_category: int | None, switch: bool, lap: int | None = None,
-              fetch: Callable[[dict], None] | None = None) -> dict | None:
+              fetch: Callable[[dict], None] | None = None, order: str = "in_order",
+              shown_this_round: list[int] | tuple = ()) -> dict | None:
     """The item to show next: from the current category, or from the next
     active one when `switch` is set (or the current one is off or empty).
+    The next one is the one after it in the categories' order, or with
+    `order` "shuffle", one picked at random from those that haven't had their turn this round
+    (`shown_this_round`); once all have, a new round starts.
     With `lap`, the number of its items shown in a row, it also switches once
     that reaches how many items the category has. `fetch` brings a category
     filled from a data source up to date before its next item is picked.
@@ -104,16 +124,20 @@ def next_item(store: db.Store, current_category: int | None, switch: bool, lap: 
     ids = [c["id"] for c, _ in pool]
     if lap is not None and current_category in ids:
         switch = switch or lap >= len(pool[ids.index(current_category)][1])
-    index = (ids.index(current_category) + switch) % len(pool) if current_category in ids else 0
+    if current_category in ids and not switch:
+        index = ids.index(current_category)
+    elif order == "shuffle":
+        others = [i for i in ids if i != current_category] or ids
+        index = ids.index(random.choice([i for i in others if i not in shown_this_round] or others))
+    else:
+        index = (ids.index(current_category) + 1) % len(pool) if current_category in ids else 0
     category, items = pool[index]
     if fetch and category["source"]:
         fetch(category)
         items = enabled(category)
     if not items:
         return None
-    if category["item_order"] == "random":
-        return random.choice(items)
-    if category["item_order"] == "shuffle":  # each item once, in a random order, then again
+    if category["item_order"] == "shuffle":  # each item once, in a shuffled order, then again
         fewest = min(i["times_shown"] for i in items)
         return random.choice([i for i in items if i["times_shown"] == fewest])
     last = max(items, key=lambda i: i["last_shown"] or "")
