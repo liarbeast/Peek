@@ -4,6 +4,7 @@ import { api, imageUrl, type Category } from "../api";
 import { Dialog, TextInput } from "../components/ui";
 import { go } from "../router";
 import { ORDERS } from "./category/SettingsTab";
+import { refreshLabel } from "../timing";
 
 export function CategoriesPage() {
   const [categories, setCategories] = useState<Category[] | null>(null);
@@ -42,15 +43,26 @@ export function CategoriesPage() {
         </Card>
       )}
 
-      {categories && categories.length > 0 && (
+      {categories?.some((c) => c.current) && (
         <CategoryGroup
-          title="Active"
-          empty="No active collections. Turn on “Show this collection on the frame” in its Settings tab."
-          categories={categories.filter((c) => c.enabled)}
+          title="Currently active"
+          subtitle={switchText(categories.find((c) => c.current))}
+          categories={categories.filter((c) => c.current)}
         />
       )}
-      {categories?.some((c) => !c.enabled) && (
-        <CategoryGroup title="Inactive" categories={categories.filter((c) => !c.enabled)} />
+      {categories && categories.length > 0 && (
+        <CategoryGroup
+          title="In rotation"
+          empty={
+            categories.some((c) => c.enabled)
+              ? undefined
+              : "No collections in rotation. Turn on “Show this collection on the frame” in its Settings tab."
+          }
+          categories={categories.filter((c) => c.enabled && !c.current)}
+        />
+      )}
+      {categories?.some((c) => !c.enabled && !c.current) && (
+        <CategoryGroup title="Disabled" categories={categories.filter((c) => !c.enabled && !c.current)} />
       )}
 
       <NewCategoryDialog
@@ -62,11 +74,34 @@ export function CategoriesPage() {
   );
 }
 
+// When and to what the frame moves on from the collection it shows, in words:
+// "Switching to Birds in 7 hours", "Switching to the next collection (shuffled) after 3 more items".
+function switchText(current: Category | undefined): string | undefined {
+  const next = current?.next_switch;
+  if (!next) return undefined;
+  const to = next.shuffle
+    ? "Switching to the next collection (shuffled)"
+    : next.next && next.next !== current.name
+      ? `Switching to ${next.next}`
+      : "Starting this collection again"; // the only one in rotation
+  if ("items_left" in next) {
+    const n = next.items_left;
+    return n === 0 ? `${to} on the next wake` : `${to} after ${n} more ${n === 1 ? "item" : "items"}`;
+  }
+  const minutes = Math.max(1, Math.round((new Date(next.at).getTime() - Date.now()) / 60000));
+  const [amount, unit]: [number, Intl.RelativeTimeFormatUnit] =
+    minutes < 60 ? [minutes, "minute"] : minutes < 48 * 60 ? [Math.round(minutes / 60), "hour"] : [Math.round(minutes / 1440), "day"];
+  return `${to} ${new Intl.RelativeTimeFormat("en").format(amount, unit)}`;
+}
+
 // A heading and the categories under it, as cards.
-function CategoryGroup(props: { title: string; categories: Category[]; empty?: string }) {
+function CategoryGroup(props: { title: string; subtitle?: string; categories: Category[]; empty?: string }) {
   return (
     <section className="flex flex-col gap-3">
-      <h2 className="text-lg font-semibold">{props.title}</h2>
+      <div>
+        <h2 className="text-lg font-semibold">{props.title}</h2>
+        {props.subtitle && <p className="text-sm text-muted">{props.subtitle}</p>}
+      </div>
       {props.categories.length === 0 && props.empty && <p className="text-muted">{props.empty}</p>}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {props.categories.map((c) => (
@@ -90,6 +125,7 @@ function CategoryGroup(props: { title: string; categories: Category[]; empty?: s
                   {c.item_count} {c.item_count === 1 ? "item" : "items"}
                 </Chip>
                 <Chip size="sm">{ORDERS.find((o) => o.id === c.item_order)?.label}</Chip>
+                <Chip size="sm">{refreshLabel(c.refresh).short}</Chip>
                 {c.source && (
                   <Chip size="sm">
                     {/* A pulsing green dot: this collection is fed live. */}

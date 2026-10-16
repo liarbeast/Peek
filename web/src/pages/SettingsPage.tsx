@@ -1,8 +1,10 @@
 import { toast } from "@heroui/react";
 import { useState } from "react";
-import { api, type Orientation, type Refresh, type Settings, type Switch } from "../api";
+import { api, type Orientation, type Settings } from "../api";
+import { SWITCHES } from "../timing";
 import { PanelImage } from "../components/PanelImage";
 import { Choice } from "../components/ui";
+import { CollectionOrder } from "./CollectionOrder";
 import { Label, Radio, RadioGroup } from "react-aria-components";
 
 const ORIENTATIONS: { id: Orientation; label: string; size: string; shape: string }[] = [
@@ -10,37 +12,8 @@ const ORIENTATIONS: { id: Orientation; label: string; size: string; shape: strin
   { id: "portrait", label: "Portrait", size: "480 × 800", shape: "h-15 w-9" },
 ];
 
-// Each with its length in minutes, so Switch collection can leave out choices
-// shorter than Refresh (the server does the same).
-const REFRESHES: { id: Refresh; label: string; minutes: number }[] = [
-  { id: "15m", label: "Every 15 minutes", minutes: 15 },
-  { id: "30m", label: "Every 30 minutes", minutes: 30 },
-  { id: "1h", label: "Every hour", minutes: 60 },
-  { id: "3h", label: "Every 3 hours", minutes: 180 },
-  { id: "6h", label: "Every 6 hours", minutes: 360 },
-  { id: "12h", label: "Every 12 hours", minutes: 720 },
-  { id: "1d", label: "Every day, at midnight", minutes: 1440 },
-  { id: "1w", label: "Every week, on Monday at midnight", minutes: 10080 },
-];
-
-const SWITCHES: { id: Switch; label: string; description?: string; divider?: boolean; minutes: number }[] = [
-  { id: "30m", label: "Every 30 minutes", minutes: 30 },
-  { id: "1h", label: "Every hour", minutes: 60 },
-  { id: "8h", label: "Every 8 hours", minutes: 480 },
-  { id: "1d", label: "Every day, at midnight", minutes: 1440 },
-  { id: "1w", label: "Every week, on Monday at midnight", minutes: 10080 },
-  { id: "1mo", label: "Every month, on the 1st at midnight", minutes: Infinity },
-  {
-    id: "finished",
-    label: "Once a collection is finished",
-    divider: true,
-    minutes: Infinity,
-  },
-];
-
 export function SettingsPage({ settings, onChange }: { settings: Settings; onChange: (s: Settings) => void }) {
   const [busy, setBusy] = useState(false);
-  const refresh = REFRESHES.find((r) => r.id === settings.refresh) ?? REFRESHES[0];
 
   const update = async (patch: Partial<Settings>) => {
     setBusy(true);
@@ -64,7 +37,8 @@ export function SettingsPage({ settings, onChange }: { settings: Settings; onCha
         <h1 className="mt-1 text-2xl font-semibold">Settings</h1>
         <p className="text-muted">These apply to the whole frame.</p>
       </div>
-      <div className="grid gap-6 md:grid-cols-2">
+      {/* The left column is the wider one, for the collections table. */}
+      <div className="grid gap-6 md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
         <div className="flex flex-col gap-4">
           <RadioGroup
             value={settings.orientation}
@@ -106,35 +80,16 @@ export function SettingsPage({ settings, onChange }: { settings: Settings; onCha
           </RadioGroup>
           <div className="flex flex-col gap-1">
             <Choice
-              label="Refresh"
-              value={settings.refresh}
-              onChange={(refresh) => update({ refresh })}
-              options={REFRESHES}
-            />
-            <p className="text-sm text-muted">
-              How often the frame wakes for a new image: the next item of the current collection. Wakes fall on the
-              round time, so it stays on schedule. More often uses more battery.
-            </p>
-          </div>
-          <div className="flex flex-col gap-1">
-            <Choice
               label="Switch collection"
               value={settings.switch}
               onChange={(s) => update({ switch: s })}
-              options={SWITCHES.map((s) => ({
-                ...s,
-                disabled:
-                  s.minutes < refresh.minutes
-                    ? `Refresh is ${refresh.label.charAt(0).toLowerCase()}${refresh.label.slice(1)}`
-                    : undefined,
-              }))}
+              options={SWITCHES}
             />
             <p className="text-sm text-muted">
               How often the frame moves on to the next active collection, on its first wake after this time.
-              “Finished” moves on once every item of the collection has been shown. Choices shorter than Refresh
-              are greyed out; pick the same as Refresh to change collection on every wake.
             </p>
           </div>
+          <CollectionOrder value={settings.collection_order} onChange={(collection_order) => update({ collection_order })} />
         </div>
         <div className="flex flex-col gap-2">
           <span className="text-sm font-medium">On the frame now</span>

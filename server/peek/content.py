@@ -46,11 +46,18 @@ class Box(BaseModel):
     font: str | None = None  # a family from fonts.FONTS; none is the built-in face
     align: Literal["left", "center", "right"] | None = None
     valign: Literal["top", "middle", "bottom"] | None = None
+    # Which way text grows as it takes more lines: from its top edge down (the
+    # default), from its bottom edge up, or both ways from its centre. `y` and
+    # `h` are the box as last placed, so those edges stay put.
+    grow: Literal["down", "up", "middle"] | None = None
     z: int | None = Field(default=None, ge=-100, le=100)  # higher is drawn in front
-    # Linked below another field: drawn `gap` pixels under where that field's
-    # content ends, so a title that wraps to two lines pushes it down.
+    # Attached to another field (named `below` for history): drawn `gap` pixels
+    # under where that field's content ends, so a title that wraps to two
+    # lines pushes it down; or, on side "above", `gap` pixels over where its
+    # content starts, so text that grows up pushes it up.
     below: str | None = Field(default=None, max_length=64)
     gap: int | None = Field(default=None, ge=-800, le=800)
+    side: Literal["below", "above"] | None = None
 
     @field_validator("font")
     @classmethod
@@ -100,6 +107,8 @@ class CategoryPatch(BaseModel):
     positions: Positions | None = None
     fields: list[FieldIn] | None = None
     source: SourceIn | None = None
+    # How often it shows its next item while it's on the frame.
+    refresh: str | None = None
 
 
 class PreviewIn(BaseModel):
@@ -118,8 +127,12 @@ class Reorder(BaseModel):
 
 class SettingsPatch(BaseModel):
     orientation: str | None = None
-    refresh: str | None = None
     switch: str | None = None
+    collection_order: Literal["in_order", "shuffle"] | None = None
+
+
+class CategoryOrder(BaseModel):
+    category_ids: list[int]
 
 
 def _store(request: Request) -> db.Store:
@@ -131,6 +144,8 @@ def _check(fields: dict) -> None:
         raise HTTPException(422, f"unknown template: {fields['template']}")
     if fields.get("item_order") not in (None, *db.ITEM_ORDERS):
         raise HTTPException(422, f"unknown item order: {fields['item_order']}")
+    if fields.get("refresh") not in (None, *schedule.REFRESH_INTERVALS):
+        raise HTTPException(422, f"unknown refresh interval: {fields['refresh']}")
 
 
 def _category_or_404(store: db.Store, category_id: int) -> dict:
@@ -245,15 +260,10 @@ def update_settings(request: Request, body: SettingsPatch) -> dict:
     fields = body.model_dump(exclude_none=True)
     if fields.get("orientation") not in (None, *renderer.ORIENTATIONS):
         raise HTTPException(422, f"unknown orientation: {fields['orientation']}")
-    if fields.get("refresh") not in (None, *schedule.REFRESH_INTERVALS):
-        raise HTTPException(422, f"unknown refresh interval: {fields['refresh']}")
     if fields.get("switch") not in (None, *schedule.SWITCH_INTERVALS):
         raise HTTPException(422, f"unknown switch interval: {fields['switch']}")
     before = _store(request).settings()
     settings = _store(request).update_settings(fields)
-    if settings["switch"] not in (choices := schedule.switch_choices(settings["refresh"])):
-        # Never switch collections more often than the frame wakes.
-        settings = _store(request).update_settings({"switch": choices[0]})
     if settings["orientation"] != before["orientation"]:
         # Turn what the frame shows now, so it doesn't wait for the next change.
         request.app.state.refresh_current()
@@ -275,7 +285,11 @@ def field_types() -> list[str]:
 
 @router.get("/api/categories")
 def list_categories(request: Request) -> list[dict]:
-    return _store(request).categories()
+    """Every category, with `current` set on the one the frame shows now, and
+    on that one `next_switch`: when the frame moves on from it."""
+    current = request.app.state.current_category()
+    return [{**c, "current": True, "next_switch": request.app.state.next_switch()} if c["id"] == current
+            else {**c, "current": False} for c in _store(request).categories()]
 
 
 @router.post("/api/categories", status_code=201)
@@ -304,6 +318,12 @@ def create_category(request: Request, body: CategoryIn) -> dict:
             positions = {o: {keys.get(k, k): box for k, box in boxes.items()} for o, boxes in new["positions"].items()}
             created = store.update_category(created["id"], {"positions": positions})
     return created
+
+
+@router.post("/api/categories/reorder", status_code=204)
+def reorder_categories(request: Request, body: CategoryOrder) -> None:
+    """The order the frame goes through categories in ("In order")."""
+    _store(request).reorder_categories(body.category_ids)
 
 
 @router.get("/api/categories/{category_id}")

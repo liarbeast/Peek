@@ -47,20 +47,26 @@ def create_app(data_dir: Path) -> FastAPI:
     current_preview = data_dir / "current-preview.png"
     current_source = data_dir / "current.json"
 
-    def periods() -> dict:
-        """The refresh and category periods the frame is in now (or is about
-        to be in, if it woke a little early); a new one means a new image."""
+    def timing(category_id: int | None) -> tuple[str, str]:
+        """The refresh while a category is on the frame (the default with
+        none, such as the welcome page) and the frame's switch."""
+        category = store.category(category_id) if category_id is not None else None
+        return (category and category["refresh"]) or schedule.DEFAULT_REFRESH, store.settings()["switch"]
+
+    def periods(category_id: int | None) -> dict:
+        """The refresh and switch periods the frame is in now (or is about to
+        be in, if it woke a little early) for a category; a new one means a
+        new image, or another category."""
         now = datetime.now() + schedule.EARLY_WAKE
-        settings = store.settings()
-        return {"refresh_period": schedule.period_start(settings["refresh"], now).isoformat(),
-                "switch_period": "finished" if settings["switch"] == "finished"
-                else schedule.period_start(settings["switch"], now).isoformat()}
+        refresh, switch = timing(category_id)
+        return {"refresh_period": schedule.period_start(refresh, now).isoformat(),
+                "switch_period": "finished" if switch == "finished" else schedule.period_start(switch, now).isoformat()}
 
     def set_current(render: renderer.Render, source: dict | None = None) -> None:
         """Make this what the frame shows until the next refresh."""
         current.write_bytes(render.panel_png())
         current_preview.write_bytes(render.preview_png())
-        current_source.write_text(json.dumps({**periods(), **(source or {})}))
+        current_source.write_text(json.dumps({**periods((source or {}).get("category_id")), **(source or {})}))
 
     def read_source() -> dict:
         try:
@@ -68,27 +74,59 @@ def create_app(data_dir: Path) -> FastAPI:
         except (OSError, ValueError):
             return {}
 
+    def current_category() -> int | None:
+        """The category the frame shows now, if it shows an item."""
+        source = read_source()
+        if "category_id" in source:
+            return source["category_id"]
+        return (store.item(source["item_id"]) or {}).get("category_id") if "item_id" in source else None
+
+    def next_switch() -> dict:
+        """When the frame moves on from the category it shows: {"at": time},
+        or with "Once a collection is finished", {"items_left": n}; and to
+        what: {"next": name} in order, or {"shuffle": True}."""
+        settings = store.settings()
+        category = current_category()
+        refresh, switch = timing(category)
+        if settings["collection_order"] == "shuffle":
+            to = {"shuffle": True}
+        else:
+            to = {"next": (schedule.next_in_order(store, category) or {}).get("name")}
+        if switch == "finished":
+            count = sum(1 for i in store.items(category) if i["enabled"]) if category else 0
+            return {"items_left": max(count - read_source().get("lap", 1), 0), **to}
+        at = schedule.next_switch(switch, refresh, datetime.now())
+        return {"at": at.astimezone().isoformat(), **to}
+
     def advance() -> None:
         """Move on to the next item once a refresh period has passed."""
-        source, now = read_source(), periods()
+        source = read_source()
+        # The category shown last; its item may be gone if a data source replaced it.
+        shown_category = current_category()
+        if shown_category is not None and not store.category(shown_category):
+            shown_category = None
+        now = periods(shown_category)
         if current.exists() and source.get("refresh_period") == now["refresh_period"]:
             return
-        # The category shown last; its item may be gone if a data source replaced it.
-        shown_category = source.get("category_id")
-        if shown_category is None and "item_id" in source:
-            shown_category = (store.item(source["item_id"]) or {}).get("category_id")
         switch = source.get("switch_period") != now["switch_period"]
         lap = source.get("lap", 1) if now["switch_period"] == "finished" else None
         day = (datetime.now() + schedule.EARLY_WAKE).date()
+        shown_this_round = source.get("round", [])
         item = schedule.next_item(store, shown_category, switch, lap,
-                                  fetch=lambda category: content.fetch_quietly(store, category, day))
+                                  fetch=lambda category: content.fetch_quietly(store, category, day),
+                                  order=store.settings()["collection_order"], shown_this_round=shown_this_round)
         if item:
             store.mark_shown(item["id"])
+            category_id = item["category_id"]
             # How many items of this category the frame has shown in a row (a
             # shown item without a count is the first).
-            lap = source.get("lap", 1) + 1 if shown_category == item["category_id"] else 1
-            set_current(content.render_item(store, store.category(item["category_id"]), item),
-                        {"item_id": item["id"], "category_id": item["category_id"], "lap": lap})
+            lap = source.get("lap", 1) + 1 if shown_category == category_id else 1
+            # The categories that had a turn this round, for shuffling; one
+            # coming round again starts a new round.
+            if category_id != shown_category:
+                shown_this_round = [*shown_this_round, category_id] if category_id not in shown_this_round else [category_id]
+            set_current(content.render_item(store, store.category(category_id), item),
+                        {"item_id": item["id"], "category_id": category_id, "lap": lap, "round": shown_this_round})
         elif not current.exists():
             set_current(_welcome_render(content.orientation(store)), {"welcome": True})
 
@@ -104,6 +142,8 @@ def create_app(data_dir: Path) -> FastAPI:
     app.state.store = store
     app.state.set_current = set_current
     app.state.refresh_current = refresh_current
+    app.state.current_category = current_category
+    app.state.next_switch = next_switch
     app.include_router(content.router)
 
     # The frame's endpoints
@@ -126,11 +166,11 @@ def create_app(data_dir: Path) -> FastAPI:
     @app.get("/api/sleep", response_class=PlainTextResponse)
     def sleep_seconds() -> str:
         """How long the frame should sleep before its next wake, in seconds:
-        until the next refresh set in Settings. PEEK_SLEEP_SECONDS overrides
-        it, for testing a frame."""
+        until the next refresh of the category it shows. PEEK_SLEEP_SECONDS
+        overrides it, for testing a frame."""
         if fixed := os.environ.get("PEEK_SLEEP_SECONDS"):
             return fixed
-        return str(schedule.sleep_seconds(store.settings()["refresh"]))
+        return str(schedule.sleep_seconds(timing(current_category())[0]))
 
     # The web app: static files, with index.html for every other page.
 

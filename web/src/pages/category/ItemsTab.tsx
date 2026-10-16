@@ -245,7 +245,7 @@ export function ItemsTab(props: {
       />
       <ItemPreviewDialog category={category} item={previewing} onClose={() => setPreviewing(null)} />
       <ImportDialog
-        key={csvFile ? `${csvFile.name}-${csvFile.lastModified}` : "none"}
+        key={csvFile ? `${csvFile.name}-${csvFile.lastModified}` : "no-csv"}
         category={category}
         file={csvFile}
         onClose={() => setCsvFile(null)}

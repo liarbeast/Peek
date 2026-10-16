@@ -49,30 +49,41 @@ _FIELD_BOXES = """
 """
 
 # Fields attached below another move to `gap` pixels under that field, which
-# for text ends where its last line does. An empty field takes no room: what
-# is attached to it moves up to where it would have been.
+# for text ends where its last line does; fields attached above it move to
+# `gap` pixels over where it starts. Both are measured, so text that grows up
+# or from the middle counts too. An empty field takes no room: what is
+# attached to it moves to where it would have been. A field attached below
+# hangs from its top, and one attached above from its bottom, whichever way it
+# would grow on its own.
 _ATTACH_FIELDS = """
 const done = new Set();
 const find = (key) => document.querySelector(`[data-field="${CSS.escape(key)}"]`);
 const empty = (key) => document.querySelector(`[data-empty="${CSS.escape(key)}"]`);
-// Where the next field down starts: under `key` if it is drawn, else where `key` would have been.
-const next = (key, gap, seen) => {
-  const el = find(key);
+// Where a field attached as `data` says goes, at its near edge: `gap` under
+// the bottom of the field it follows, or `gap` over its top for "above". A
+// field attached to an empty one takes the place that one would have had.
+const at = (data, side, seen) => {
+  const el = find(data.below);
   if (el) {
     place(el, seen);
-    return el.getBoundingClientRect().bottom + gap;
+    const r = el.getBoundingClientRect();
+    return side === "above" ? r.top - Number(data.gap) : r.bottom + Number(data.gap);
   }
-  const missing = empty(key);
+  const missing = empty(data.below);
   if (!missing || seen.has(missing)) return null;
   seen.add(missing);
-  const below = missing.dataset.below;
-  return below ? next(below, Number(missing.dataset.gap), seen) : Number(missing.dataset.top);
+  return missing.dataset.below ? at(missing.dataset, missing.dataset.side, seen) : Number(missing.dataset.top);
 };
 const place = (el, seen) => {
   if (!el.dataset.below || done.has(el) || seen.has(el)) return;
   seen.add(el);
-  const top = next(el.dataset.below, Number(el.dataset.gap), seen);
-  if (top !== null) el.style.top = `${Math.round(top)}px`;
+  const side = el.dataset.side;
+  const y = at(el.dataset, side, seen);
+  if (y !== null) {
+    el.style.transform = "none";
+    const top = side === "above" ? y - el.getBoundingClientRect().height : y;
+    el.style.top = `${Math.round(top)}px`;
+  }
   done.add(el);
 };
 for (const el of document.querySelectorAll("[data-field][data-below]")) place(el, new Set());

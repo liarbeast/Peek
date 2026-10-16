@@ -21,10 +21,17 @@ export interface Layer {
 
 // A layer's box: its saved one, or else where the last render drew it (a
 // style image that was never moved sits behind everything). Text is as tall
-// as its lines, so its height always comes from the last render.
+// as its lines, so its height always comes from the last render; text that
+// grows up or from the middle moves its top to keep its bottom or centre.
 function boxOf(key: string, placed: Record<string, Box>, measured: Preview["boxes"], text: boolean): Box | null {
   const m = measured[key];
-  if (placed[key]) return { size: m?.[4], ...placed[key], ...(text && m ? { h: m[3] } : {}) };
+  if (placed[key] && text && m) {
+    const box = { size: m[4], ...placed[key] };
+    const extra = box.h - m[3]; // how much shorter the text came out than the box as placed
+    const y = box.y + (box.grow === "up" ? extra : box.grow === "middle" ? Math.round(extra / 2) : 0);
+    return { ...box, y, h: m[3] };
+  }
+  if (placed[key]) return { size: m?.[4], ...placed[key] };
   if (!m) return null;
   return { x: m[0], y: m[1], w: m[2], h: m[3], ...(key.startsWith("@") ? { z: -1 } : { size: m[4] }) };
 }
@@ -76,29 +83,39 @@ export function FieldBoxes(props: {
   const contentHeight = (key: string) => measured[key]?.[3] ?? null;
   const isText = (key: string) => props.fields.find((f) => f.key === key)?.type === "text";
 
-  // A field's box as it is drawn now: a field attached below another sits
-  // `gap` under where that field's content ends, wherever that field is.
-  // Attached fields can point at fields this overlay doesn't list (hidden
-  // ones), which still have a saved box.
+  // A field's box as it is drawn now: a field attached to another sits `gap`
+  // under where that field's content ends, or `gap` over where it starts if
+  // it is attached above it, wherever that field is. Attached fields can point
+  // at fields this overlay doesn't list (hidden ones), which still have a
+  // saved box.
   const shown = (key: string, seen = new Set<string>()): Box | null => {
     const box = boxOf(key, placed, measured, isText(key));
     if (!box?.below || seen.has(key)) return box;
     seen.add(key);
-    const above = shown(box.below, seen);
-    if (!above) return box;
+    const target = shown(box.below, seen);
+    if (!target) return box;
     const height = contentHeight(box.below);
+    const gap = box.gap ?? 0;
     // An empty or hidden field isn't drawn and passes its place on.
-    return { ...box, y: height === null ? above.y : above.y + height + (box.gap ?? 0) };
+    if (box.side === "above") return { ...box, y: target.y - box.h - (height === null ? 0 : gap) };
+    return { ...box, y: height === null ? target.y : target.y + height + gap };
   };
 
-  // Saves boxes; for an attached field, its new position becomes its new gap.
+  // Saves boxes. For an attached field, its new position becomes its new gap,
+  // and the side it's on: above the field it's attached to if its middle is
+  // higher than that field's middle, so it keeps its distance from that edge.
   const placeAll = (boxes: Record<string, Box>) => {
     const next = { ...placed };
     for (let [key, box] of Object.entries(boxes)) {
       if (box.below) {
-        const above = shown(box.below);
+        const target = shown(box.below);
         const height = contentHeight(box.below);
-        if (above && height !== null) box = { ...box, gap: Math.round(box.y - (above.y + height)) };
+        if (target && height !== null) {
+          const above = box.y + box.h / 2 < target.y + height / 2;
+          box = above
+            ? { ...box, side: "above", gap: Math.round(target.y - (box.y + box.h)) }
+            : { ...box, side: "below", gap: Math.round(box.y - (target.y + height)) };
+        }
       }
       next[key] = box;
     }
@@ -145,7 +162,7 @@ export function FieldBoxes(props: {
   const attach = (key: string, below: string | null) => {
     const box = shown(key);
     if (!box) return;
-    const { below: _, gap: __, ...rest } = box;
+    const { below: _, gap: __, side: ___, ...rest } = box;
     place(key, below ? { ...rest, below } : rest);
   };
 

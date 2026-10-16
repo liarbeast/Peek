@@ -16,7 +16,7 @@ from typing import Iterator
 
 from . import layouts
 
-ITEM_ORDERS = ("in_order", "random", "shuffle")
+ITEM_ORDERS = ("in_order", "shuffle")
 
 # Each entry upgrades the schema by one version; never edit a shipped entry.
 MIGRATIONS = [
@@ -124,13 +124,39 @@ MIGRATIONS = [
     ALTER TABLE category ADD COLUMN source TEXT;
     ALTER TABLE category ADD COLUMN synced TEXT;
     """,
+    # The order the frame goes through categories in ("Collection order" in
+    # Settings); it starts out alphabetical, as they were listed until now.
+    """
+    ALTER TABLE category ADD COLUMN position INTEGER NOT NULL DEFAULT 0;
+    UPDATE category SET position = 1 + (
+        SELECT COUNT(*) FROM category other
+        WHERE other.name COLLATE NOCASE < category.name COLLATE NOCASE
+           OR (other.name COLLATE NOCASE = category.name COLLATE NOCASE AND other.id < category.id)
+    );
+    """,
+    # A category's own refresh, while it's on the frame; none means the
+    # frame's refresh from Settings.
+    """
+    ALTER TABLE category ADD COLUMN refresh TEXT;
+    """,
+    # Every category has its own refresh: those that used the frame's take it
+    # over, and the frame no longer has one.
+    """
+    UPDATE category SET refresh = COALESCE((SELECT value FROM setting WHERE key = 'refresh'), '1h')
+    WHERE refresh IS NULL;
+    DELETE FROM setting WHERE key = 'refresh';
+    """,
+    # Items in random order made way for shuffle: random, but each once a round.
+    """
+    UPDATE category SET item_order = 'shuffle' WHERE item_order = 'random';
+    """,
 ]
 
 # Frame-wide settings and their values until someone changes them.
 SETTING_DEFAULTS = {
     "orientation": "landscape",
-    "refresh": "1h",  # see schedule.REFRESH_INTERVALS
     "switch": "1d",  # see schedule.SWITCH_INTERVALS
+    "collection_order": "in_order",  # or "shuffle": see schedule.next_item
 }
 
 
@@ -183,7 +209,7 @@ class Store:
             rows = conn.execute(
                 """SELECT c.*, COUNT(i.id) AS item_count
                    FROM category c LEFT JOIN item i ON i.category_id = c.id
-                   GROUP BY c.id ORDER BY c.name COLLATE NOCASE"""
+                   GROUP BY c.id ORDER BY c.position, c.name COLLATE NOCASE"""
             ).fetchall()
             categories = [_category(r) for r in rows]
             for c in categories:
@@ -219,8 +245,9 @@ class Store:
     def create_category(self, fields: dict) -> dict:
         with self.connect() as conn:
             cur = conn.execute(
-                """INSERT INTO category (name, template, item_order, weight, enabled, fields, mono, pixelate, positions)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                """INSERT INTO category (name, template, item_order, weight, enabled, fields, mono, pixelate, positions,
+                                        refresh, position)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(position), 0) + 1 FROM category))""",
                 (
                     fields["name"],
                     fields["template"],
@@ -231,6 +258,7 @@ class Store:
                     int(fields.get("mono", False)),
                     int(fields.get("pixelate", False)),
                     json.dumps(fields.get("positions", {})),
+                    fields.get("refresh", "1h"),
                 ),
             )
             new_id = cur.lastrowid
@@ -238,7 +266,7 @@ class Store:
 
     def update_category(self, category_id: int, fields: dict) -> dict | None:
         allowed = ("name", "template", "item_order", "weight", "enabled", "fields", "mono", "pixelate", "positions",
-                   "source", "synced")
+                   "source", "synced", "refresh")
         changes = {k: _column(k, v) for k, v in fields.items() if k in allowed}
         if changes:
             sets = ", ".join(f"{k} = ?" for k in changes)
@@ -340,6 +368,14 @@ class Store:
     def delete_item(self, item_id: int) -> None:
         with self.connect() as conn:
             conn.execute("DELETE FROM item WHERE id = ?", (item_id,))
+
+    def reorder_categories(self, category_ids: list[int]) -> None:
+        """Put these categories first, in this order; the rest keep theirs after them."""
+        with self.connect() as conn:
+            rest = [r[0] for r in conn.execute("SELECT id FROM category ORDER BY position, name COLLATE NOCASE")
+                    if r[0] not in category_ids]
+            for position, category_id in enumerate([*category_ids, *rest], start=1):
+                conn.execute("UPDATE category SET position = ? WHERE id = ?", (position, category_id))
 
     def reorder_items(self, category_id: int, item_ids: list[int]) -> None:
         with self.connect() as conn:

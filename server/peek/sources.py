@@ -1,4 +1,4 @@
-"""Collections filled from the web: a JSON address, read again once a day.
+"""Collections filled from the web: a JSON address, read again on every wake that shows them.
 
 A source says where to fetch (the address may hold {YYYY}, {MM} and {DD},
 filled in with the day's date, and {RANDOM:min-max}, a new random whole

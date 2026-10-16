@@ -1,27 +1,31 @@
 import { Button, toast } from "@heroui/react";
 import { useState } from "react";
-import { api, type Category, type ItemOrder } from "../../api";
+import { api, type Category, type ItemOrder, type Refresh } from "../../api";
 import { Choice, Dialog, TextInput, Toggle } from "../../components/ui";
 import { go } from "../../router";
+import { refreshOptions } from "../../timing";
 
 export const ORDERS: Array<{ id: ItemOrder; label: string; description: string }> = [
   { id: "in_order", label: "In order", description: "Top to bottom, then start again" },
-  { id: "random", label: "Random", description: "Any item each time, repeats possible" },
-  { id: "shuffle", label: "Shuffle", description: "Random, but every item once before repeating" },
+  { id: "shuffle", label: "Shuffle", description: "Every item once in a shuffled order, then again" },
 ];
 
 export function SettingsTab({ category, onSaved }: { category: Category; onSaved: (c: Category) => void }) {
   const [name, setName] = useState(category.name);
   const [order, setOrder] = useState<ItemOrder>(category.item_order);
   const [enabled, setEnabled] = useState(category.enabled);
+  const [refresh, setRefresh] = useState<Refresh>(category.refresh);
   const [confirming, setConfirming] = useState(false);
   const dirty =
-    name !== category.name || order !== category.item_order || enabled !== category.enabled;
+    name !== category.name ||
+    order !== category.item_order ||
+    enabled !== category.enabled ||
+    refresh !== category.refresh;
 
   const save = async () => {
     try {
       onSaved(
-        await api.updateCategory(category.id, { name: name.trim(), item_order: order, enabled }),
+        await api.updateCategory(category.id, { name: name.trim(), item_order: order, enabled, refresh }),
       );
       toast.success("Settings saved");
     } catch (e) {
@@ -39,6 +43,13 @@ export function SettingsTab({ category, onSaved }: { category: Category; onSaved
     <div className="flex max-w-lg flex-col gap-5">
       <TextInput label="Name" value={name} onChange={setName} />
       <Choice label="Order of items" value={order} onChange={setOrder} options={ORDERS} />
+      <Choice
+        label="Refresh"
+        value={refresh}
+        onChange={setRefresh}
+        options={refreshOptions()}
+        description="How often the frame wakes for the next item while this collection is on it. More often uses more battery."
+      />
       <Toggle label="Show this collection on the frame" isSelected={enabled} onChange={setEnabled} />
       <div className="flex gap-2">
         <Button isDisabled={!dirty || !name.trim()} onPress={save}>
