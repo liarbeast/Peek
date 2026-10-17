@@ -26,6 +26,10 @@ Open http://localhost:8080. The first build downloads Chromium and takes a few m
 Peek keeps time in the zone set as `TZ` in `compose.yaml` (`Europe/Amsterdam`); change it to yours, so "at midnight"
 and "today" mean your midnight.
 
+Peek uses host networking, so frames on your network find it by themselves. On Docker Desktop (Mac, Windows) that
+doesn't reach your network: there, swap `network_mode: host` in `compose.yaml` for the `ports` lines next to it, and
+type Peek's address on the frame's page when it asks. To set up a frame, see [firmware/](firmware/README.md).
+
 Collections, uploaded images and the current frame image live in the `data` folder next to `compose.yaml`.
 To move Peek to another machine, copy the whole folder and run the same command there.
 

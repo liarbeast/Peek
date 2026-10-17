@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+from contextlib import asynccontextmanager
 from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
@@ -14,7 +15,7 @@ from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Res
 from fastapi.staticfiles import StaticFiles
 from PIL import Image
 
-from . import content, db, layouts, palette, renderer, samples, schedule
+from . import announce, content, db, layouts, palette, renderer, samples, schedule
 
 STATIC = Path(__file__).parent / "static"
 # The built web app (see web/); absent when only the API is installed.
@@ -36,8 +37,16 @@ def _welcome_render(orientation: str) -> renderer.Render:
     return renderer.render(layouts.build(template, fields, values, size=size), orientation)
 
 
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    announcer = announce.Announcer()
+    await announcer.start()
+    yield
+    await announcer.stop()
+
+
 def create_app(data_dir: Path) -> FastAPI:
-    app = FastAPI(title="Peek")
+    app = FastAPI(title="Peek", lifespan=_lifespan)
     store = db.Store(data_dir)
     store.migrate()
 

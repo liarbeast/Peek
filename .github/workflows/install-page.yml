@@ -1,0 +1,77 @@
+name: Firmware and install page
+
+# Builds the frame firmware and publishes the install page (install/) on
+# GitHub Pages, with the firmware next to it. Runs for every release, and by
+# hand from the Actions tab. Pull requests that touch either only build them.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - firmware/**
+      - install/**
+      - .github/workflows/install-page.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: install-page-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # to attach the firmware to a release
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install esphome==2026.9.1
+      - name: Build the firmware
+        run: esphome compile firmware/peek-frame.yaml
+      - name: Put the page and firmware together
+        env:
+          VERSION: ${{ github.event.release.tag_name || github.sha }}
+        run: |
+          mkdir site
+          cp install/* site/
+          cp "$(find firmware/.esphome -name firmware.factory.bin | head -n 1)" site/peek-frame.bin
+          cat > site/manifest.json <<EOF
+          {
+            "name": "Peek frame",
+            "version": "$VERSION",
+            "new_install_improv_wait_time": 20,
+            "builds": [
+              { "chipFamily": "ESP32-S3", "parts": [{ "path": "peek-frame.bin", "offset": 0 }] }
+            ]
+          }
+          EOF
+          ls -l site
+      - name: Attach the firmware to the release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" site/peek-frame.bin --clobber
+      - uses: actions/upload-pages-artifact@v3
+        if: github.event_name != 'pull_request'
+        with:
+          path: site
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
