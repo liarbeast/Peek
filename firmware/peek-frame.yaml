@@ -109,9 +109,14 @@ display:
     reset_pin: GPIO38
     # Switches on the panel's power on the EE04 (TFT_ENABLE in Seeed's own driver).
     enable_pin: GPIO43
+    reset_duration: 20ms
     busy_pin:
       number: GPIO4
       inverted: true
+      # The panel only pulls this line low while busy; without a pull-up it never reads idle.
+      mode:
+        input: true
+        pullup: true
     # Peek already sends 800x480 turned for the panel, so no rotation here.
     rotation: 0
     update_interval: never
