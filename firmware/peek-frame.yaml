@@ -3,20 +3,35 @@
 # On every wake it joins Wi-Fi, downloads /frame.png from Peek, draws it, asks
 # /api/sleep how long to wait and goes into deep sleep. Press KEY0 to wake it
 # early: it then shows the current picture and stays awake for 5 minutes, so
-# `esphome run` can update it over Wi-Fi.
+# it can be updated over Wi-Fi and its page (http://<frame's IP>/) can be opened.
 #
-# Build and flash from the Peek folder: esphome run firmware/peek-frame.yaml
-# Wi-Fi and Peek's address go in firmware/secrets.yaml (see secrets.example.yaml).
+# Nothing in here is personal: everyone gets the same firmware from the install
+# page. Wi-Fi is set up after installing (from the install page, or by joining
+# the frame's own "Peek frame" Wi-Fi), and the frame finds Peek on the network
+# by itself. If it can't, the screen explains how to type Peek's address on
+# the frame's page.
+#
+# Build and flash it yourself from the Peek folder: esphome run firmware/peek-frame.yaml
 
 substitutions:
   # Minutes to sleep when Peek can't be reached, then try again.
   retry_minutes: "15"
   # Long enough for the six-colour refresh (about 30 s) to finish before sleeping.
   refresh_time: 45s
+  # How long the frame waits for Wi-Fi details or Peek's address while setting up.
+  setup_minutes: "10"
+  install_page: liarbeast.github.io/Peek
 
 esphome:
   name: peek-frame
   friendly_name: Peek frame
+  # Each frame gets its own name (peek-frame-1a2b3c), so several can share a network.
+  name_add_mac_suffix: true
+  project:
+    name: liarbeast.peek
+    version: "1.0"
+  includes:
+    - peek_setup.h
   on_boot:
     priority: -100
     then:
@@ -27,18 +42,24 @@ esphome:
             - logger.log: "Woken by KEY0: staying awake for 5 minutes for updates"
             - deep_sleep.prevent: sleeper
             - script.execute: stay_awake
-      - wait_until:
-          condition:
-            wifi.connected:
-          timeout: 30s
       - if:
           condition:
-            wifi.connected:
+            lambda: return !wifi::global_wifi_component->has_sta();
           then:
-            - component.update: frame
+            - script.execute: setup_wifi
           else:
-            - logger.log: "No Wi-Fi, trying again later"
-            - script.execute: sleep_retry
+            - wait_until:
+                condition:
+                  wifi.connected:
+                timeout: 30s
+            - if:
+                condition:
+                  wifi.connected:
+                then:
+                  - script.execute: show_picture
+                else:
+                  - logger.log: "No Wi-Fi, trying again later"
+                  - script.execute: sleep_retry
 
 esp32:
   board: esp32-s3-devkitc-1
@@ -51,36 +72,100 @@ psram:
 
 logger:
 
+# No Wi-Fi details here: they come from the install page (Improv) or from the
+# frame's own "Peek frame" Wi-Fi with its setup page.
 wifi:
-  ssid: !secret wifi_ssid
-  password: !secret wifi_password
-  fast_connect: true
+  ap:
+    ssid: Peek frame
+
+captive_portal:
+
+improv_serial:
+  next_url: "http://{{ip_address}}/"
+
+# The frame's own page, where Peek's address can be typed in.
+web_server:
+  port: 80
+  version: 3
+  local: true
 
 ota:
   - platform: esphome
-    password: !secret ota_password
 
 http_request:
   verify_ssl: false
   timeout: 20s
 
+globals:
+  # What the screen shows: 0 the picture, 1 Wi-Fi setup, 2 "can't find Peek".
+  - id: screen
+    type: int
+    initial_value: "0"
+  # Peek's base address for this wake, like http://192.168.1.20:8080.
+  - id: peek_base
+    type: std::string
+  # True while the frame waits for someone to type Peek's address.
+  - id: waiting_for_address
+    type: bool
+    initial_value: "false"
+  # Peek is only looked for again once per wake.
+  - id: looked_again
+    type: bool
+    initial_value: "false"
+
+text:
+  - platform: template
+    id: peek_address
+    name: Peek address
+    icon: mdi:server-network
+    mode: text
+    max_length: 100
+    optimistic: true
+    restore_value: true
+    initial_value: ""
+    on_value:
+      - if:
+          condition:
+            lambda: return id(waiting_for_address);
+          then:
+            - lambda: id(waiting_for_address) = false;
+            - script.stop: ask_for_address
+            - script.execute: stay_awake
+            - script.execute: show_picture
+
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      id: frame_ip
+
 spi:
   clk_pin: GPIO7
   mosi_pin: GPIO9
 
-online_image:
-  - id: frame
-    url: !secret peek_frame_url
+image:
+  - platform: online_image
+    id: frame
+    # Replaced on every wake by Peek's real address.
+    url: http://peek.local/frame.png
     format: png
     type: RGB565
     update_interval: never
     on_download_finished:
+      - lambda: id(screen) = 0;
       - component.update: epaper
       - delay: ${refresh_time}
       - script.execute: sleep_until_next_refresh
     on_error:
-      - logger.log: "Couldn't download the picture from Peek, trying again later"
-      - script.execute: sleep_retry
+      - logger.log: "Couldn't download the picture from Peek"
+      - script.execute: peek_unreachable
+
+font:
+  - file: "gfonts://Inter@600"
+    id: title_font
+    size: 40
+  - file: "gfonts://Inter"
+    id: text_font
+    size: 24
 
 display:
   - platform: epaper_spi
@@ -105,7 +190,39 @@ display:
     rotation: 0
     update_interval: never
     lambda: |-
-      it.image(0, 0, id(frame));
+      if (id(screen) == 0) {
+        it.image(0, 0, id(frame));
+        return;
+      }
+      auto black = Color(0, 0, 0);
+      it.fill(Color(255, 255, 255));
+      int y = 50;
+      auto line = [&](const char *text) {
+        it.print(50, y, id(text_font), black, text);
+        y += 36;
+      };
+      if (id(screen) == 1) {
+        it.print(50, y, id(title_font), black, "Connect your Peek frame to Wi-Fi");
+        y += 80;
+        line("On a computer: open ${install_page}");
+        line("in Chrome or Edge, click Install and follow the steps.");
+        y += 24;
+        line("Or on your phone: join the Wi-Fi network");
+        line("\"Peek frame\" and pick your home Wi-Fi.");
+        y += 24;
+        line("Asleep? Press KEY0 on the back to try again.");
+      } else {
+        it.print(50, y, id(title_font), black, "Your frame can't find Peek");
+        y += 80;
+        line("Make sure Peek is running. Then, on a phone or");
+        line("computer on the same Wi-Fi, open this frame's page:");
+        it.printf(50, y, id(title_font), black, "http://%s", id(frame_ip).state.c_str());
+        y += 64;
+        line("and type Peek's address, for example");
+        line("http://192.168.1.20:8080");
+        y += 24;
+        line("Asleep? Press KEY0 on the back to try again.");
+      }
 
 deep_sleep:
   id: sleeper
@@ -121,10 +238,47 @@ deep_sleep:
       pullup: true
 
 script:
+  # Find Peek (the saved address, or on the network) and download the picture.
+  - id: show_picture
+    then:
+      - lambda: |-
+          std::string base = peek::normalize_address(id(peek_address).state);
+          if (base.empty() || id(looked_again)) {
+            std::string found = peek::find_peek();
+            if (!found.empty() && found != base) {
+              base = found;
+              auto call = id(peek_address).make_call();
+              call.set_value(base);
+              call.perform();
+            }
+          }
+          if (base.empty()) {
+            id(ask_for_address).execute();
+            return;
+          }
+          id(peek_base) = base;
+          ESP_LOGI("peek", "Getting the picture from %s", base.c_str());
+          id(frame).set_url(base + "/frame.png");
+          id(frame).update();
+
+  # The download failed: look for Peek on the network once (its address may
+  # have changed), then give up until the next try.
+  - id: peek_unreachable
+    then:
+      - delay: 1s
+      - if:
+          condition:
+            lambda: return !id(looked_again);
+          then:
+            - lambda: id(looked_again) = true;
+            - script.execute: show_picture
+          else:
+            - script.execute: sleep_retry
+
   - id: sleep_until_next_refresh
     then:
       - http_request.get:
-          url: !secret peek_sleep_url
+          url: !lambda return id(peek_base) + "/api/sleep";
           capture_response: true
           on_response:
             then:
@@ -153,3 +307,42 @@ script:
       - delay: 5min
       - deep_sleep.allow: sleeper
       - script.execute: sleep_until_next_refresh
+
+  # No Wi-Fi details yet: show how to give them and wait.
+  - id: setup_wifi
+    then:
+      - logger.log: "No Wi-Fi set up yet: waiting for the install page or the setup Wi-Fi"
+      - deep_sleep.prevent: sleeper
+      - lambda: id(screen) = 1;
+      - component.update: epaper
+      - wait_until:
+          condition:
+            wifi.connected:
+          timeout: ${setup_minutes}min
+      - if:
+          condition:
+            wifi.connected:
+          then:
+            - script.execute: stay_awake
+            - script.execute: show_picture
+          else:
+            # Sleep long: KEY0 wakes it when someone is ready to set it up.
+            - deep_sleep.allow: sleeper
+            - lambda: |-
+                id(sleeper).set_sleep_duration(24 * 60 * 60 * 1000U);
+                id(sleeper).begin_sleep();
+
+  # Peek wasn't found: show how to type its address on the frame's page and wait.
+  - id: ask_for_address
+    mode: restart
+    then:
+      - logger.log: "Peek not found: waiting for its address on the frame's page"
+      - deep_sleep.prevent: sleeper
+      - lambda: |-
+          id(waiting_for_address) = true;
+          id(screen) = 2;
+      - component.update: epaper
+      - delay: ${setup_minutes}min
+      - lambda: id(waiting_for_address) = false;
+      - deep_sleep.allow: sleeper
+      - script.execute: sleep_retry
