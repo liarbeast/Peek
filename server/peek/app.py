@@ -45,6 +45,20 @@ async def _lifespan(app: FastAPI):
     await announcer.stop()
 
 
+# A Li-ion cell's voltage at rest against how full it is (roughly; it depends on the cell).
+_LI_ION = [(3.3, 0), (3.6, 10), (3.7, 30), (3.8, 55), (3.9, 70), (4.0, 80), (4.1, 90), (4.2, 100)]
+
+
+def battery_percent(voltage: float) -> int:
+    """How full the battery is, from its voltage."""
+    if voltage <= _LI_ION[0][0]:
+        return 0
+    for (v0, p0), (v1, p1) in zip(_LI_ION, _LI_ION[1:]):
+        if voltage <= v1:
+            return round(p0 + (p1 - p0) * (voltage - v0) / (v1 - v0))
+    return 100
+
+
 def create_app(data_dir: Path) -> FastAPI:
     app = FastAPI(title="Peek", lifespan=_lifespan)
     store = db.Store(data_dir)
@@ -55,6 +69,8 @@ def create_app(data_dir: Path) -> FastAPI:
     current = data_dir / "current.png"
     current_preview = data_dir / "current-preview.png"
     current_source = data_dir / "current.json"
+    # The frame's battery as it last reported it.
+    battery_file = data_dir / "battery.json"
 
     def timing(category_id: int | None) -> tuple[str, str]:
         """The refresh while a category is on the frame (the default with
@@ -173,13 +189,24 @@ def create_app(data_dir: Path) -> FastAPI:
         return _image_response(renderer.png(palette.indices_to_image(idx, realistic=True)))
 
     @app.get("/api/sleep", response_class=PlainTextResponse)
-    def sleep_seconds() -> str:
+    def sleep_seconds(battery: float | None = None) -> str:
         """How long the frame should sleep before its next wake, in seconds:
         until the next refresh of the category it shows. PEEK_SLEEP_SECONDS
-        overrides it, for testing a frame."""
+        overrides it, for testing a frame. The frame passes its battery
+        voltage along, when it could measure it."""
+        if battery is not None and 0 < battery < 10:
+            battery_file.write_text(json.dumps({"voltage": round(battery, 2), "at": datetime.now().astimezone().isoformat()}))
         if fixed := os.environ.get("PEEK_SLEEP_SECONDS"):
             return fixed
         return str(schedule.sleep_seconds(timing(current_category())[0]))
+
+    @app.get("/api/battery")
+    def battery_level() -> dict | None:
+        """The frame's battery as it last reported it, or null before it has."""
+        if not battery_file.exists():
+            return None
+        reading = json.loads(battery_file.read_text())
+        return {**reading, "percent": battery_percent(reading["voltage"])}
 
     # The web app: static files, with index.html for every other page.
 
