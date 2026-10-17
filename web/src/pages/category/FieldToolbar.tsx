@@ -1,19 +1,5 @@
 import { Button, Dropdown, ToggleButton, ToggleButtonGroup, Toolbar } from "@heroui/react";
-import {
-  AlignCenter,
-  AlignCenterHorizontal,
-  AlignEndHorizontal,
-  AlignLeft,
-  AlignRight,
-  AlignStartHorizontal,
-  ArrowDownFromLine,
-  ArrowUpFromLine,
-  BringToFront,
-  Link,
-  SendToBack,
-  Trash2,
-  UnfoldVertical,
-} from "lucide-react";
+import { ArrowDownFromLine, ArrowShapeDownToLine, ArrowShapeUpToLine, ArrowUpFromLine, ArrowsExpandVertical, Link, ObjectAlignBottom, ObjectAlignCenterVertical, ObjectAlignTop, TextAlignCenter, TextAlignLeft, TextAlignRight, TrashBin } from "@gravity-ui/icons";
 import { useEffect, useState, type ReactNode } from "react";
 import { api, PANEL_COLOURS, type Box, type CategoryImage, type PanelColour } from "../../api";
 import type { Layer } from "./FieldBoxes";
@@ -88,9 +74,9 @@ export function FieldToolbar(props: {
           label="Horizontal alignment"
           value={box.align ?? "center"}
           options={[
-            ["left", "Align left", <AlignLeft key="l" size={16} />],
-            ["center", "Align centre", <AlignCenter key="c" size={16} />],
-            ["right", "Align right", <AlignRight key="r" size={16} />],
+            ["left", "Align left", <TextAlignLeft key="l" width={16} height={16} />],
+            ["center", "Align centre", <TextAlignCenter key="c" width={16} height={16} />],
+            ["right", "Align right", <TextAlignRight key="r" width={16} height={16} />],
           ]}
           onChange={(align) => props.onChange({ align: align as Box["align"] })}
         />
@@ -117,9 +103,9 @@ export function FieldToolbar(props: {
               label="Grow"
               value={box.grow ?? "down"}
               options={[
-                ["down", "Grow down: the top edge stays put", <ArrowDownFromLine key="d" size={16} />],
-                ["up", "Grow up: the bottom edge stays put", <ArrowUpFromLine key="u" size={16} />],
-                ["middle", "Grow both ways: the centre stays put", <UnfoldVertical key="m" size={16} />],
+                ["down", "Grow down: the top edge stays put", <ArrowDownFromLine key="d" width={16} height={16} />],
+                ["up", "Grow up: the bottom edge stays put", <ArrowUpFromLine key="u" width={16} height={16} />],
+                ["middle", "Grow both ways: the centre stays put", <ArrowsExpandVertical key="m" width={16} height={16} />],
               ]}
               onChange={(grow) => props.onChange({ grow: grow as Box["grow"] })}
             />
@@ -131,9 +117,9 @@ export function FieldToolbar(props: {
             label="Vertical alignment"
             value={box.valign ?? "middle"}
             options={[
-              ["top", "Align top", <AlignStartHorizontal key="t" size={16} />],
-              ["middle", "Align middle", <AlignCenterHorizontal key="m" size={16} />],
-              ["bottom", "Align bottom", <AlignEndHorizontal key="b" size={16} />],
+              ["top", "Align top", <ObjectAlignTop key="t" width={16} height={16} />],
+              ["middle", "Align middle", <ObjectAlignCenterVertical key="m" width={16} height={16} />],
+              ["bottom", "Align bottom", <ObjectAlignBottom key="b" width={16} height={16} />],
             ]}
             onChange={(valign) => props.onChange({ valign: valign as Box["valign"] })}
           />
@@ -152,17 +138,17 @@ export function FieldToolbar(props: {
         />
       )}
       <IconButton label="Bring to front" onPress={props.onFront}>
-        <BringToFront size={16} />
+        <ArrowShapeUpToLine width={16} height={16} />
       </IconButton>
       <IconButton label="Send to back" onPress={props.onBack}>
-        <SendToBack size={16} />
+        <ArrowShapeDownToLine width={16} height={16} />
       </IconButton>
       <Dropdown>
         <Dropdown.Trigger
           aria-label="Attach to another field"
           className="flex h-8 items-center gap-1 rounded-lg px-2 text-sm hover:bg-default"
         >
-          <Link size={16} />
+          <Link width={16} height={16} />
           {attached ? `Attached to ${attached.label}` : "Attach to"}
         </Dropdown.Trigger>
         <Dropdown.Popover>
@@ -187,7 +173,7 @@ export function FieldToolbar(props: {
       </Dropdown>
       {layer.image && (
         <IconButton label="Remove this image" onPress={props.onImageDelete}>
-          <Trash2 size={16} />
+          <TrashBin width={16} height={16} />
         </IconButton>
       )}
     </Toolbar>

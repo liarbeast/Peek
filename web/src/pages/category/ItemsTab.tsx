@@ -1,5 +1,5 @@
 import { Button, toast } from "@heroui/react";
-import { ArrowDown, ArrowUp, GripVertical, Quote } from "lucide-react";
+import { ArrowDown, ArrowUp, Grip, QuoteOpen } from "@gravity-ui/icons";
 import { Reorder, useDragControls } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { api, describeItem, imageUrl, type Category, type Item } from "../../api";
@@ -307,7 +307,7 @@ function ItemRow(props: {
           />
         ) : (
           <div className="flex h-14 w-24 flex-none items-center justify-center rounded-md bg-surface-secondary text-muted">
-            <Quote size={20} />
+            <QuoteOpen width={20} height={20} />
           </div>
         )}
         <div className="min-w-0 flex-1">
@@ -327,7 +327,7 @@ function ItemRow(props: {
               isDisabled={props.isFirst}
               onPress={() => props.onMove(-1)}
             >
-              <ArrowUp size={16} />
+              <ArrowUp width={16} height={16} />
             </Button>
             <Button
               size="sm"
@@ -337,7 +337,7 @@ function ItemRow(props: {
               isDisabled={props.isLast}
               onPress={() => props.onMove(1)}
             >
-              <ArrowDown size={16} />
+              <ArrowDown width={16} height={16} />
             </Button>
           </>
         )}
@@ -367,7 +367,7 @@ export function DragHandle({ onPointerDown }: { onPointerDown: (e: React.Pointer
       className="cursor-grab touch-none rounded p-1 text-muted hover:bg-surface-secondary active:cursor-grabbing"
       onPointerDown={onPointerDown}
     >
-      <GripVertical size={16} />
+      <Grip width={16} height={16} />
     </button>
   );
 }
