@@ -29,13 +29,6 @@ export interface Field {
 // A field being edited: new fields get their key from the server.
 export type FieldDraft = Omit<Field, "key"> & { key?: string };
 
-export interface Template {
-  name: string;
-  label: string;
-  description: string;
-  fields: Field[];
-}
-
 // The six colours the panel can show.
 export const PANEL_COLOURS = {
   black: "#000000",
@@ -83,7 +76,6 @@ export interface Preview {
 export interface Category {
   id: number;
   name: string;
-  template: string;
   item_order: ItemOrder;
   weight: number;
   enabled: boolean;
@@ -150,7 +142,6 @@ export interface ImportColumn {
 export type ImportTarget = { field: string } | { new: { label: string; type: FieldType } } | null;
 
 export interface StyleChanges {
-  template?: string;
   mono?: boolean;
   pixelate?: boolean;
   positions?: Positions;
@@ -210,7 +201,6 @@ export function describeItem(fields: Field[], item: Item): { title: string; deta
 }
 
 export const api = {
-  templates: () => request<Template[]>("/api/templates"),
   settings: () => request<Settings>("/api/settings"),
   updateSettings: (body: Partial<Settings>) => request<Settings>("/api/settings", json("PATCH", body)),
 

@@ -1,7 +1,7 @@
 import { Button, Spinner, Toast } from "@heroui/react";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import { useEffect, useState } from "react";
-import { api, type Settings, type Template } from "./api";
+import { api, type Settings } from "./api";
 import { FrameStatus } from "./components/FrameStatus";
 import { Logo } from "./components/Logo";
 import { CategoriesPage } from "./pages/CategoriesPage";
@@ -24,11 +24,9 @@ function useSystemTheme() {
 export function App() {
   useSystemTheme();
   const route = useRoute();
-  const [templates, setTemplates] = useState<Template[] | null>(null);
   const [settings, setSettings] = useState<Settings | null>(null);
 
   useEffect(() => {
-    api.templates().then(setTemplates);
     api.settings().then(setSettings);
   }, []);
 
@@ -64,12 +62,12 @@ export function App() {
                 animate={{ opacity: 1, y: 0, transition: { duration: 0.2, ease: [0.2, 0.8, 0.2, 1] } }}
                 exit={{ opacity: 0, transition: { duration: 0.1, ease: "easeIn" } }}
               >
-                {!templates || !settings ? (
+                {!settings ? (
                   <Spinner />
                 ) : route.page === "settings" ? (
                   <SettingsPage tab={route.tab} settings={settings} onChange={setSettings} />
                 ) : route.page === "category" ? (
-                  <CategoryPage id={route.id} tab={route.tab} templates={templates} />
+                  <CategoryPage id={route.id} tab={route.tab} />
                 ) : (
                   <CategoriesPage />
                 )}

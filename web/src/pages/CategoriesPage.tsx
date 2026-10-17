@@ -33,8 +33,7 @@ export function CategoriesPage() {
           <Card.Header>
             <Card.Title>No collections yet</Card.Title>
             <Card.Description>
-              Start with one, for example "Bird of the day" with the Photo layout, or "Movie quotes" with the Quote
-              layout.
+              Start with one, for example "Bird of the day" or "Movie quotes".
             </Card.Description>
           </Card.Header>
           <Card.Footer>

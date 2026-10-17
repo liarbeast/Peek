@@ -1,14 +1,14 @@
 import { Chip, Spinner, Tabs } from "@heroui/react";
 import { ArrowLeft } from "@gravity-ui/icons";
 import { useCallback, useEffect, useState } from "react";
-import { api, type Category, type Item, type Template } from "../api";
+import { api, type Category, type Item } from "../api";
 import { ItemsTab } from "./category/ItemsTab";
 import { FieldsTab } from "./category/FieldsTab";
 import { SettingsTab } from "./category/SettingsTab";
 import { StyleTab } from "./category/StyleTab";
 import { go, type CategoryTab } from "../router";
 
-export function CategoryPage({ id, tab, templates }: { id: number; tab: CategoryTab; templates: Template[] }) {
+export function CategoryPage({ id, tab }: { id: number; tab: CategoryTab }) {
   const [category, setCategory] = useState<Category | null>(null);
   const [items, setItems] = useState<Item[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -75,7 +75,6 @@ export function CategoryPage({ id, tab, templates }: { id: number; tab: Category
           <StyleTab
             key={JSON.stringify(category.fields)}
             category={category}
-            templates={templates}
             items={items}
             onSaved={setCategory}
           />

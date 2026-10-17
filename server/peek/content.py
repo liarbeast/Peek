@@ -80,7 +80,6 @@ class FieldIn(BaseModel):
 
 class CategoryIn(BaseModel):
     name: str = Field(min_length=1, max_length=80)
-    template: str = "canvas"
     # Start from another category's fields and style instead of the defaults.
     copy_from: int | None = None
     item_order: str = "in_order"
@@ -98,7 +97,6 @@ class SourceIn(BaseModel):
 
 class CategoryPatch(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=80)
-    template: str | None = None
     item_order: str | None = None
     weight: int | None = Field(None, ge=1, le=10)
     enabled: bool | None = None
@@ -114,7 +112,6 @@ class CategoryPatch(BaseModel):
 class PreviewIn(BaseModel):
     """Unsaved style changes to preview."""
 
-    template: str | None = None
     mono: bool | None = None
     pixelate: bool | None = None
     positions: Positions | None = None
@@ -140,8 +137,6 @@ def _store(request: Request) -> db.Store:
 
 
 def _check(fields: dict) -> None:
-    if fields.get("template") not in (None, *layouts.TEMPLATES):
-        raise HTTPException(422, f"unknown template: {fields['template']}")
     if fields.get("item_order") not in (None, *db.ITEM_ORDERS):
         raise HTTPException(422, f"unknown item order: {fields['item_order']}")
     if fields.get("refresh") not in (None, *schedule.REFRESH_INTERVALS):
@@ -273,11 +268,6 @@ def update_settings(request: Request, body: SettingsPatch) -> dict:
 # Categories
 
 
-@router.get("/api/templates")
-def templates() -> list[dict]:
-    return [{"name": name, **layouts.TEMPLATE_INFO[name]} for name in layouts.TEMPLATES]
-
-
 @router.get("/api/field-types")
 def field_types() -> list[str]:
     return list(fieldlib.FIELD_TYPES)
@@ -301,8 +291,8 @@ def create_category(request: Request, body: CategoryIn) -> dict:
         for key in ("template", "fields", "mono", "pixelate", "positions", "item_order"):
             new[key] = source[key]
     else:
-        _check(new)
-        new["fields"] = layouts.TEMPLATE_INFO[body.template]["fields"]
+        new["template"] = layouts.TEMPLATES[0]
+        new["fields"] = layouts.TEMPLATE_INFO[new["template"]]["fields"]
     _check(new)
     created = store.create_category(new)
     if body.copy_from is not None:

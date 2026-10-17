@@ -10,7 +10,6 @@ import {
   type Item,
   type Positions,
   type Preview,
-  type Template,
 } from "../../api";
 import { PanelImage } from "../../components/PanelImage";
 import { Choice, Toggle } from "../../components/ui";
@@ -28,7 +27,6 @@ function useDebounced<T>(value: T, ms: number): T {
 
 export function StyleTab(props: {
   category: Category;
-  templates: Template[];
   items: Item[];
   onSaved: (c: Category) => void;
 }) {

@@ -38,11 +38,6 @@ def add_item(client, category_id, data=None, images=None):
     return res.json()
 
 
-def test_templates_are_listed(client):
-    names = [t["name"] for t in client.get("/api/templates").json()]
-    assert names == ["canvas"]
-
-
 def test_category_crud(client):
     cat = make_category(client)
     assert cat["item_count"] == 0 and cat["enabled"] is True
@@ -58,8 +53,7 @@ def test_category_crud(client):
     assert client.get(f"/api/categories/{cat['id']}").status_code == 404
 
 
-def test_unknown_template_and_order_are_rejected(client):
-    assert client.post("/api/categories", json={"name": "X", "template": "nope"}).status_code == 422
+def test_unknown_order_is_rejected(client):
     cat = make_category(client)
     assert client.patch(f"/api/categories/{cat['id']}", json={"item_order": "sideways"}).status_code == 422
 
