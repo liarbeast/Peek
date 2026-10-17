@@ -1,4 +1,4 @@
-import { Button, Popover } from "@heroui/react";
+import { Button, Popover, Separator } from "@heroui/react";
 import { useEffect, useState } from "react";
 import { api, type Battery, type Category } from "../api";
 import { switchText } from "../pages/CategoriesPage";
@@ -59,27 +59,32 @@ export function FrameStatus() {
         </span>
       </Button>
       <Popover.Content placement="bottom end">
-        <Popover.Dialog aria-label="The frame" className="flex items-start gap-6 p-5 text-sm">
-          <div className="flex w-32 flex-col gap-2">
+        <Popover.Dialog aria-label="The frame" className="flex w-64 flex-col gap-4 p-5 text-sm">
+          <section className="flex flex-col gap-2">
+            <h3 className="text-xs font-medium uppercase tracking-wide text-muted">Now showing</h3>
             {open && <PanelImage alt="The frame's current image" load={api.framePreview} deps={[frameVersion]} />}
-            <span className="text-xs">{current ? current.name : "Welcome page"}</span>
-            {switching && <span className="text-xs text-muted">{switching}</span>}
-          </div>
-          <div className="flex w-40 flex-col gap-1">
+            <div className="flex flex-col">
+              <span>{current ? current.name : "Welcome page"}</span>
+              {switching && <span className="text-xs text-muted">{switching}</span>}
+            </div>
+          </section>
+          <Separator className="bg-default-foreground/25" />
+          <section className="flex flex-col gap-2">
+            <h3 className="text-xs font-medium uppercase tracking-wide text-muted">Battery</h3>
             {battery ? (
-              <>
+              <div className="flex flex-col gap-0.5">
                 <span className={`flex items-center gap-1.5 font-medium ${isLow(battery) ? "text-danger" : ""}`}>
                   <BatteryIcon percent={battery.percent} />
-                  {battery.percent}%
+                  {battery.percent}%{isLow(battery) && ", charge it soon"}
                 </span>
-                {isLow(battery) && <span className="text-xs text-danger">Charge it soon</span>}
-                <span className="text-xs text-muted">{battery.voltage.toFixed(2)} V</span>
-                <span className="text-xs text-muted">Reported {ago(battery.at)}</span>
-              </>
+                <span className="text-xs text-muted">
+                  {battery.voltage.toFixed(2)} V, reported {ago(battery.at)}
+                </span>
+              </div>
             ) : (
-              <span className="text-xs text-muted">No battery report yet. The frame sends one each time it wakes.</span>
+              <span className="text-xs text-muted">No report yet. The frame sends one each time it wakes.</span>
             )}
-          </div>
+          </section>
         </Popover.Dialog>
       </Popover.Content>
     </Popover>
