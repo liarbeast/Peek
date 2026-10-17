@@ -1,0 +1,155 @@
+# Peek frame: Seeed XIAO ePaper EE04 board (XIAO ESP32-S3 Plus) with the 7.3" Spectra 6 panel.
+#
+# On every wake it joins Wi-Fi, downloads /frame.png from Peek, draws it, asks
+# /api/sleep how long to wait and goes into deep sleep. Press KEY0 to wake it
+# early: it then shows the current picture and stays awake for 5 minutes, so
+# `esphome run` can update it over Wi-Fi.
+#
+# Build and flash from the Peek folder: esphome run firmware/peek-frame.yaml
+# Wi-Fi and Peek's address go in firmware/secrets.yaml (see secrets.example.yaml).
+
+substitutions:
+  # Minutes to sleep when Peek can't be reached, then try again.
+  retry_minutes: "15"
+  # Long enough for the six-colour refresh (about 30 s) to finish before sleeping.
+  refresh_time: 45s
+
+esphome:
+  name: peek-frame
+  friendly_name: Peek frame
+  on_boot:
+    priority: -100
+    then:
+      - if:
+          condition:
+            lambda: return esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_EXT0;
+          then:
+            - logger.log: "Woken by KEY0: staying awake for 5 minutes for updates"
+            - deep_sleep.prevent: sleeper
+            - script.execute: stay_awake
+      - wait_until:
+          condition:
+            wifi.connected:
+          timeout: 30s
+      - if:
+          condition:
+            wifi.connected:
+          then:
+            - component.update: frame
+          else:
+            - logger.log: "No Wi-Fi, trying again later"
+            - script.execute: sleep_retry
+
+esp32:
+  board: esp32-s3-devkitc-1
+  framework:
+    type: esp-idf
+
+psram:
+  mode: octal
+  speed: 80MHz
+
+logger:
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  fast_connect: true
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+http_request:
+  verify_ssl: false
+  timeout: 20s
+
+spi:
+  clk_pin: GPIO7
+  mosi_pin: GPIO9
+
+online_image:
+  - id: frame
+    url: !secret peek_frame_url
+    format: png
+    type: RGB565
+    update_interval: never
+    on_download_finished:
+      - component.update: epaper
+      - delay: ${refresh_time}
+      - script.execute: sleep_until_next_refresh
+    on_error:
+      - logger.log: "Couldn't download the picture from Peek, trying again later"
+      - script.execute: sleep_retry
+
+display:
+  - platform: epaper_spi
+    id: epaper
+    model: 7.3in-Spectra-E6
+    # Slower than the default 20 MHz, so the long ribbon cable doesn't garble the signal.
+    data_rate: 4MHz
+    cs_pin: GPIO44
+    dc_pin: GPIO10
+    reset_pin: GPIO38
+    # Switches on the panel's power on the EE04 (TFT_ENABLE in Seeed's own driver).
+    enable_pin: GPIO43
+    reset_duration: 20ms
+    busy_pin:
+      number: GPIO4
+      inverted: true
+      # The panel only pulls this line low while busy; without a pull-up it never reads idle.
+      mode:
+        input: true
+        pullup: true
+    # Peek already sends 800x480 turned for the panel, so no rotation here.
+    rotation: 0
+    update_interval: never
+    lambda: |-
+      it.image(0, 0, id(frame));
+
+deep_sleep:
+  id: sleeper
+  # A safety net: if a wake ever gets stuck, sleep anyway instead of draining the battery.
+  run_duration: 3min
+  sleep_duration: ${retry_minutes}min
+  # KEY0 wakes the frame early.
+  wakeup_pin:
+    number: GPIO2
+    inverted: true
+    mode:
+      input: true
+      pullup: true
+
+script:
+  - id: sleep_until_next_refresh
+    then:
+      - http_request.get:
+          url: !secret peek_sleep_url
+          capture_response: true
+          on_response:
+            then:
+              - lambda: |-
+                  int seconds = atoi(body.c_str());
+                  if (response->status_code != 200 || seconds <= 0) {
+                    ESP_LOGW("peek", "Peek gave no sleep time, trying again later");
+                    id(sleep_retry).execute();
+                    return;
+                  }
+                  ESP_LOGI("peek", "Sleeping %d seconds", seconds);
+                  id(sleeper).set_sleep_duration(uint32_t(seconds) * 1000U);
+                  id(sleeper).begin_sleep();
+          on_error:
+            - script.execute: sleep_retry
+
+  - id: sleep_retry
+    then:
+      # Not deep_sleep.enter: that would also sleep while KEY0 keeps the frame awake.
+      - lambda: |-
+          id(sleeper).set_sleep_duration(${retry_minutes} * 60 * 1000U);
+          id(sleeper).begin_sleep();
+
+  - id: stay_awake
+    then:
+      - delay: 5min
+      - deep_sleep.allow: sleeper
+      - script.execute: sleep_until_next_refresh
