@@ -11,6 +11,8 @@ On every wake the frame joins Wi-Fi, downloads `/frame.png` from Peek, draws it 
 
 - Put the EE04's jumper on the side of the connector your screen's ribbon uses (24-pin or 50-pin), then plug in
   the ribbon and the battery. Seeed warns that the wrong jumper can damage the screen.
+- Plug the screen's orange ribbon straight into the board's big connector. With the white extension cable and
+  the small joiner in between, the screen stayed blank.
 - Peek must be running, and reachable from your phone on the same Wi-Fi at `http://<your computer's IP>:8080/frame.png`.
 - Install ESPHome: `brew install esphome` on a Mac, or `pip install esphome` elsewhere.
 
