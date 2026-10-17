@@ -3,6 +3,7 @@ import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { api, type Settings, type Template } from "./api";
 import { FrameStatus } from "./components/FrameStatus";
+import { Logo } from "./components/Logo";
 import { CategoriesPage } from "./pages/CategoriesPage";
 import { CategoryPage } from "./pages/CategoryPage";
 import { SettingsPage } from "./pages/SettingsPage";
@@ -37,7 +38,8 @@ export function App() {
         <Toast.Provider placement="bottom" />
         <header className="border-b border-separator">
           <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
-            <a href="#/" className="text-lg font-semibold tracking-tight">
+            <a href="#/" className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+              <Logo />
               Peek
             </a>
             <nav className="flex items-center gap-2">
