@@ -109,8 +109,8 @@
     <ul>
       <li>Your frame: the Seeed EE04 board with the 7.3" colour screen.</li>
       <li>A USB-C cable that can carry data. The one from the kit works. Some phone chargers' cables only charge.</li>
-      <li>A computer with <strong>Chrome</strong> or <strong>Edge</strong>. Phones, Safari and Firefox can't do this.</li>
-      <li>Your Wi-Fi name and password. The frame only works with 2.4 GHz Wi-Fi, which almost every home router has.</li>
+      <li>A computer with <strong>Chrome</strong> or <strong>Edge</strong>. Firefox, Safari and phones can't talk to USB devices from a web page, so installing only works in Chrome or Edge. You only need it once.</li>
+      <li>Your Wi-Fi name and password. The frame only works with 2.4 GHz Wi-Fi.</li>
       <li>Peek running on a computer or NAS in your home.</li>
     </ul>
   </section>
@@ -126,8 +126,8 @@
           "USB JTAG/serial debug unit") and click Connect. Then click <strong>Install Peek frame</strong>.</p>
         <esp-web-install-button manifest="manifest.json">
           <button slot="activate" class="button">Install</button>
-          <div slot="unsupported" class="note">This browser can't install the software. Open this page in
-            <strong>Chrome</strong> or <strong>Edge</strong> on a computer.</div>
+          <div slot="unsupported" class="note">This browser can't talk to USB devices, so it can't install the software.
+            Open this page in <strong>Chrome</strong> or <strong>Edge</strong> on a computer.</div>
           <div slot="not-allowed" class="note">This page has to be opened over a secure (https) connection.</div>
         </esp-web-install-button>
       </li>
@@ -166,7 +166,7 @@
     <h2>It didn't work</h2>
     <details>
       <summary>There's no Install button</summary>
-      <div><p>Open this page in Chrome or Edge on a computer. Phones, Safari and Firefox can't install the software.</p></div>
+      <div><p>Your browser can't talk to USB devices. Only Chrome and Edge can, so open this page in one of them on a computer.</p></div>
     </details>
     <details>
       <summary>The frame isn't in the list</summary>
