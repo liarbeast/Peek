@@ -51,9 +51,8 @@ export function FrameStatus() {
 
   return (
     <Popover isOpen={open} onOpenChange={setOpen}>
-      <Button variant="tertiary" size="sm" aria-label={`The frame, battery ${battery ? level : "unknown"}`}>
-        Frame
-        <span className="mx-0.5 h-4 w-px bg-current opacity-25" />
+      <Button variant="ghost" size="sm" aria-label={`The frame, battery ${battery ? level : "unknown"}`}>
+        <FrameIcon />
         <span className={`flex items-center gap-1.5 tabular-nums ${isLow(battery) ? "text-danger" : "text-muted"}`}>
           <BatteryIcon percent={battery?.percent ?? 0} />
           {level}
@@ -94,6 +93,17 @@ function BatteryIcon({ percent }: { percent: number }) {
       <rect x="0.75" y="0.75" width="19.5" height="12.5" rx="2.5" stroke="currentColor" strokeWidth="1.5" />
       <rect x="21.5" y="4.5" width="2" height="5" rx="1" fill="currentColor" />
       {width > 0 && <rect x="3" y="3" width={width} height="8" rx="1" fill="currentColor" />}
+    </svg>
+  );
+}
+
+// A picture frame: a border with mountains and a sun inside.
+function FrameIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+      <rect x="1.75" y="2.75" width="14.5" height="12.5" rx="2" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M4.5 12.5 7.5 8.5l2.25 2.5 1.5-1.5 2.25 3" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+      <circle cx="12" cy="6.25" r="1.25" fill="currentColor" />
     </svg>
   );
 }
