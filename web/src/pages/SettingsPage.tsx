@@ -1,4 +1,4 @@
-import { toast } from "@heroui/react";
+import { Button, toast } from "@heroui/react";
 import { useState } from "react";
 import { api, type Orientation, type Settings } from "../api";
 import { SWITCHES } from "../timing";
@@ -11,6 +11,15 @@ const ORIENTATIONS: { id: Orientation; label: string; size: string; shape: strin
   { id: "landscape", label: "Landscape", size: "800 × 480", shape: "h-9 w-15" },
   { id: "portrait", label: "Portrait", size: "480 × 800", shape: "h-15 w-9" },
 ];
+
+const INSTALL_PAGE = "https://liarbeast.github.io/Peek/";
+
+/** Peek's address as a frame on the network would use it; not when it's only
+ * reachable on this computer (localhost). */
+function peekAddress(): string | null {
+  const local = ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname);
+  return local ? null : window.location.origin;
+}
 
 export function SettingsPage({ settings, onChange }: { settings: Settings; onChange: (s: Settings) => void }) {
   const [busy, setBusy] = useState(false);
@@ -90,12 +99,34 @@ export function SettingsPage({ settings, onChange }: { settings: Settings; onCha
             </p>
           </div>
           <CollectionOrder value={settings.collection_order} onChange={(collection_order) => update({ collection_order })} />
+          <InstallFirmware />
         </div>
         <div className="flex flex-col gap-2">
           <span className="text-sm font-medium">On the frame now</span>
           <PanelImage alt="The frame's current image" load={api.framePreview} deps={[settings.orientation]} />
         </div>
       </div>
+    </div>
+  );
+}
+
+function InstallFirmware() {
+  const address = peekAddress();
+  const url = address ? `${INSTALL_PAGE}?peek=${encodeURIComponent(address)}` : INSTALL_PAGE;
+  return (
+    <div className="flex flex-col items-start gap-1">
+      <span className="text-sm font-medium">Frame software</span>
+      <p className="text-sm text-muted">
+        Put Peek on a new frame, or update one. The install page opens in a new tab and walks you through it.
+      </p>
+      {address && (
+        <p className="text-sm text-muted">
+          Peek's address, if a frame asks for it: <code className="select-all text-foreground">{address}</code>
+        </p>
+      )}
+      <Button className="mt-1" variant="tertiary" onPress={() => window.open(url, "_blank", "noopener")}>
+        Install firmware
+      </Button>
     </div>
   );
 }
