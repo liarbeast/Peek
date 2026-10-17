@@ -1,3 +1,8 @@
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.svg">
+  <img src="assets/logo-light.svg" alt="" width="96" height="96">
+</picture>
+
 # Peek
 
 Peek drives a battery-powered 7.3" Spectra 6 e-paper frame (800x480, six colours).
