@@ -18,7 +18,7 @@ RUN pip install --no-cache-dir -r requirements.txt \
 COPY server/peek ./peek
 COPY --from=web /src/server/peek/static/app ./peek/static/app
 
-ENV PEEK_DATA=/data
+ENV PEEK_DATA=/data PEEK_PORT=8080
 VOLUME /data
 EXPOSE 8080
-CMD ["uvicorn", "--factory", "peek.app:main", "--host", "0.0.0.0", "--port", "8080"]
+CMD exec uvicorn --factory peek.app:main --host 0.0.0.0 --port "$PEEK_PORT"

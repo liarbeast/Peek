@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Install Peek firmware</title>
+<meta name="description" content="Put the Peek software on your e-paper frame, straight from your browser.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+<script type="module" src="https://unpkg.com/esp-web-tools@10.2.1/dist/web/install-button.js?module"></script>
+<style>
+  :root {
+    --bg: #f4f4f5;
+    --surface: #ffffff;
+    --border: #e4e4e7;
+    --text: #18181b;
+    --muted: #71717a;
+    --accent: #0485f7;
+    --accent-soft: #e6f3fe;
+    --warn-soft: #fef6e6;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f0f11;
+      --surface: #1a1a1d;
+      --border: #2e2e33;
+      --text: #f4f4f5;
+      --muted: #a1a1aa;
+      --accent: #3a9ffa;
+      --accent-soft: #10263a;
+      --warn-soft: #33290f;
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.55 Inter, system-ui, sans-serif;
+  }
+  main { max-width: 720px; margin: 0 auto; padding: 0 16px; }
+  main { padding-top: 40px; padding-bottom: 64px; }
+  h1 { font-size: 26px; font-weight: 600; margin: 0; }
+  h2 { font-size: 18px; font-weight: 600; margin: 0 0 8px; }
+  p { margin: 0 0 8px; }
+  .lead { color: var(--muted); margin-bottom: 24px; }
+  .muted { color: var(--muted); }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  ol.steps { list-style: none; counter-reset: step; padding: 0; margin: 0; }
+  ol.steps > li { counter-increment: step; position: relative; padding-left: 44px; margin-bottom: 20px; }
+  ol.steps > li:last-child { margin-bottom: 0; }
+  ol.steps > li::before {
+    content: counter(step);
+    position: absolute; left: 0; top: -2px;
+    width: 30px; height: 30px; border-radius: 50%;
+    background: var(--accent-soft); color: var(--accent);
+    display: grid; place-items: center; font-weight: 600;
+  }
+  ul { margin: 0; padding-left: 20px; }
+  li { margin-bottom: 4px; }
+  .button {
+    display: inline-block; margin-top: 8px;
+    background: var(--accent); color: #fff;
+    border: 0; border-radius: 10px; padding: 10px 20px;
+    font: inherit; font-weight: 500; cursor: pointer;
+  }
+  .button:hover { filter: brightness(1.08); }
+  .note { background: var(--warn-soft); border-radius: 10px; padding: 12px 14px; margin-top: 8px; }
+  .address { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+  code {
+    font: 15px ui-monospace, SFMono-Regular, Menlo, monospace;
+    background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 2px 6px;
+    overflow-wrap: anywhere;
+  }
+  .small-button {
+    background: var(--surface); color: var(--text); border: 1px solid var(--border);
+    border-radius: 8px; padding: 4px 12px; font: inherit; font-size: 14px; cursor: pointer;
+  }
+  details { border-top: 1px solid var(--border); padding: 12px 0; }
+  details:first-of-type { border-top: 0; padding-top: 0; }
+  details:last-of-type { padding-bottom: 0; }
+  summary { cursor: pointer; font-weight: 500; }
+  details > div { padding-top: 8px; }
+  details ol { margin: 0 0 8px; padding-left: 20px; }
+  a { color: var(--accent); }
+  /* Until the install button has loaded, only show the button itself. */
+  esp-web-install-button:not(:defined) [slot="unsupported"],
+  esp-web-install-button:not(:defined) [slot="not-allowed"] { display: none; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Install the Peek firmware</h1>
+  <p class="lead">This installs the firmware, the software that runs on your frame, straight from this page. It takes about 5 minutes.</p>
+
+  <section class="card">
+    <h2>What you need</h2>
+    <ul>
+      <li>Your frame: the Seeed EE04 board with the 7.3" colour screen.</li>
+      <li>A USB-C cable that can carry data. The one from the kit works. Some phone chargers' cables only charge.</li>
+      <li>A computer with <strong>Chrome</strong> or <strong>Edge</strong>. Firefox, Safari and phones can't talk to USB devices from a web page, so installing only works in Chrome or Edge. You only need it once.</li>
+      <li>Your Wi-Fi name and password. The frame only works with 2.4 GHz Wi-Fi.</li>
+      <li>Peek running on a computer or NAS in your home.</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>Install</h2>
+    <ol class="steps">
+      <li>
+        <p><strong>Plug the frame into this computer</strong> with the USB-C cable.</p>
+      </li>
+      <li>
+        <p><strong>Click Install.</strong> A list pops up: pick the frame (it's called something like
+          "USB JTAG/serial debug unit") and click Connect. Then click <strong>Install Peek frame</strong>.</p>
+        <esp-web-install-button manifest="manifest.json">
+          <button slot="activate" class="button">Install</button>
+          <div slot="unsupported" class="note">This browser can't talk to USB devices, so it can't install the software.
+            Open this page in <strong>Chrome</strong> or <strong>Edge</strong> on a computer.</div>
+          <div slot="not-allowed" class="note">This page has to be opened over a secure (https) connection.</div>
+        </esp-web-install-button>
+      </li>
+      <li>
+        <p><strong>Type your Wi-Fi name and password</strong> when the window asks for them, and click Connect.</p>
+      </li>
+      <li>
+        <p><strong>Wait for the first picture.</strong> Unplug the frame if you like. It finds Peek by itself and
+          shows whatever Peek has on the frame right now. The colours take about 30 seconds to appear.</p>
+      </li>
+      <li>
+        <p><strong>Give it something to show.</strong> From now on the frame gets everything it shows from Peek.
+          Open Peek, add a collection with some items and make sure it's switched on. The frame picks it up the
+          next time it wakes.</p>
+      </li>
+    </ol>
+  </section>
+
+  <section class="card">
+    <h2>How the frame finds Peek</h2>
+    <ul>
+      <li><strong>Peek on a NAS or Linux computer, started with its compose file:</strong> nothing to do. The frame
+        finds Peek by itself, even when Peek's address changes.</li>
+      <li><strong>Set up Peek by clicking through your NAS's Docker screen?</strong> Tick
+        <strong>use host network</strong>, and it works the same way.</li>
+      <li><strong>Peek in Docker Desktop on a Mac or Windows PC?</strong> The frame can't find Peek by itself there,
+        so you type Peek's address once on the frame's page (the frame's screen tells you how). Then give that
+        computer a fixed address in your router, so you never have to type it again. Routers call this
+        "DHCP reservation" or "static lease".</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>It didn't work</h2>
+    <details>
+      <summary>There's no Install button</summary>
+      <div><p>Your browser can't talk to USB devices. Only Chrome and Edge can, so open this page in one of them on a computer.</p></div>
+    </details>
+    <details>
+      <summary>The frame isn't in the list</summary>
+      <div><p>Press <strong>KEY0</strong> on the board to wake the frame, then click Install again. Try another USB-C
+        cable too: some only charge. Still nothing? Hold the small <strong>B</strong> button on the
+        board, tap <strong>R</strong>, let go of <strong>B</strong> and click Install again.</p></div>
+    </details>
+    <details>
+      <summary>The frame doesn't connect to Wi-Fi</summary>
+      <div>
+        <p>Check the Wi-Fi name and password, and that your router has 2.4 GHz Wi-Fi switched on.
+          Make sure the little antenna is clicked onto the board.</p>
+        <p>To try again: plug the frame in, click Install and choose <strong>Change Wi-Fi</strong>. Or, on your phone,
+          join the Wi-Fi network <strong>Peek frame</strong> and pick your home Wi-Fi there.</p>
+      </div>
+    </details>
+    <details>
+      <summary>The screen says it can't find Peek</summary>
+      <div>
+        <ol>
+          <li>Make sure Peek is running.</li>
+          <li>On a phone or computer on the same Wi-Fi, type the address from the frame's screen (something like
+            <code>http://192.168.1.42</code>) into your browser. The frame's own page opens.</li>
+          <li>Paste Peek's address into the <strong>Peek address</strong> field and press Enter. The frame remembers it.</li>
+        </ol>
+        <div class="address" id="peek-address" hidden>Your Peek's address: <code id="peek-address-value"></code>
+          <button class="small-button" id="copy-address" type="button">Copy</button></div>
+        <p id="peek-address-unknown">You'll find Peek's address in Peek, under Settings → Frame software.</p>
+      </div>
+    </details>
+    <details>
+      <summary>The frame is asleep and I want to change something</summary>
+      <div><p>Press <strong>KEY0</strong> on the board. The frame wakes up and stays awake for 5 minutes.</p></div>
+    </details>
+  </section>
+
+  <p class="muted">Want to build the software yourself? See
+    <a href="https://github.com/liarbeast/Peek/tree/main/firmware">the firmware folder on GitHub</a>.</p>
+</main>
+<script>
+  // Peek's Settings link here with ?peek=<its address>; show it, ready to copy.
+  const peek = new URLSearchParams(location.search).get("peek");
+  if (peek && /^https?:\/\/[^\s]+$/.test(peek)) {
+    document.getElementById("peek-address-value").textContent = peek;
+    document.getElementById("peek-address").hidden = false;
+    document.getElementById("peek-address-unknown").hidden = true;
+    const copy = document.getElementById("copy-address");
+    copy.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(peek);
+        copy.textContent = "Copied";
+      } catch {
+        copy.textContent = "Select and copy it";
+      }
+    });
+  }
+</script>
+</body>
+</html>

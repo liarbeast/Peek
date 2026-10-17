@@ -2,12 +2,18 @@ services:
   peek:
     build: .
     image: localhost/peek:latest
-    ports:
-      - "8080:8080"
+    # Host networking lets frames find Peek on your network by themselves.
+    # Docker Desktop (Mac, Windows) doesn't pass that on: there, replace this
+    # line with the two lines below and type Peek's address on the frame's page.
+    #   ports:
+    #     - "8080:8080"
+    network_mode: host
     volumes:
       # :Z lets SELinux systems (Fedora, Bazzite) share the folder; others ignore it.
       - ./data:/data:Z
     environment:
       # Your time zone: wakes "at midnight" and "today" for data sources follow it.
       TZ: Europe/Amsterdam
+      # Peek's port. Change it if something else on this computer already uses 8080.
+      PEEK_PORT: "8080"
     restart: unless-stopped
