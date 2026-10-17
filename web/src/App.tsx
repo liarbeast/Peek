@@ -2,6 +2,7 @@ import { Button, Spinner, Toast } from "@heroui/react";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { api, type Settings, type Template } from "./api";
+import { BatteryLevel } from "./components/BatteryLevel";
 import { PanelImage } from "./components/PanelImage";
 import { Dialog } from "./components/ui";
 import { CategoriesPage } from "./pages/CategoriesPage";
@@ -47,6 +48,7 @@ export function App() {
               Peek
             </a>
             <nav className="flex items-center gap-2">
+              <BatteryLevel />
               <Button variant="ghost" size="sm" onPress={() => go("#/settings")}>
                 Settings
               </Button>
