@@ -50,6 +50,22 @@ psram:
   speed: 80MHz
 
 logger:
+  # Detailed screen steps while we get the panel working; the rest stays at the usual level.
+  level: VERBOSE
+  logs:
+    epaper_spi: VERBOSE
+    epaper_spi.6c: VERBOSE
+    wifi: DEBUG
+    wifi_esp32: DEBUG
+    http_request: DEBUG
+    online_image: DEBUG
+    runtime_image: DEBUG
+    component: DEBUG
+    scheduler: DEBUG
+    api: DEBUG
+    mdns: DEBUG
+    esp32.preferences: DEBUG
+    preferences: DEBUG
 
 wifi:
   ssid: !secret wifi_ssid
@@ -86,6 +102,8 @@ display:
   - platform: epaper_spi
     id: epaper
     model: 7.3in-Spectra-E6
+    # Slower than the default 20 MHz, so the long ribbon cable doesn't garble the signal.
+    data_rate: 4MHz
     cs_pin: GPIO44
     dc_pin: GPIO10
     reset_pin: GPIO38
