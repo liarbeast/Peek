@@ -52,11 +52,13 @@ export function FrameStatus() {
 
   return (
     <Popover isOpen={open} onOpenChange={setOpen}>
-      <Button variant="ghost" size="sm" className="gap-2 px-3" aria-label={`The frame, battery ${battery ? level : "unknown"}`}>
-        <Image size={18} />
-        <span className={`flex items-center gap-1.5 tabular-nums ${isLow(battery) ? "text-danger" : ""}`}>
-          <BatteryIcon percent={battery?.percent ?? null} />
-          {level}
+      <Button variant="ghost" size="sm" className="px-3" aria-label={`The frame, battery ${battery ? level : "unknown"}`}>
+        <span className="flex items-center gap-4">
+          <Image size={18} />
+          <span className={`flex items-center gap-2 tabular-nums ${isLow(battery) ? "text-danger" : ""}`}>
+            <BatteryIcon percent={battery?.percent ?? null} />
+            {level}
+          </span>
         </span>
       </Button>
       <Popover.Content placement="bottom end">
