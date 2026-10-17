@@ -6,8 +6,8 @@
 **Most people don't need this folder:** the install page at https://liarbeast.github.io/Peek/ (also linked from
 Peek's Settings) puts the firmware on a frame straight from Chrome or Edge.
 
-On every wake the frame joins Wi-Fi, downloads `/frame.png` from Peek, draws it (about 30 seconds), asks
-`/api/sleep` how long to wait and goes into deep sleep until then. If Peek can't be reached it looks for Peek on the
+On every wake the frame joins Wi-Fi, downloads `/frame.png` from Peek, draws it (about 30 seconds), measures its battery, asks
+`/api/sleep` how long to wait (passing the battery voltage along) and goes into deep sleep until then. If Peek can't be reached it looks for Peek on the
 network once more, then tries again after 15 minutes and keeps showing the last picture.
 
 ## Setting up

@@ -1,8 +1,3 @@
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.svg">
-  <img src="assets/logo-light.svg" alt="" width="96" height="96">
-</picture>
-
 # Peek
 
 Peek drives a battery-powered 7.3" Spectra 6 e-paper frame (800x480, six colours).
@@ -57,7 +52,7 @@ takes a minute. Add `--build` only when `requirements.txt` changes, and go back 
 
 | Endpoint | What it returns |
 | --- | --- |
-| `GET /api/sleep` | Seconds to sleep before the next wake, as plain text: until the next refresh of the collection on the frame (every 15 minutes up to weekly, set per collection on its Settings tab or in the list in Settings), on the round time in the server's time zone |
+| `GET /api/sleep` | Seconds to sleep before the next wake, as plain text: until the next refresh of the collection on the frame (every 15 minutes up to weekly, set per collection on its Settings tab or in the list in Settings), on the round time in the server's time zone. The frame adds `?battery=<volts>`, which Peek keeps to show the battery level at the top of the web app |
 | `GET /frame.png` | The current 800x480 image, a paletted PNG in the six pure panel colours. Once per refresh it moves on to the next item of the current collection (in the collection's item order), and once per "Switch collection" interval (in Settings) to the next one in rotation ("Collection order": in order or shuffled). "Show" on an item puts it on the frame until the next refresh |
 
 ## Fields and CSV import

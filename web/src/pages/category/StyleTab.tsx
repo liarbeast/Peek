@@ -1,4 +1,5 @@
 import { Button, toast } from "@heroui/react";
+import { ChevronLeft, ChevronRight } from "@gravity-ui/icons";
 import { useEffect, useRef, useState } from "react";
 import {
   api,
@@ -155,7 +156,7 @@ export function StyleTab(props: {
             <span className="text-sm font-medium">Preview with</span>
             <div className="flex items-center gap-1">
               <Button variant="ghost" isIconOnly aria-label="Previous item" onPress={() => step(-1)}>
-                ‹
+                <ChevronLeft width={18} height={18} />
               </Button>
               <div className="min-w-0 flex-1">
                 <Choice
@@ -167,7 +168,7 @@ export function StyleTab(props: {
                 />
               </div>
               <Button variant="ghost" isIconOnly aria-label="Next item" onPress={() => step(1)}>
-                ›
+                <ChevronRight width={18} height={18} />
               </Button>
             </div>
           </div>

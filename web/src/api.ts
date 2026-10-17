@@ -184,6 +184,13 @@ const json = (method: string, body: unknown): RequestInit => ({
   body: JSON.stringify(body),
 });
 
+// The frame's battery as it last reported it.
+export interface Battery {
+  voltage: number;
+  percent: number;
+  at: string; // ISO time of the report
+}
+
 export const imageUrl = (name: string) => `/images/${name}`;
 
 export const FIELD_TYPES: Array<{ id: FieldType; label: string }> = [
@@ -275,5 +282,6 @@ export const api = {
     );
   },
 
+  battery: () => request<Battery | null>("/api/battery"),
   framePreview: () => request<Blob>(`/frame/preview.png?t=${Date.now()}`),
 };

@@ -2,8 +2,7 @@ import { Button, Spinner, Toast } from "@heroui/react";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { api, type Settings, type Template } from "./api";
-import { PanelImage } from "./components/PanelImage";
-import { Dialog } from "./components/ui";
+import { FrameStatus } from "./components/FrameStatus";
 import { Logo } from "./components/Logo";
 import { CategoriesPage } from "./pages/CategoriesPage";
 import { CategoryPage } from "./pages/CategoryPage";
@@ -27,15 +26,10 @@ export function App() {
   const route = useRoute();
   const [templates, setTemplates] = useState<Template[] | null>(null);
   const [settings, setSettings] = useState<Settings | null>(null);
-  const [showFrame, setShowFrame] = useState(false);
-  const [frameVersion, setFrameVersion] = useState(0);
 
   useEffect(() => {
     api.templates().then(setTemplates);
     api.settings().then(setSettings);
-    const bump = () => setFrameVersion((v) => v + 1);
-    window.addEventListener("peek:frame-changed", bump);
-    return () => window.removeEventListener("peek:frame-changed", bump);
   }, []);
 
   return (
@@ -52,9 +46,7 @@ export function App() {
               <Button variant="ghost" size="sm" onPress={() => go("#/settings")}>
                 Settings
               </Button>
-              <Button variant="tertiary" size="sm" onPress={() => setShowFrame(true)}>
-                On the frame now
-              </Button>
+              <FrameStatus />
             </nav>
           </div>
         </header>
@@ -86,10 +78,6 @@ export function App() {
           </MotionConfig>
         </main>
 
-        <Dialog isOpen={showFrame} onOpenChange={setShowFrame} title="On the frame now" size="lg">
-          {showFrame && <PanelImage alt="The frame's current image" load={api.framePreview} deps={[frameVersion]} />}
-          <p className="text-sm text-muted">The frame picks this up on its next wake.</p>
-        </Dialog>
       </div>
     </SettingsContext>
   );

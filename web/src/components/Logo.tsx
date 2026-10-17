@@ -1,12 +1,12 @@
 // Peek's logo: a cat peeking up from the bottom of a frame. A placeholder for
-// now; the same drawing is in web/public/favicon.svg and assets/logo-*.svg.
+// now; the same drawing is in web/public/favicon.svg.
 export function Logo({ size = 24 }: { size?: number }) {
   const line = { stroke: "currentColor", strokeLinecap: "round", strokeLinejoin: "round" } as const;
   return (
     <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-hidden="true">
       <path
         {...line}
-        strokeWidth={2.5}
+        strokeWidth={2}
         d="M8.25 3.25h15.5a5 5 0 0 1 5 5v15.5a5 5 0 0 1-5 5H8.25a5 5 0 0 1-5-5V8.25a5 5 0 0 1 5-5M7.5 28.75V21a8.5 8.5 0 0 1 1.3-4.5L8.5 11l5.1 2.6a8.5 8.5 0 0 1 4.8 0L23.5 11l-.3 5.5a8.5 8.5 0 0 1 1.3 4.5v7.75"
       />
       <circle cx="12.5" cy="21" r="1.9" fill="currentColor" />
