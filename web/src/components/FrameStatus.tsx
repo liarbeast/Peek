@@ -1,9 +1,8 @@
-import { Button } from "@heroui/react";
+import { Button, Popover } from "@heroui/react";
 import { useEffect, useState } from "react";
 import { api, type Battery, type Category } from "../api";
 import { switchText } from "../pages/CategoriesPage";
 import { PanelImage } from "./PanelImage";
-import { Dialog } from "./ui";
 
 // Checked again now and then, since the frame reports on its own schedule.
 const POLL_MS = 5 * 60 * 1000;
@@ -21,7 +20,8 @@ function ago(iso: string): string {
 const isLow = (battery: Battery | null | undefined) => !!battery && battery.percent <= 15;
 
 // The frame's button in the top bar, with its battery level always in view. It
-// opens the frame's status: the picture on it now, what it shows and its battery.
+// drops down the frame's status, like a menu bar item: the picture on it now,
+// what it shows and its battery.
 export function FrameStatus() {
   const [battery, setBattery] = useState<Battery | null | undefined>(undefined);
   const [current, setCurrent] = useState<Category | undefined>(undefined);
@@ -50,13 +50,8 @@ export function FrameStatus() {
   const switching = switchText(current);
 
   return (
-    <>
-      <Button
-        variant="tertiary"
-        size="sm"
-        aria-label={`The frame, battery ${battery ? level : "unknown"}`}
-        onPress={() => setOpen(true)}
-      >
+    <Popover isOpen={open} onOpenChange={setOpen}>
+      <Button variant="tertiary" size="sm" aria-label={`The frame, battery ${battery ? level : "unknown"}`}>
         Frame
         <span className="mx-0.5 h-4 w-px bg-current opacity-25" />
         <span className={`flex items-center gap-1.5 tabular-nums ${isLow(battery) ? "text-danger" : "text-muted"}`}>
@@ -64,33 +59,31 @@ export function FrameStatus() {
           {level}
         </span>
       </Button>
-
-      <Dialog isOpen={open} onOpenChange={setOpen} title="Frame" size="lg">
-        {open && <PanelImage alt="The frame's current image" load={api.framePreview} deps={[frameVersion]} />}
-        <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
-          <dt className="text-muted">Showing</dt>
-          <dd>
-            {current ? current.name : "The welcome page"}
-            {switching && <span className="block text-muted">{switching}</span>}
-          </dd>
-          <dt className="text-muted">Battery</dt>
-          <dd className="flex flex-col">
+      <Popover.Content placement="bottom end" className="w-72">
+        <Popover.Dialog aria-label="The frame" className="flex flex-col gap-3 p-3 text-sm">
+          {open && <PanelImage alt="The frame's current image" load={api.framePreview} deps={[frameVersion]} />}
+          <div className="flex flex-col">
+            <span className="font-medium">{current ? current.name : "The welcome page"}</span>
+            {switching && <span className="text-xs text-muted">{switching}</span>}
+          </div>
+          <div className="flex flex-col border-t border-separator pt-3">
             {battery ? (
               <>
-                <span className={`flex items-center gap-1.5 ${isLow(battery) ? "text-danger" : ""}`}>
+                <span className={`flex items-center gap-1.5 font-medium ${isLow(battery) ? "text-danger" : ""}`}>
                   <BatteryIcon percent={battery.percent} />
-                  {battery.percent}% ({battery.voltage.toFixed(2)} V){isLow(battery) && ", charge it soon"}
+                  {battery.percent}%{isLow(battery) && ", charge it soon"}
                 </span>
-                <span className="text-muted">Reported {ago(battery.at)}</span>
+                <span className="text-xs text-muted">
+                  {battery.voltage.toFixed(2)} V, reported {ago(battery.at)}
+                </span>
               </>
             ) : (
-              <span className="text-muted">Not reported yet. The frame sends it each time it wakes.</span>
+              <span className="text-xs text-muted">No battery report yet. The frame sends one each time it wakes.</span>
             )}
-          </dd>
-        </dl>
-        <p className="text-sm text-muted">Changes show up on the frame on its next wake.</p>
-      </Dialog>
-    </>
+          </div>
+        </Popover.Dialog>
+      </Popover.Content>
+    </Popover>
   );
 }
 
