@@ -1,4 +1,19 @@
 import { Button, Dropdown, ToggleButton, ToggleButtonGroup, Toolbar } from "@heroui/react";
+import {
+  AlignCenter,
+  AlignCenterHorizontal,
+  AlignEndHorizontal,
+  AlignLeft,
+  AlignRight,
+  AlignStartHorizontal,
+  ArrowDownFromLine,
+  ArrowUpFromLine,
+  BringToFront,
+  Link,
+  SendToBack,
+  Trash2,
+  UnfoldVertical,
+} from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { api, PANEL_COLOURS, type Box, type CategoryImage, type PanelColour } from "../../api";
 import type { Layer } from "./FieldBoxes";
@@ -73,9 +88,9 @@ export function FieldToolbar(props: {
           label="Horizontal alignment"
           value={box.align ?? "center"}
           options={[
-            ["left", "Align left", <Lines key="l" lines={[[2, 14], [2, 10], [2, 14]]} />],
-            ["center", "Align centre", <Lines key="c" lines={[[2, 14], [4, 12], [2, 14]]} />],
-            ["right", "Align right", <Lines key="r" lines={[[2, 14], [6, 14], [2, 14]]} />],
+            ["left", "Align left", <AlignLeft key="l" size={16} />],
+            ["center", "Align centre", <AlignCenter key="c" size={16} />],
+            ["right", "Align right", <AlignRight key="r" size={16} />],
           ]}
           onChange={(align) => props.onChange({ align: align as Box["align"] })}
         />
@@ -102,9 +117,9 @@ export function FieldToolbar(props: {
               label="Grow"
               value={box.grow ?? "down"}
               options={[
-                ["down", "Grow down: the top edge stays put", <Grow key="d" edge={3} arrows={[1]} />],
-                ["up", "Grow up: the bottom edge stays put", <Grow key="u" edge={13} arrows={[-1]} />],
-                ["middle", "Grow both ways: the centre stays put", <Grow key="m" edge={8} arrows={[-1, 1]} />],
+                ["down", "Grow down: the top edge stays put", <ArrowDownFromLine key="d" size={16} />],
+                ["up", "Grow up: the bottom edge stays put", <ArrowUpFromLine key="u" size={16} />],
+                ["middle", "Grow both ways: the centre stays put", <UnfoldVertical key="m" size={16} />],
               ]}
               onChange={(grow) => props.onChange({ grow: grow as Box["grow"] })}
             />
@@ -116,9 +131,9 @@ export function FieldToolbar(props: {
             label="Vertical alignment"
             value={box.valign ?? "middle"}
             options={[
-              ["top", "Align top", <Bar key="t" y={5} />],
-              ["middle", "Align middle", <Bar key="m" y={8} />],
-              ["bottom", "Align bottom", <Bar key="b" y={11} />],
+              ["top", "Align top", <AlignStartHorizontal key="t" size={16} />],
+              ["middle", "Align middle", <AlignCenterHorizontal key="m" size={16} />],
+              ["bottom", "Align bottom", <AlignEndHorizontal key="b" size={16} />],
             ]}
             onChange={(valign) => props.onChange({ valign: valign as Box["valign"] })}
           />
@@ -137,17 +152,17 @@ export function FieldToolbar(props: {
         />
       )}
       <IconButton label="Bring to front" onPress={props.onFront}>
-        <Layers front />
+        <BringToFront size={16} />
       </IconButton>
       <IconButton label="Send to back" onPress={props.onBack}>
-        <Layers />
+        <SendToBack size={16} />
       </IconButton>
       <Dropdown>
         <Dropdown.Trigger
           aria-label="Attach to another field"
           className="flex h-8 items-center gap-1 rounded-lg px-2 text-sm hover:bg-default"
         >
-          <AttachIcon />
+          <Link size={16} />
           {attached ? `Attached to ${attached.label}` : "Attach to"}
         </Dropdown.Trigger>
         <Dropdown.Popover>
@@ -172,7 +187,7 @@ export function FieldToolbar(props: {
       </Dropdown>
       {layer.image && (
         <IconButton label="Remove this image" onPress={props.onImageDelete}>
-          <TrashIcon />
+          <Trash2 size={16} />
         </IconButton>
       )}
     </Toolbar>
@@ -330,75 +345,5 @@ function Segments(props: {
         </ToggleButton>
       ))}
     </ToggleButtonGroup>
-  );
-}
-
-const svg = { width: 16, height: 16, viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round" } as const;
-
-// Three lines, like a text alignment icon.
-function Lines(props: { lines: [number, number][] }) {
-  return (
-    <svg {...svg}>
-      {props.lines.map(([x1, x2], i) => (
-        <line key={i} x1={x1} x2={x2} y1={4 + i * 4} y2={4 + i * 4} />
-      ))}
-    </svg>
-  );
-}
-
-// A bar at the top, middle or bottom of a frame.
-function Bar(props: { y: number }) {
-  return (
-    <svg {...svg}>
-      <rect x="2" y="2" width="12" height="12" rx="1.5" strokeOpacity="0.4" />
-      <line x1="5" x2="11" y1={props.y} y2={props.y} strokeWidth="2.5" />
-    </svg>
-  );
-}
-
-// A line that stays put, with arrows pointing the way the text grows from it.
-function Grow(props: { edge: number; arrows: (1 | -1)[] }) {
-  return (
-    <svg {...svg}>
-      <line x1="2" x2="14" y1={props.edge} y2={props.edge} strokeWidth="2" />
-      {props.arrows.map((dir) => {
-        const tip = props.edge + dir * (props.arrows.length > 1 ? 5 : 9);
-        return (
-          <path key={dir} d={`M8 ${props.edge + dir * 2.5}V${tip}M5.5 ${tip - dir * 2.5}L8 ${tip}l2.5 ${-dir * 2.5}`} strokeLinejoin="round" />
-        );
-      })}
-    </svg>
-  );
-}
-
-// Two overlapping squares, the filled one in front or behind.
-function Layers(props: { front?: boolean }) {
-  const behind = "M2 10V2h8v4"; // the part of the back square the front one doesn't cover
-  return props.front ? (
-    <svg {...svg}>
-      <path d={behind} strokeLinejoin="round" />
-      <rect x="6" y="6" width="8" height="8" rx="1" fill="currentColor" />
-    </svg>
-  ) : (
-    <svg {...svg}>
-      <path d="M2 10V2h8v4H6v4z" fill="currentColor" strokeLinejoin="round" />
-      <rect x="6" y="6" width="8" height="8" rx="1" />
-    </svg>
-  );
-}
-
-function AttachIcon() {
-  return (
-    <svg {...svg}>
-      <path d="M6.5 9.5l3-3M7 4.5l1-1a2.5 2.5 0 013.5 3.5l-1 1M9 11.5l-1 1A2.5 2.5 0 014.5 9l1-1" />
-    </svg>
-  );
-}
-
-function TrashIcon() {
-  return (
-    <svg {...svg}>
-      <path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.7 8.5h5.6l.7-8.5" strokeLinejoin="round" />
-    </svg>
   );
 }

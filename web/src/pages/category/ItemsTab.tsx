@@ -1,4 +1,5 @@
 import { Button, toast } from "@heroui/react";
+import { ArrowDown, ArrowUp, GripVertical, Quote } from "lucide-react";
 import { Reorder, useDragControls } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { api, describeItem, imageUrl, type Category, type Item } from "../../api";
@@ -305,8 +306,8 @@ function ItemRow(props: {
             style={{ imageRendering: category.pixelate ? "pixelated" : "auto" }}
           />
         ) : (
-          <div className="flex h-14 w-24 flex-none items-center justify-center rounded-md bg-surface-secondary text-2xl text-muted">
-            “
+          <div className="flex h-14 w-24 flex-none items-center justify-center rounded-md bg-surface-secondary text-muted">
+            <Quote size={20} />
           </div>
         )}
         <div className="min-w-0 flex-1">
@@ -326,7 +327,7 @@ function ItemRow(props: {
               isDisabled={props.isFirst}
               onPress={() => props.onMove(-1)}
             >
-              ↑
+              <ArrowUp size={16} />
             </Button>
             <Button
               size="sm"
@@ -336,7 +337,7 @@ function ItemRow(props: {
               isDisabled={props.isLast}
               onPress={() => props.onMove(1)}
             >
-              ↓
+              <ArrowDown size={16} />
             </Button>
           </>
         )}
@@ -366,9 +367,7 @@ export function DragHandle({ onPointerDown }: { onPointerDown: (e: React.Pointer
       className="cursor-grab touch-none rounded p-1 text-muted hover:bg-surface-secondary active:cursor-grabbing"
       onPointerDown={onPointerDown}
     >
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-        {[3, 8, 13].flatMap((y) => [5, 11].map((x) => <circle key={`${x}-${y}`} cx={x} cy={y} r="1.5" />))}
-      </svg>
+      <GripVertical size={16} />
     </button>
   );
 }

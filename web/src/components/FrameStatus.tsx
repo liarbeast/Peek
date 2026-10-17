@@ -1,4 +1,5 @@
 import { Button, Popover, Separator } from "@heroui/react";
+import { Battery as BatteryEmpty, BatteryFull, BatteryLow, BatteryMedium, BatteryWarning, Image } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api, type Battery, type Category } from "../api";
 import { switchText } from "../pages/CategoriesPage";
@@ -52,9 +53,9 @@ export function FrameStatus() {
   return (
     <Popover isOpen={open} onOpenChange={setOpen}>
       <Button variant="ghost" size="sm" className="gap-2 px-3" aria-label={`The frame, battery ${battery ? level : "unknown"}`}>
-        <FrameIcon />
+        <Image size={18} />
         <span className={`flex items-center gap-1.5 tabular-nums ${isLow(battery) ? "text-danger" : ""}`}>
-          <BatteryIcon percent={battery?.percent ?? 0} />
+          <BatteryIcon percent={battery?.percent ?? null} />
           {level}
         </span>
       </Button>
@@ -91,24 +92,17 @@ export function FrameStatus() {
   );
 }
 
-function BatteryIcon({ percent }: { percent: number }) {
-  const width = (15 * Math.min(Math.max(percent, 0), 100)) / 100;
-  return (
-    <svg width="24" height="14" viewBox="0 0 24 14" fill="none" aria-hidden="true">
-      <rect x="0.75" y="0.75" width="19.5" height="12.5" rx="2.5" stroke="currentColor" strokeWidth="1.5" />
-      <rect x="21.5" y="4.5" width="2" height="5" rx="1" fill="currentColor" />
-      {width > 0 && <rect x="3" y="3" width={width} height="8" rx="1" fill="currentColor" />}
-    </svg>
-  );
-}
-
-// A picture frame: a border with mountains and a sun inside.
-function FrameIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-      <rect x="1.75" y="2.75" width="14.5" height="12.5" rx="2" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M4.5 12.5 7.5 8.5l2.25 2.5 1.5-1.5 2.25 3" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
-      <circle cx="12" cy="6.25" r="1.25" fill="currentColor" />
-    </svg>
-  );
+// Lucide's battery in steps, like a phone's: a warning when low, empty while unknown.
+function BatteryIcon({ percent }: { percent: number | null }) {
+  const Icon =
+    percent === null
+      ? BatteryEmpty
+      : percent <= 15
+        ? BatteryWarning
+        : percent < 40
+          ? BatteryLow
+          : percent < 75
+            ? BatteryMedium
+            : BatteryFull;
+  return <Icon size={20} aria-hidden="true" />;
 }

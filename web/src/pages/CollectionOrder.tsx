@@ -1,4 +1,5 @@
 import { Button, toast } from "@heroui/react";
+import { ArrowDown, ArrowUp } from "lucide-react";
 import { Reorder, useDragControls } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { api, imageUrl, type Category, type CollectionOrder as Order, type ItemOrder, type Refresh } from "../api";
@@ -152,10 +153,10 @@ function Row(props: {
       {props.sortable && (
         <>
           <Button size="sm" variant="ghost" isIconOnly aria-label="Move up" isDisabled={props.isFirst} onPress={() => props.onMove(-1)}>
-            ↑
+            <ArrowUp size={16} />
           </Button>
           <Button size="sm" variant="ghost" isIconOnly aria-label="Move down" isDisabled={props.isLast} onPress={() => props.onMove(1)}>
-            ↓
+            <ArrowDown size={16} />
           </Button>
         </>
       )}
