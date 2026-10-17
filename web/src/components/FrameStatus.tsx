@@ -59,23 +59,23 @@ export function FrameStatus() {
           {level}
         </span>
       </Button>
-      <Popover.Content placement="bottom end" className="w-72">
-        <Popover.Dialog aria-label="The frame" className="flex flex-col gap-3 p-3 text-sm">
-          {open && <PanelImage alt="The frame's current image" load={api.framePreview} deps={[frameVersion]} />}
-          <div className="flex flex-col">
-            <span className="font-medium">{current ? current.name : "The welcome page"}</span>
+      <Popover.Content placement="bottom end">
+        <Popover.Dialog aria-label="The frame" className="flex items-start gap-6 p-3 text-sm">
+          <div className="flex w-28 flex-col gap-1.5">
+            {open && <PanelImage alt="The frame's current image" load={api.framePreview} deps={[frameVersion]} />}
+            <span className="text-xs">{current ? current.name : "Welcome page"}</span>
             {switching && <span className="text-xs text-muted">{switching}</span>}
           </div>
-          <div className="flex flex-col border-t border-separator pt-3">
+          <div className="flex w-36 flex-col gap-0.5">
             {battery ? (
               <>
                 <span className={`flex items-center gap-1.5 font-medium ${isLow(battery) ? "text-danger" : ""}`}>
                   <BatteryIcon percent={battery.percent} />
-                  {battery.percent}%{isLow(battery) && ", charge it soon"}
+                  {battery.percent}%
                 </span>
-                <span className="text-xs text-muted">
-                  {battery.voltage.toFixed(2)} V, reported {ago(battery.at)}
-                </span>
+                {isLow(battery) && <span className="text-xs text-danger">Charge it soon</span>}
+                <span className="text-xs text-muted">{battery.voltage.toFixed(2)} V</span>
+                <span className="text-xs text-muted">Reported {ago(battery.at)}</span>
               </>
             ) : (
               <span className="text-xs text-muted">No battery report yet. The frame sends one each time it wakes.</span>
