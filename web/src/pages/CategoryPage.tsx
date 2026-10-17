@@ -1,4 +1,5 @@
 import { Chip, Spinner, Tabs } from "@heroui/react";
+import { ArrowLeft } from "@gravity-ui/icons";
 import { useCallback, useEffect, useState } from "react";
 import { api, type Category, type Item, type Template } from "../api";
 import { ItemsTab } from "./category/ItemsTab";
@@ -29,8 +30,9 @@ export function CategoryPage({ id, tab, templates }: { id: number; tab: Category
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <a href="#/" className="text-sm text-muted hover:underline">
-          ← Collections
+        <a href="#/" className="inline-flex items-center gap-1 text-sm text-muted hover:underline">
+          <ArrowLeft width={14} height={14} />
+          Collections
         </a>
         <div className="mt-1 flex flex-wrap items-center gap-3">
           <h1 className="text-2xl font-semibold">{category.name}</h1>

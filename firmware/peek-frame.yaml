@@ -138,6 +138,24 @@ text_sensor:
     ip_address:
       id: frame_ip
 
+# The battery, measured just before asking Peek how long to sleep. GPIO6 switches
+# on the EE04's measuring circuit; its divider makes volts = raw / 4096 * 7.16.
+output:
+  - platform: gpio
+    id: battery_meter
+    pin: GPIO6
+
+sensor:
+  - platform: adc
+    id: battery
+    pin: GPIO1
+    attenuation: 12db
+    raw: true
+    samples: 16
+    update_interval: never
+    filters:
+      - multiply: 0.001748
+
 spi:
   clk_pin: GPIO7
   mosi_pin: GPIO9
@@ -277,8 +295,16 @@ script:
 
   - id: sleep_until_next_refresh
     then:
+      - output.turn_on: battery_meter
+      - delay: 10ms
+      - component.update: battery
+      - output.turn_off: battery_meter
       - http_request.get:
-          url: !lambda return id(peek_base) + "/api/sleep";
+          url: !lambda |-
+            std::string url = id(peek_base) + "/api/sleep";
+            if (id(battery).has_state())
+              url += str_sprintf("?battery=%.2f", id(battery).state);
+            return url;
           capture_response: true
           on_response:
             then:
