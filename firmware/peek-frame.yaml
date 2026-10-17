@@ -89,6 +89,8 @@ display:
     cs_pin: GPIO44
     dc_pin: GPIO10
     reset_pin: GPIO38
+    # Switches on the panel's power on the EE04 (TFT_ENABLE in Seeed's own driver).
+    enable_pin: GPIO43
     busy_pin:
       number: GPIO4
       inverted: true
