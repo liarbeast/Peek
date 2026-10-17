@@ -1,3 +1,4 @@
+import { Tooltip } from "@heroui/react";
 import { useEffect, useState } from "react";
 import { api, type Battery } from "../api";
 
@@ -11,7 +12,7 @@ function ago(iso: string): string {
   for (const [unit, size] of [["day", 86400], ["hour", 3600], ["minute", 60]] as const) {
     if (Math.abs(seconds) >= size) return format.format(Math.round(seconds / size), unit);
   }
-  return format.format(0, "minute");
+  return "just now";
 }
 
 // The frame's battery level for the top bar: an icon filled to match, and the percentage.
@@ -27,20 +28,34 @@ export function BatteryLevel() {
 
   if (battery === undefined) return null;
   const low = battery !== null && battery.percent <= 15;
-  const description = battery
-    ? `Frame battery ${battery.percent}% (${battery.voltage.toFixed(2)} V), reported ${ago(battery.at)}`
-    : "The frame hasn't reported its battery yet";
+  const label = battery ? `Frame battery ${battery.percent}%` : "Frame battery unknown";
 
   return (
-    <span
-      role="img"
-      aria-label={description}
-      title={description}
-      className={`flex items-center gap-1.5 px-2 text-sm tabular-nums ${low ? "text-danger" : "text-muted"}`}
-    >
-      <BatteryIcon percent={battery?.percent ?? 0} />
-      {battery ? `${battery.percent}%` : "–"}
-    </span>
+    <Tooltip delay={200}>
+      <Tooltip.Trigger
+        aria-label={label}
+        className={`flex cursor-default items-center gap-1.5 rounded-md px-2 py-1 text-sm tabular-nums ${low ? "text-danger" : "text-muted"}`}
+      >
+        <BatteryIcon percent={battery?.percent ?? 0} />
+        {battery ? `${battery.percent}%` : "–"}
+      </Tooltip.Trigger>
+      <Tooltip.Content showArrow placement="bottom">
+        <Tooltip.Arrow />
+        {battery ? (
+          <div className="flex flex-col gap-0.5 text-sm">
+            <span className="font-medium">Frame battery {battery.percent}%</span>
+            <span className="text-muted">
+              {battery.voltage.toFixed(2)} V, reported {ago(battery.at)}
+            </span>
+            {low && <span className="text-danger">Charge the frame soon.</span>}
+          </div>
+        ) : (
+          <div className="max-w-56 text-sm">
+            The frame reports its battery each time it wakes. It hasn't reported yet.
+          </div>
+        )}
+      </Tooltip.Content>
+    </Tooltip>
   );
 }
 
