@@ -89,6 +89,7 @@
   details:last-of-type { padding-bottom: 0; }
   summary { cursor: pointer; font-weight: 500; }
   details > div { padding-top: 8px; }
+  details ol { margin: 0 0 8px; padding-left: 20px; }
   a { color: var(--accent); }
   /* Until the install button has loaded, only show the button itself. */
   esp-web-install-button:not(:defined) [slot="unsupported"],
@@ -143,13 +144,6 @@
     </ol>
   </section>
 
-  <section class="card" id="peek-address" hidden>
-    <h2>Your Peek's address</h2>
-    <p>If the frame's screen says it can't find Peek, open the web address shown on that screen and paste this into the <strong>Peek address</strong> field.</p>
-    <div class="address"><code id="peek-address-value"></code>
-      <button class="small-button" id="copy-address" type="button">Copy</button></div>
-  </section>
-
   <section class="card">
     <h2>How the frame finds Peek</h2>
     <ul>
@@ -188,9 +182,15 @@
     <details>
       <summary>The screen says it can't find Peek</summary>
       <div>
-        <p>Make sure Peek is running. Then, on a phone or computer on the same Wi-Fi, open the address the frame shows
-          and type Peek's address, for example <code>http://192.168.1.20:8080</code>. Peek shows its own address in
-          Settings, under Install firmware.</p>
+        <ol>
+          <li>Make sure Peek is running.</li>
+          <li>On a phone or computer on the same Wi-Fi, type the address from the frame's screen (something like
+            <code>http://192.168.1.42</code>) into your browser. The frame's own page opens.</li>
+          <li>Paste Peek's address into the <strong>Peek address</strong> field and press Enter. The frame remembers it.</li>
+        </ol>
+        <div class="address" id="peek-address" hidden>Your Peek's address: <code id="peek-address-value"></code>
+          <button class="small-button" id="copy-address" type="button">Copy</button></div>
+        <p id="peek-address-unknown">You'll find Peek's address in Peek, under Settings → Frame software.</p>
       </div>
     </details>
     <details>
@@ -208,6 +208,7 @@
   if (peek && /^https?:\/\/[^\s]+$/.test(peek)) {
     document.getElementById("peek-address-value").textContent = peek;
     document.getElementById("peek-address").hidden = false;
+    document.getElementById("peek-address-unknown").hidden = true;
     const copy = document.getElementById("copy-address");
     copy.addEventListener("click", async () => {
       try {
