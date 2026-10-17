@@ -14,7 +14,7 @@ export function Logo({ size = 24 }: { size?: number }) {
       <path fill="currentColor" d="M14.85 23h2.3a.4.4 0 0 1 .3.65l-1.15 1.25a.4.4 0 0 1-.6 0l-1.15-1.25a.4.4 0 0 1 .3-.65" />
       <path
         {...line}
-        strokeWidth={1.5}
+        strokeWidth={2}
         d="M14.25 25.25a.9.9 0 0 0 1.75 0 .9.9 0 0 0 1.75 0M10.25 23.5 5.25 22.75M10.25 25.5l-4.75.75M21.75 23.5l5-.75M21.75 25.5l4.75.75"
       />
     </svg>
