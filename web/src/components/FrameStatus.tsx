@@ -51,21 +51,21 @@ export function FrameStatus() {
 
   return (
     <Popover isOpen={open} onOpenChange={setOpen}>
-      <Button variant="ghost" size="sm" aria-label={`The frame, battery ${battery ? level : "unknown"}`}>
+      <Button variant="ghost" size="sm" className="gap-2 px-3" aria-label={`The frame, battery ${battery ? level : "unknown"}`}>
         <FrameIcon />
-        <span className={`flex items-center gap-1.5 tabular-nums ${isLow(battery) ? "text-danger" : "text-muted"}`}>
+        <span className={`flex items-center gap-1.5 tabular-nums ${isLow(battery) ? "text-danger" : ""}`}>
           <BatteryIcon percent={battery?.percent ?? 0} />
           {level}
         </span>
       </Button>
       <Popover.Content placement="bottom end">
-        <Popover.Dialog aria-label="The frame" className="flex items-start gap-6 p-3 text-sm">
-          <div className="flex w-28 flex-col gap-1.5">
+        <Popover.Dialog aria-label="The frame" className="flex items-start gap-6 p-5 text-sm">
+          <div className="flex w-32 flex-col gap-2">
             {open && <PanelImage alt="The frame's current image" load={api.framePreview} deps={[frameVersion]} />}
             <span className="text-xs">{current ? current.name : "Welcome page"}</span>
             {switching && <span className="text-xs text-muted">{switching}</span>}
           </div>
-          <div className="flex w-36 flex-col gap-0.5">
+          <div className="flex w-40 flex-col gap-1">
             {battery ? (
               <>
                 <span className={`flex items-center gap-1.5 font-medium ${isLow(battery) ? "text-danger" : ""}`}>
