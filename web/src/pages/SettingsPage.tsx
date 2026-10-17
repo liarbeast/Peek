@@ -1,4 +1,5 @@
 import { Button, toast } from "@heroui/react";
+import { ArrowLeft } from "@gravity-ui/icons";
 import { useState } from "react";
 import { api, type Orientation, type Settings } from "../api";
 import { SWITCHES } from "../timing";
@@ -40,8 +41,9 @@ export function SettingsPage({ settings, onChange }: { settings: Settings; onCha
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <a href="#/" className="text-sm text-muted hover:underline">
-          ← Collections
+        <a href="#/" className="inline-flex items-center gap-1 text-sm text-muted hover:underline">
+          <ArrowLeft width={14} height={14} />
+          Collections
         </a>
         <h1 className="mt-1 text-2xl font-semibold">Settings</h1>
         <p className="text-muted">These apply to the whole frame.</p>

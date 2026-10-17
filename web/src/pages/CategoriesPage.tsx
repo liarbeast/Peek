@@ -76,7 +76,7 @@ export function CategoriesPage() {
 
 // When and to what the frame moves on from the collection it shows, in words:
 // "Switching to Birds in 7 hours", "Switching to the next collection (shuffled) after 3 more items".
-function switchText(current: Category | undefined): string | undefined {
+export function switchText(current: Category | undefined): string | undefined {
   const next = current?.next_switch;
   if (!next) return undefined;
   const to = next.shuffle
