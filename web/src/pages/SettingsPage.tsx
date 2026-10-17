@@ -58,7 +58,7 @@ export function SettingsPage({
         <p className="text-muted">These apply to the whole frame.</p>
       </div>
       <Tabs variant="secondary" selectedKey={tab} onSelectionChange={(key) => go(`#/settings/${key}`)}>
-        <Tabs.ListContainer>
+        <Tabs.ListContainer className="w-fit">
           <Tabs.List aria-label="Settings sections">
             <Tabs.Tab id="general">
               General
