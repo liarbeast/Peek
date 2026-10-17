@@ -149,14 +149,16 @@
   </section>
 
   <section class="card">
-    <h2>Tips</h2>
+    <h2>How the frame finds Peek</h2>
     <ul>
-      <li><strong>Give Peek a fixed address.</strong> In your router, reserve the address of the computer or NAS
-        that runs Peek. Routers call this "DHCP reservation" or "static lease". Then the frame always knows where Peek is.</li>
-      <li><strong>Start Peek with its compose file.</strong> If you set up Peek by clicking through your NAS's Docker
-        screen instead, tick <strong>use host network</strong>. Otherwise the frame can't find Peek by itself.</li>
-      <li><strong>Peek in Docker Desktop on a Mac or Windows PC?</strong> The frame can't find Peek by itself there.
-        Type Peek's address once on the frame's page (the frame's screen tells you how).</li>
+      <li><strong>Peek on a NAS or Linux computer, started with its compose file:</strong> nothing to do. The frame
+        finds Peek by itself, even when Peek's address changes.</li>
+      <li><strong>Set up Peek by clicking through your NAS's Docker screen?</strong> Tick
+        <strong>use host network</strong>, and it works the same way.</li>
+      <li><strong>Peek in Docker Desktop on a Mac or Windows PC?</strong> The frame can't find Peek by itself there,
+        so you type Peek's address once on the frame's page (the frame's screen tells you how). Then give that
+        computer a fixed address in your router, so you never have to type it again. Routers call this
+        "DHCP reservation" or "static lease".</li>
     </ul>
   </section>
 
