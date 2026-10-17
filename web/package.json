@@ -9,13 +9,13 @@
     "typecheck": "tsc -b"
   },
   "dependencies": {
+    "@gravity-ui/icons": "^2.22.0",
     "@heroui/react": "^3.2.6",
     "@heroui/styles": "^3.2.6",
     "@internationalized/date": "^3.12.4",
     "@react-aria/ssr": "^3.10.1",
     "@react-aria/utils": "^3.34.1",
     "@tailwindcss/vite": "^4.3.3",
-    "lucide-react": "^1.50.0",
     "motion": "^12.43.0",
     "react": "^19.3.0",
     "react-aria": "^3.53.1",

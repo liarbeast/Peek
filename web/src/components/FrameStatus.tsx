@@ -1,5 +1,5 @@
 import { Button, Popover, Separator } from "@heroui/react";
-import { Battery as BatteryEmpty, BatteryFull, BatteryLow, BatteryMedium, BatteryWarning, Image } from "lucide-react";
+import { Picture, Thunderbolt } from "@gravity-ui/icons";
 import { useEffect, useState } from "react";
 import { api, type Battery, type Category } from "../api";
 import { switchText } from "../pages/CategoriesPage";
@@ -54,9 +54,9 @@ export function FrameStatus() {
     <Popover isOpen={open} onOpenChange={setOpen}>
       <Button variant="ghost" size="sm" className="px-3" aria-label={`The frame, battery ${battery ? level : "unknown"}`}>
         <span className="flex items-center gap-4">
-          <Image size={18} />
+          <Picture width={16} height={16} />
           <span className={`flex items-center gap-2 tabular-nums ${isLow(battery) ? "text-danger" : ""}`}>
-            <BatteryIcon percent={battery?.percent ?? null} />
+            <Thunderbolt width={16} height={16} />
             {level}
           </span>
         </span>
@@ -77,7 +77,7 @@ export function FrameStatus() {
             {battery ? (
               <div className="flex flex-col gap-0.5">
                 <span className={`flex items-center gap-1.5 font-medium ${isLow(battery) ? "text-danger" : ""}`}>
-                  <BatteryIcon percent={battery.percent} />
+                  <Thunderbolt width={16} height={16} />
                   {battery.percent}%{isLow(battery) && ", charge it soon"}
                 </span>
                 <span className="text-xs text-muted">
@@ -94,17 +94,3 @@ export function FrameStatus() {
   );
 }
 
-// Lucide's battery in steps, like a phone's: a warning when low, empty while unknown.
-function BatteryIcon({ percent }: { percent: number | null }) {
-  const Icon =
-    percent === null
-      ? BatteryEmpty
-      : percent <= 15
-        ? BatteryWarning
-        : percent < 40
-          ? BatteryLow
-          : percent < 75
-            ? BatteryMedium
-            : BatteryFull;
-  return <Icon size={20} aria-hidden="true" />;
-}
