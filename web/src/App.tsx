@@ -67,7 +67,7 @@ export function App() {
                 {!templates || !settings ? (
                   <Spinner />
                 ) : route.page === "settings" ? (
-                  <SettingsPage settings={settings} onChange={setSettings} />
+                  <SettingsPage tab={route.tab} settings={settings} onChange={setSettings} />
                 ) : route.page === "category" ? (
                   <CategoryPage id={route.id} tab={route.tab} templates={templates} />
                 ) : (
@@ -77,7 +77,6 @@ export function App() {
             </AnimatePresence>
           </MotionConfig>
         </main>
-
       </div>
     </SettingsContext>
   );
