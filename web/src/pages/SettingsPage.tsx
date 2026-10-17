@@ -1,7 +1,8 @@
-import { Button, toast } from "@heroui/react";
+import { Button, Tabs, toast } from "@heroui/react";
 import { ArrowLeft } from "@gravity-ui/icons";
 import { useState } from "react";
 import { api, type Orientation, type Settings } from "../api";
+import { go, type SettingsTab } from "../router";
 import { SWITCHES } from "../timing";
 import { PanelImage } from "../components/PanelImage";
 import { Choice } from "../components/ui";
@@ -22,7 +23,15 @@ function peekAddress(): string | null {
   return local ? null : window.location.origin;
 }
 
-export function SettingsPage({ settings, onChange }: { settings: Settings; onChange: (s: Settings) => void }) {
+export function SettingsPage({
+  tab,
+  settings,
+  onChange,
+}: {
+  tab: SettingsTab;
+  settings: Settings;
+  onChange: (s: Settings) => void;
+}) {
   const [busy, setBusy] = useState(false);
 
   const update = async (patch: Partial<Settings>) => {
@@ -48,66 +57,87 @@ export function SettingsPage({ settings, onChange }: { settings: Settings; onCha
         <h1 className="mt-1 text-2xl font-semibold">Settings</h1>
         <p className="text-muted">These apply to the whole frame.</p>
       </div>
-      {/* The left column is the wider one, for the collections table. */}
-      <div className="grid gap-6 md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-        <div className="flex flex-col gap-4">
-          <RadioGroup
-            value={settings.orientation}
-            onChange={(o) => update({ orientation: o as Orientation })}
-            isDisabled={busy}
-            orientation="horizontal"
-            className="flex flex-col gap-2"
-          >
-            <Label className="text-sm font-medium">Orientation</Label>
-            <div className="grid grid-cols-2 gap-3">
-              {ORIENTATIONS.map((o) => (
-                <Radio
-                  key={o.id}
-                  value={o.id}
-                  className={({ isSelected, isFocusVisible }) =>
-                    `flex cursor-pointer flex-col items-center gap-3 rounded-xl border-2 bg-surface p-4 transition ${
-                      isSelected ? "border-accent" : "border-border hover:border-default-foreground/30"
-                    } ${isFocusVisible ? "ring-2 ring-accent ring-offset-2" : ""}`
-                  }
-                >
-                  {({ isSelected }) => (
-                    <>
-                      <div className="flex h-16 items-center">
-                        <div
-                          className={`${o.shape} rounded-sm border-2 ${
-                            isSelected ? "border-accent bg-accent/15" : "border-muted bg-surface-secondary"
-                          }`}
-                        />
-                      </div>
-                      <div className="text-center">
-                        <p className="font-medium">{o.label}</p>
-                        <p className="text-sm text-muted">{o.size}</p>
-                      </div>
-                    </>
-                  )}
-                </Radio>
-              ))}
+      <Tabs variant="secondary" selectedKey={tab} onSelectionChange={(key) => go(`#/settings/${key}`)}>
+        <Tabs.ListContainer className="w-fit">
+          <Tabs.List aria-label="Settings sections">
+            <Tabs.Tab id="general">
+              General
+              <Tabs.Indicator />
+            </Tabs.Tab>
+            <Tabs.Tab id="firmware">
+              Firmware
+              <Tabs.Indicator />
+            </Tabs.Tab>
+          </Tabs.List>
+        </Tabs.ListContainer>
+        <Tabs.Panel id="general" className="pt-4">
+          {/* The left column is the wider one, for the collections table. */}
+          <div className="grid gap-6 md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+            <div className="flex flex-col gap-4">
+              <RadioGroup
+                value={settings.orientation}
+                onChange={(o) => update({ orientation: o as Orientation })}
+                isDisabled={busy}
+                orientation="horizontal"
+                className="flex flex-col gap-2"
+              >
+                <Label className="text-sm font-medium">Orientation</Label>
+                <div className="grid grid-cols-2 gap-3">
+                  {ORIENTATIONS.map((o) => (
+                    <Radio
+                      key={o.id}
+                      value={o.id}
+                      className={({ isSelected, isFocusVisible }) =>
+                        `flex cursor-pointer flex-col items-center gap-3 rounded-xl border-2 bg-surface p-4 transition ${
+                          isSelected ? "border-accent" : "border-border hover:border-default-foreground/30"
+                        } ${isFocusVisible ? "ring-2 ring-accent ring-offset-2" : ""}`
+                      }
+                    >
+                      {({ isSelected }) => (
+                        <>
+                          <div className="flex h-16 items-center">
+                            <div
+                              className={`${o.shape} rounded-sm border-2 ${
+                                isSelected ? "border-accent bg-accent/15" : "border-muted bg-surface-secondary"
+                              }`}
+                            />
+                          </div>
+                          <div className="text-center">
+                            <p className="font-medium">{o.label}</p>
+                            <p className="text-sm text-muted">{o.size}</p>
+                          </div>
+                        </>
+                      )}
+                    </Radio>
+                  ))}
+                </div>
+              </RadioGroup>
+              <div className="flex flex-col gap-1">
+                <Choice
+                  label="Switch collection"
+                  value={settings.switch}
+                  onChange={(s) => update({ switch: s })}
+                  options={SWITCHES}
+                />
+                <p className="text-sm text-muted">
+                  How often the frame moves on to the next active collection, on its first wake after this time.
+                </p>
+              </div>
+              <CollectionOrder
+                value={settings.collection_order}
+                onChange={(collection_order) => update({ collection_order })}
+              />
             </div>
-          </RadioGroup>
-          <div className="flex flex-col gap-1">
-            <Choice
-              label="Switch collection"
-              value={settings.switch}
-              onChange={(s) => update({ switch: s })}
-              options={SWITCHES}
-            />
-            <p className="text-sm text-muted">
-              How often the frame moves on to the next active collection, on its first wake after this time.
-            </p>
+            <div className="flex flex-col gap-2">
+              <span className="text-sm font-medium">On the frame now</span>
+              <PanelImage alt="The frame's current image" load={api.framePreview} deps={[settings.orientation]} />
+            </div>
           </div>
-          <CollectionOrder value={settings.collection_order} onChange={(collection_order) => update({ collection_order })} />
+        </Tabs.Panel>
+        <Tabs.Panel id="firmware" className="pt-4">
           <InstallFirmware />
-        </div>
-        <div className="flex flex-col gap-2">
-          <span className="text-sm font-medium">On the frame now</span>
-          <PanelImage alt="The frame's current image" load={api.framePreview} deps={[settings.orientation]} />
-        </div>
-      </div>
+        </Tabs.Panel>
+      </Tabs>
     </div>
   );
 }
