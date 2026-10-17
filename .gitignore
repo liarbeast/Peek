@@ -6,3 +6,7 @@ node_modules/
 server/peek/static/app/
 *.tsbuildinfo
 .DS_Store
+
+# ESPHome: your own Wi-Fi details and its build folder
+firmware/secrets.yaml
+firmware/.esphome/
